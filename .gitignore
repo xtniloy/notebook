@@ -1,0 +1,226 @@
+# =============================================================================
+# NotesApp .gitignore
+# C++20 · Qt 6 · CMake/Ninja · SQLCipher · libsodium · Google Drive sync
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Build output (CMake + Ninja)
+# -----------------------------------------------------------------------------
+/build/
+/build-*/
+/cmake-build-*/
+/out/
+/_build/
+/install/
+
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+Testing/
+_deps/
+CMakeUserPresets.json
+compile_commands.json
+build.ninja
+.ninja_deps
+.ninja_log
+Makefile
+
+# -----------------------------------------------------------------------------
+# C++ compiled artifacts
+# -----------------------------------------------------------------------------
+*.o
+*.obj
+*.lo
+*.slo
+*.ko
+*.a
+*.la
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+*.gch
+*.pch
+*.d
+
+# -----------------------------------------------------------------------------
+# Qt generated files
+# -----------------------------------------------------------------------------
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.moc
+*.qm
+*_autogen/
+.rcc/
+.qmake.stash
+*.pro.user
+*.pro.user.*
+CMakeLists.txt.user
+CMakeLists.txt.user.*
+*.qbs.user
+*.qbs.user.*
+
+# -----------------------------------------------------------------------------
+# Editors / IDEs
+# -----------------------------------------------------------------------------
+# JetBrains (CLion / PhpStorm)
+.idea/
+*.iml
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Qt Creator
+*.creator.user
+*.autosave
+
+# clangd / ccls
+.cache/
+.clangd/
+.ccls-cache/
+
+# Vim / Emacs / misc
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+
+# -----------------------------------------------------------------------------
+# Secrets & credentials — NEVER commit these
+# -----------------------------------------------------------------------------
+# Google OAuth client file downloaded from Cloud Console
+client_secret*.json
+credentials*.json
+token*.json
+oauth*.json
+
+# Local environment / config overrides
+.env
+.env.*
+!.env.example
+*.local.ini
+*.local.conf
+
+# Keys, certificates, signing material
+*.pem
+*.key
+*.p12
+*.pfx
+*.gpg
+*.asc
+recovery-key*.txt
+
+# -----------------------------------------------------------------------------
+# Local databases & app data (may contain real notes)
+# -----------------------------------------------------------------------------
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlcipher
+# Allow intentional test fixtures
+!tests/**/fixtures/**/*.db
+!tests/**/fixtures/**/*.sqlite
+
+# Synced/encrypted blobs pulled during manual testing
+*.bin
+!tests/**/fixtures/**/*.bin
+
+# -----------------------------------------------------------------------------
+# Testing, sanitizers, fuzzing, coverage
+# -----------------------------------------------------------------------------
+# libFuzzer
+crash-*
+leak-*
+timeout-*
+oom-*
+slow-unit-*
+fuzz-*.log
+/tests/fuzz/corpus/
+/tests/fuzz/artifacts/
+
+# Coverage
+*.gcno
+*.gcda
+*.gcov
+*.profraw
+*.profdata
+coverage/
+coverage.info
+lcov.info
+
+# Benchmark output (10k-note generated data)
+/tests/benchmarks/generated/
+benchmark-results*.json
+
+# -----------------------------------------------------------------------------
+# Profiling
+# -----------------------------------------------------------------------------
+perf.data
+perf.data.old
+heaptrack.*.gz
+heaptrack.*.zst
+callgrind.out.*
+massif.out.*
+*.trace
+/core
+/core.[0-9]*
+vgcore.*
+
+# -----------------------------------------------------------------------------
+# Packaging (.deb / Flatpak / Snap)
+# -----------------------------------------------------------------------------
+*.deb
+*.ddeb
+*.changes
+*.buildinfo
+*.dsc
+*.tar.gz
+*.tar.xz
+*.flatpak
+*.snap
+
+# Debian build tree
+packaging/debian/.debhelper/
+packaging/debian/debhelper-build-stamp
+packaging/debian/files
+packaging/debian/*.substvars
+packaging/debian/*.log
+packaging/debian/notesapp/
+
+# Flatpak build dirs
+.flatpak-builder/
+/flatpak-build/
+/flatpak-repo/
+/repo/
+
+# Snap
+/parts/
+/prime/
+/stage/
+
+# Release checksums/signatures generated locally
+SHA256SUMS*
+*.sig
+
+# -----------------------------------------------------------------------------
+# OS clutter
+# -----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.directory
+.Trash-*
