@@ -1,6 +1,7 @@
 // Smoke test for the widget layer under QT_QPA_PLATFORM=offscreen.
 // Layout tests TC-UI-005..007 are added in task 1.3.
 
+#include "TestHelpers.h"
 #include "app/Config.h"
 #include "ui/MainWindow.h"
 
@@ -16,7 +17,9 @@ private slots:
 
 void tst_MainWindow::showsWithAppTitle()
 {
-    notes::ui::MainWindow window;
+    const notes::test::TempDb dir;
+    const auto context = notes::test::makeTestContext(dir.dirPath());
+    notes::ui::MainWindow window(*context);
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
     QCOMPARE(window.windowTitle(), QString::fromLatin1(notes::config::kAppName));

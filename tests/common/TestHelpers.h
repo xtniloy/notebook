@@ -1,7 +1,12 @@
 #pragma once
 
+#include "app/AppContext.h"
+
+#include <QSettings>
 #include <QString>
 #include <QTemporaryDir>
+
+#include <memory>
 
 namespace notes::test {
 
@@ -21,5 +26,13 @@ public:
 private:
     QTemporaryDir m_dir;
 };
+
+// An AppContext whose settings live in `directory`/settings.ini instead of the
+// user's ~/.config.
+inline std::unique_ptr<app::AppContext> makeTestContext(const QString& directory)
+{
+    return std::make_unique<app::AppContext>(std::make_unique<QSettings>(
+        directory + QStringLiteral("/settings.ini"), QSettings::IniFormat));
+}
 
 } // namespace notes::test

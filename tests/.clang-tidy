@@ -1,5 +1,10 @@
 ---
 InheritParentConfig: true
-# Qt Test discovers test functions as private slots, so they can't be static.
+# - Qt Test discovers test functions as private slots, so they can't be static.
+# - Every QVERIFY/QCOMPARE expands to an `if`, so straight-line tests score as
+#   "complex".
+# - QFETCH declares non-const locals.
 Checks: >
-  -readability-convert-member-functions-to-static
+  -readability-convert-member-functions-to-static,
+  -readability-function-cognitive-complexity,
+  -misc-const-correctness

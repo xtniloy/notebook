@@ -28,11 +28,13 @@ function(notes_add_test)
     add_test(NAME ${ARG_NAME} COMMAND ${ARG_NAME})
     set_tests_properties(${ARG_NAME} PROPERTIES
         LABELS "${ARG_LABELS}"
-        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        TIMEOUT 120)
 endfunction()
 
 if(NOTES_ENABLE_TESTS)
     add_subdirectory(unit)
+    add_subdirectory(integration)
     add_subdirectory(ui)
 endif()
 if(NOTES_ENABLE_BENCH)

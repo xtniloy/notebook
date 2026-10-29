@@ -200,9 +200,9 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 1.1 Application bootstrap `S`
 
-- [ ] `Application` class: sets org/app name, app ID (e.g. `io.augmex.NotesApp`), loads `QSettings`
-- [ ] Single-instance guard with `QLocalServer`: a second launch focuses the existing window (prevents two processes writing the same DB and running two sync engines)
-- [ ] Central `AppContext` that owns services (empty for now) and hands them to the UI (dependency injection, no globals)
+- [x] `Application` class: sets org/app name, app ID (e.g. `io.augmex.NotesApp`), loads `QSettings`
+- [x] Single-instance guard with `QLocalServer`: a second launch focuses the existing window (prevents two processes writing the same DB and running two sync engines)
+- [x] Central `AppContext` that owns services (empty for now) and hands them to the UI (dependency injection, no globals)
 
 **Tests**
 - `TC-UI-001` (I) Starting a second instance sends an "activate" message and the second process exits with code 0.
