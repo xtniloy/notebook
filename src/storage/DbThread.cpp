@@ -25,7 +25,7 @@ DbThread::~DbThread()
 void DbThread::stop()
 {
     {
-        const std::lock_guard lock(m_mutex);
+        const std::scoped_lock lock(m_mutex);
         m_stopping = true;
     }
     m_wake.notify_all();
@@ -37,7 +37,7 @@ void DbThread::stop()
 bool DbThread::enqueue(Task task)
 {
     {
-        const std::lock_guard lock(m_mutex);
+        const std::scoped_lock lock(m_mutex);
         if (m_stopping) {
             return false;
         }
