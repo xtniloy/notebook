@@ -33,6 +33,8 @@ ctest --preset debug
 ./build/debug/src/notesapp
 ```
 
+Not seeing your changes, or a build folder in a bad state? See [Clean, refresh and rebuild](docs/clean-rebuild.md).
+
 ### Other systems: the dev container
 
 On anything other than Ubuntu 26.04+ (another distro, an older Ubuntu, Windows with WSL 2, macOS), build in the Ubuntu 26.04 container instead. It has the same packages as `setup-dev.sh` and CI. You need Docker.
