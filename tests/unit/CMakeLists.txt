@@ -4,3 +4,6 @@ notes_add_test(NAME tst_singleinstance SOURCES tst_singleinstance.cpp LABELS uni
 notes_add_test(NAME tst_fonts SOURCES tst_fonts.cpp LABELS unit LIBS notesapp_ui)
 notes_add_test(NAME tst_icons SOURCES tst_icons.cpp LABELS unit LIBS notesapp_ui)
 notes_add_test(NAME tst_actionregistry SOURCES tst_actionregistry.cpp LABELS unit LIBS notesapp_ui)
+# Qt6::Gui: QAbstractItemModelTester checks decorations as QPixmap/QIcon, which
+# needs a QGuiApplication (QTEST_MAIN picks one when QtGui is linked).
+notes_add_test(NAME tst_fakesidebarmodel SOURCES tst_fakesidebarmodel.cpp LABELS unit LIBS Qt6::Gui)

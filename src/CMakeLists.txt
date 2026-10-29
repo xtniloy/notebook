@@ -10,6 +10,9 @@ add_library(notesapp_core STATIC
     app/SingleInstance.h
     crypto/Sodium.cpp
     crypto/Sodium.h
+    models/FakeSidebarModel.cpp
+    models/FakeSidebarModel.h
+    models/SidebarRoles.h
     storage/SqlCipher.cpp
     storage/SqlCipher.h)
 target_include_directories(notesapp_core PUBLIC
@@ -32,7 +35,11 @@ add_library(notesapp_ui STATIC
     ui/Icons.cpp
     ui/Icons.h
     ui/MainWindow.cpp
-    ui/MainWindow.h)
+    ui/MainWindow.h
+    ui/Sidebar.cpp
+    ui/Sidebar.h
+    ui/SidebarDelegate.cpp
+    ui/SidebarDelegate.h)
 target_link_libraries(notesapp_ui PUBLIC notesapp_core Qt6::Widgets)
 
 # Bundled assets (resources/SOURCES.md). qt_add_resources() on a static library

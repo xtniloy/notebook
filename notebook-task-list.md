@@ -253,11 +253,11 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 1.5 Sidebar `M`
 
-- [ ] `Sidebar` widget with `QTreeView`
-- [ ] Sections: account header ("On My Computer"), All Notes, Notes, user folders (nested), Tags (placeholder), Recently Deleted
-- [ ] "+ Folder" button at the bottom
-- [ ] Count badges drawn by a delegate
-- [ ] Fake model with sample folders
+- [x] `Sidebar` widget with `QTreeView` *(works with any model that provides the roles in `models/SidebarRoles.h`, so `FolderTreeModel` (2.8) can replace the fake one; All Notes and Recently Deleted use the reserved folder ids `-1`/`-2`)*
+- [x] Sections: account header ("On My Computer"), All Notes, Notes, user folders (nested), Tags (placeholder), Recently Deleted *(tags are display-only until Phase 7; Recently Deleted sits below Tags, as in the Plan §3.1 sketch)*
+- [x] "+ Folder" button at the bottom *(disabled until the FolderService in 2.7)*
+- [x] Count badges drawn by a delegate
+- [x] Fake model with sample folders
 
 **Tests**
 - `TC-UI-011` (UI) Selecting a folder emits `folderSelected(id)`.

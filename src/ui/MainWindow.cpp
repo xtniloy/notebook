@@ -2,8 +2,10 @@
 
 #include "app/AppContext.h"
 #include "app/Config.h"
+#include "models/FakeSidebarModel.h"
 #include "ui/ActionRegistry.h"
 #include "ui/Icons.h"
+#include "ui/Sidebar.h"
 #include "ui/dialogs/AboutDialog.h"
 
 #include <QAction>
@@ -35,9 +37,10 @@ constexpr int kSidebarIndex = 0;
 constexpr int kNoteListIndex = 1;
 constexpr int kEditorIndex = 2;
 
-QWidget* createPane(QLatin1StringView objectName, int minimumWidth, QWidget* parent)
+template <typename Pane = QWidget>
+Pane* createPane(QLatin1StringView objectName, int minimumWidth, QWidget* parent)
 {
-    auto* pane = new QWidget(parent);
+    auto* pane = new Pane(parent);
     pane->setObjectName(objectName);
     pane->setMinimumWidth(minimumWidth);
     return pane;
@@ -61,11 +64,13 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     , m_context(context)
     , m_actions(new ActionRegistry(this))
     , m_splitter(new QSplitter(Qt::Horizontal, this))
-    // Placeholders until the Sidebar (1.5), NoteListView (1.6) and EditorView (1.7).
-    , m_sidebar(createPane(QLatin1StringView("sidebarPane"), kSidebarMinimumWidth, m_splitter))
+    , m_sidebar(
+          createPane<Sidebar>(QLatin1StringView("sidebarPane"), kSidebarMinimumWidth, m_splitter))
+    // Placeholders until the NoteListView (1.6) and EditorView (1.7).
     , m_noteList(createPane(QLatin1StringView("noteListPane"), kNoteListMinimumWidth, m_splitter))
     , m_editor(createPane(QLatin1StringView("editorPane"), kEditorMinimumWidth, m_splitter))
     , m_toggleSidebar(m_actions->action(ActionId::ToggleSidebar))
+    , m_sidebarModel(new models::FakeSidebarModel(this))
 {
     setWindowTitle(QString::fromLatin1(config::kDisplayName));
 
@@ -79,6 +84,7 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     m_splitter->setStretchFactor(kNoteListIndex, 0);
     m_splitter->setStretchFactor(kEditorIndex, 1);
     setCentralWidget(m_splitter);
+    m_sidebar->setModel(m_sidebarModel);
 
     m_toggleSidebar->setChecked(true);
     connect(m_toggleSidebar, &QAction::toggled, this, &MainWindow::setSidebarVisible);
