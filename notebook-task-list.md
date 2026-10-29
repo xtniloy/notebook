@@ -239,10 +239,10 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 1.4 Toolbar and actions `M`
 
-- [ ] Create all actions from **Plan §3.2** as `QAction`s in an `ActionRegistry`, in the documented order
-- [ ] Icons, tooltips that include the shortcut
-- [ ] Actions that aren't implemented yet are disabled
-- [ ] Search box on the right side of the toolbar
+- [x] Create all actions from **Plan §3.2** as `QAction`s in an `ActionRegistry`, in the documented order *(also listed in File/Edit/Format/View menus; the search box is backed by two actions, Find in Note `Ctrl+F` and Search All Notes `Ctrl+Alt+F`)*
+- [x] Icons, tooltips that include the shortcut
+- [x] Actions that aren't implemented yet are disabled *(only Sidebar toggle and Search All Notes, which focuses the search box, are enabled)*
+- [x] Search box on the right side of the toolbar
 
 **Tests**
 - `TC-UI-008` (UI) Toolbar action order equals the order in Plan §3.2.

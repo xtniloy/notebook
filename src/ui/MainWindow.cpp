@@ -2,14 +2,20 @@
 
 #include "app/AppContext.h"
 #include "app/Config.h"
+#include "ui/ActionRegistry.h"
+#include "ui/Icons.h"
 #include "ui/dialogs/AboutDialog.h"
 
 #include <QAction>
+#include <QLineEdit>
 #include <QMenuBar>
 #include <QSettings>
+#include <QSizePolicy>
 #include <QSplitter>
+#include <QToolBar>
 
 #include <algorithm>
+#include <initializer_list>
 
 namespace notes::ui {
 
@@ -22,6 +28,7 @@ constexpr QLatin1StringView kSidebarVisibleKey("mainWindow/sidebarVisible");
 constexpr QSize kDefaultWindowSize(1100, 720);
 // Restored widths beyond this are treated as corrupt settings.
 constexpr int kMaxRestoredPaneWidth = 2000;
+constexpr int kSearchFieldWidth = 220;
 
 // Splitter positions.
 constexpr int kSidebarIndex = 0;
@@ -52,11 +59,13 @@ int restoredWidth(const QVariantList& widths, int index, int minimum, int fallba
 MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     : QMainWindow(parent)
     , m_context(context)
+    , m_actions(new ActionRegistry(this))
     , m_splitter(new QSplitter(Qt::Horizontal, this))
     // Placeholders until the Sidebar (1.5), NoteListView (1.6) and EditorView (1.7).
     , m_sidebar(createPane(QLatin1StringView("sidebarPane"), kSidebarMinimumWidth, m_splitter))
     , m_noteList(createPane(QLatin1StringView("noteListPane"), kNoteListMinimumWidth, m_splitter))
     , m_editor(createPane(QLatin1StringView("editorPane"), kEditorMinimumWidth, m_splitter))
+    , m_toggleSidebar(m_actions->action(ActionId::ToggleSidebar))
 {
     setWindowTitle(QString::fromLatin1(config::kDisplayName));
 
@@ -71,27 +80,92 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     m_splitter->setStretchFactor(kEditorIndex, 1);
     setCentralWidget(m_splitter);
 
-    // Menus move into the ActionRegistry in task 1.4.
-    m_toggleSidebar = new QAction(tr("Show &Sidebar"), this);
-    m_toggleSidebar->setObjectName(QStringLiteral("toggleSidebarAction"));
-    m_toggleSidebar->setCheckable(true);
     m_toggleSidebar->setChecked(true);
-    m_toggleSidebar->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
     connect(m_toggleSidebar, &QAction::toggled, this, &MainWindow::setSidebarVisible);
-    menuBar()->addMenu(tr("&View"))->addAction(m_toggleSidebar);
+    connect(m_actions->action(ActionId::SearchAllNotes), &QAction::triggered, this,
+            &MainWindow::focusSearch);
 
-    QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
-    QAction* about = helpMenu->addAction(tr("&About %1").arg(windowTitle()));
-    about->setObjectName(QStringLiteral("aboutAction"));
-    about->setMenuRole(QAction::AboutRole);
-    connect(about, &QAction::triggered, this, &MainWindow::showAbout);
-
+    createToolBar();
+    createMenus();
     restoreLayout();
 }
 
 MainWindow::~MainWindow()
 {
     saveLayout();
+}
+
+void MainWindow::createToolBar()
+{
+    QToolBar* toolBar = addToolBar(tr("Toolbar"));
+    toolBar->setObjectName(QStringLiteral("mainToolBar"));
+    toolBar->setMovable(false);
+    toolBar->setFloatable(false);
+    // No "hide toolbar" context menu: there would be no way to bring it back.
+    toolBar->setContextMenuPolicy(Qt::PreventContextMenu);
+    toolBar->toggleViewAction()->setVisible(false);
+
+    // Groups as in Plan §3.1: layout | note | editing, then search on the right.
+    for (QAction* action : m_actions->toolbarActions()) {
+        if (action == m_actions->action(ActionId::ListView) ||
+            action == m_actions->action(ActionId::DeleteNote) ||
+            action == m_actions->action(ActionId::Format)) {
+            toolBar->addSeparator();
+        }
+        toolBar->addAction(action);
+    }
+
+    auto* spacer = new QWidget(toolBar);
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    toolBar->addWidget(spacer);
+
+    m_searchField = new QLineEdit(toolBar);
+    m_searchField->setObjectName(QStringLiteral("searchField"));
+    m_searchField->setPlaceholderText(tr("Search"));
+    m_searchField->setToolTip(m_actions->action(ActionId::SearchAllNotes)->toolTip());
+    m_searchField->setClearButtonEnabled(true);
+    m_searchField->addAction(icon(Icon::Search), QLineEdit::LeadingPosition);
+    m_searchField->setFixedWidth(kSearchFieldWidth);
+    toolBar->addWidget(m_searchField);
+}
+
+void MainWindow::createMenus()
+{
+    const auto add = [this](QMenu* menu, std::initializer_list<ActionId> ids) {
+        for (const ActionId id : ids) {
+            menu->addAction(m_actions->action(id));
+        }
+    };
+
+    QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
+    add(fileMenu, {ActionId::NewNote});
+    fileMenu->addSeparator();
+    add(fileMenu, {ActionId::LockNote, ActionId::ShareExport});
+
+    QMenu* editMenu = menuBar()->addMenu(tr("&Edit"));
+    add(editMenu, {ActionId::DeleteNote});
+    editMenu->addSeparator();
+    add(editMenu, {ActionId::FindInNote, ActionId::SearchAllNotes});
+
+    add(menuBar()->addMenu(tr("F&ormat")),
+        {ActionId::Format, ActionId::Checklist, ActionId::InsertTable, ActionId::Attachment});
+
+    QMenu* viewMenu = menuBar()->addMenu(tr("&View"));
+    add(viewMenu, {ActionId::ListView, ActionId::GalleryView});
+    viewMenu->addSeparator();
+    add(viewMenu, {ActionId::ToggleSidebar});
+
+    QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
+    QAction* about = helpMenu->addAction(tr("&About %1").arg(windowTitle()));
+    about->setObjectName(QStringLiteral("aboutAction"));
+    about->setMenuRole(QAction::AboutRole);
+    connect(about, &QAction::triggered, this, &MainWindow::showAbout);
+}
+
+void MainWindow::focusSearch()
+{
+    m_searchField->setFocus(Qt::ShortcutFocusReason);
+    m_searchField->selectAll();
 }
 
 void MainWindow::showEvent(QShowEvent* event)

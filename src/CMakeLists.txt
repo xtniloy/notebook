@@ -23,6 +23,8 @@ target_link_libraries(notesapp_core
 add_library(notesapp_ui STATIC
     app/Application.cpp
     app/Application.h
+    ui/ActionRegistry.cpp
+    ui/ActionRegistry.h
     ui/dialogs/AboutDialog.cpp
     ui/dialogs/AboutDialog.h
     ui/Fonts.cpp
