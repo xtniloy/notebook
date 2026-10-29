@@ -10,7 +10,9 @@ target_link_libraries(notes_test_common INTERFACE notesapp_core)
 #   notes_add_test(NAME tst_x SOURCES tst_x.cpp LABELS unit [LIBS extra_target ...])
 #
 # Links notesapp_core, Qt6::Test and tests/common automatically. UI tests add
-# `LIBS notesapp_ui`. Every test runs with QT_QPA_PLATFORM=offscreen.
+# `LIBS notesapp_ui`. Every test runs headless with QT_QPA_PLATFORM=offscreen, on
+# a 1920x1080 screen (Qt's default offscreen screen is 800x600, smaller than
+# the app's default window, so window geometry would be clamped).
 function(notes_add_test)
     cmake_parse_arguments(ARG "" "NAME" "SOURCES;LABELS;LIBS" ${ARGN})
     if(NOT ARG_NAME OR NOT ARG_SOURCES OR NOT ARG_LABELS)
@@ -28,7 +30,7 @@ function(notes_add_test)
     add_test(NAME ${ARG_NAME} COMMAND ${ARG_NAME})
     set_tests_properties(${ARG_NAME} PROPERTIES
         LABELS "${ARG_LABELS}"
-        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_FUNCTION_LIST_DIR}/common/offscreen-screen.json"
         TIMEOUT 120)
 endfunction()
 

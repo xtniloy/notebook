@@ -225,10 +225,10 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 1.3 Main window with three panes `M`
 
-- [ ] `MainWindow` with a `QSplitter`: sidebar (220 px), note list (300 px), editor (flexible)
-- [ ] Minimum widths so panes can't collapse to zero by accident
-- [ ] Save/restore window geometry and splitter sizes in `QSettings`
-- [ ] Sidebar toggle (`Ctrl+Alt+S`)
+- [x] `MainWindow` with a `QSplitter`: sidebar (220 px), note list (300 px), editor (flexible)
+- [x] Minimum widths so panes can't collapse to zero by accident
+- [x] Save/restore window geometry and splitter sizes in `QSettings`
+- [x] Sidebar toggle (`Ctrl+Alt+S`)
 
 **Tests**
 - `TC-UI-005` (UI) Window opens with default widths 220/300/rest.
