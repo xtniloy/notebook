@@ -25,10 +25,10 @@ DbThread::~DbThread()
 void DbThread::stop()
 {
     {
-        const QMutexLocker lock(&m_mutex);
+        const std::lock_guard lock(m_mutex);
         m_stopping = true;
     }
-    m_wake.wakeAll();
+    m_wake.notify_all();
     if (m_thread) {
         m_thread->wait();
     }
@@ -37,13 +37,13 @@ void DbThread::stop()
 bool DbThread::enqueue(Task task)
 {
     {
-        const QMutexLocker lock(&m_mutex);
+        const std::lock_guard lock(m_mutex);
         if (m_stopping) {
             return false;
         }
         m_queue.push_back(std::move(task));
     }
-    m_wake.wakeOne();
+    m_wake.notify_one();
     return true;
 }
 
@@ -65,10 +65,8 @@ void DbThread::run()
     while (true) {
         Task task;
         {
-            const QMutexLocker lock(&m_mutex);
-            while (m_queue.empty() && !m_stopping) {
-                m_wake.wait(lock.mutex());
-            }
+            std::unique_lock lock(m_mutex);
+            m_wake.wait(lock, [this] { return !m_queue.empty() || m_stopping; });
             if (m_queue.empty()) {
                 break; // stopping, and every posted job has run
             }

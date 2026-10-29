@@ -4,14 +4,14 @@
 #include "storage/DbResult.h"
 
 #include <QFuture>
-#include <QMutex>
 #include <QPromise>
 #include <QString>
-#include <QWaitCondition>
 
+#include <condition_variable>
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <type_traits>
 
 class QThread;
@@ -78,8 +78,11 @@ private:
     QString m_path;
     QPromise<DbStatus> m_opened;
 
-    QMutex m_mutex;
-    QWaitCondition m_wake;
+    // std:: rather than QMutex/QWaitCondition: QWaitCondition::wait() releases
+    // the mutex inside libQt6Core, which ThreadSanitizer can't see, so TSan runs
+    // (TC-STO-006) reported false races.
+    std::mutex m_mutex;
+    std::condition_variable m_wake;
     std::deque<Task> m_queue; // guarded by m_mutex
     bool m_stopping = false;  // guarded by m_mutex
 

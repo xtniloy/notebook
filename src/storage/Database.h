@@ -69,7 +69,7 @@ public:
     [[nodiscard]] int changes() const;
     [[nodiscard]] bool inTransaction() const;
     [[nodiscard]] std::size_t cachedStatementCount() const { return m_cache.size(); }
-    [[nodiscard]] QString path() const { return m_path; }
+    [[nodiscard]] const QString& path() const { return m_path; }
 
 private:
     struct CacheSlot
