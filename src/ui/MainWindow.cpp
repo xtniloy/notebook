@@ -2,6 +2,7 @@
 
 #include "app/AppContext.h"
 #include "app/Config.h"
+#include "app/IClock.h"
 #include "models/FakeNoteListModel.h"
 #include "models/FakeSidebarModel.h"
 #include "ui/ActionRegistry.h"
@@ -84,8 +85,8 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
           createPane<EditorView>(QLatin1StringView("editorPane"), kEditorMinimumWidth, m_splitter))
     , m_toggleSidebar(m_actions->action(ActionId::ToggleSidebar))
     , m_sidebarModel(new models::FakeSidebarModel(this))
-    , m_noteListModel(new models::FakeNoteListModel(
-          kFakeNoteCount, QDateTime::currentMSecsSinceEpoch(), QTimeZone::LocalTime, this))
+    , m_noteListModel(new models::FakeNoteListModel(kFakeNoteCount, context.clock().nowMs(),
+                                                    QTimeZone::LocalTime, this))
 {
     setWindowTitle(QString::fromLatin1(config::kDisplayName));
 

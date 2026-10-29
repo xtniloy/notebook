@@ -180,6 +180,10 @@ void tst_NoteListView::mainWindowHostsNoteList()
     QVERIFY(list);
     QVERIFY(list->model());
     QCOMPARE(qobject_cast<const FakeNoteListModel*>(list->model())->noteCount(), 10'000);
+    // Dated from the context's clock (a FakeClock here), not the real time (ADR 0004).
+    const qint64 newest = list->model()->index(1, 0).data(roles::kModifiedRole).toLongLong();
+    QVERIFY(newest <= notes::test::FakeClock::kDefaultStartMs);
+    QVERIFY(newest > notes::test::FakeClock::kDefaultStartMs - (qint64{6} * 60 * 60 * 1000));
     QVERIFY(list->currentNote().has_value());
 }
 

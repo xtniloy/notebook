@@ -9,3 +9,5 @@ notes_add_test(NAME tst_actionregistry SOURCES tst_actionregistry.cpp LABELS uni
 notes_add_test(NAME tst_fakesidebarmodel SOURCES tst_fakesidebarmodel.cpp LABELS unit LIBS Qt6::Gui)
 notes_add_test(NAME tst_dategrouping SOURCES tst_dategrouping.cpp LABELS unit)
 notes_add_test(NAME tst_fakenotelistmodel SOURCES tst_fakenotelistmodel.cpp LABELS unit LIBS Qt6::Gui)
+notes_add_test(NAME tst_clock SOURCES tst_clock.cpp LABELS unit)
+notes_add_test(NAME tst_models SOURCES tst_models.cpp LABELS unit)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FakeClock.h"
 #include "app/AppContext.h"
 
 #include <QSettings>
@@ -28,11 +29,14 @@ private:
 };
 
 // An AppContext whose settings live in `directory`/settings.ini instead of the
-// user's ~/.config.
+// user's ~/.config, with a FakeClock at FakeClock::kDefaultStartMs so results
+// don't depend on the real date.
 inline std::unique_ptr<app::AppContext> makeTestContext(const QString& directory)
 {
-    return std::make_unique<app::AppContext>(std::make_unique<QSettings>(
-        directory + QStringLiteral("/settings.ini"), QSettings::IniFormat));
+    return std::make_unique<app::AppContext>(
+        std::make_unique<QSettings>(directory + QStringLiteral("/settings.ini"),
+                                    QSettings::IniFormat),
+        std::make_unique<FakeClock>());
 }
 
 } // namespace notes::test

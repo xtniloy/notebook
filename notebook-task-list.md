@@ -326,8 +326,8 @@ Record each in `docs/adr/`:
 
 ### 2.2 Domain models and clock `S`
 
-- [ ] Value types in `src/models/`: `Note`, `Folder`, `Attachment`, `Tag` (plain structs, no Qt widgets)
-- [ ] `IClock` with `SystemClock` and `FakeClock` (in `tests/common/`)
+- [x] Value types in `src/models/`: `Note`, `Folder`, `Attachment`, `Tag` (plain structs, no Qt widgets) *(plus `SyncState` and the ADR 0005 helpers `newUuid()` / `parseUuid()`. The locked-note columns join `Note` in Phase 6 with `SecureBuffer`. "Used by the repositories" completes in 2.5/2.6)*
+- [x] `IClock` with `SystemClock` and `FakeClock` (in `tests/common/`) *(`IClock::nowMs()`; `AppContext::clock()` owns it; test contexts use `FakeClock`. The fake notes in `MainWindow` now use it, so `SystemClock` is the only reader of system time in `src/`)*
 
 **Tests**
 - `TC-STO-001` (U) `FakeClock::advance(30 days)` changes `now()` by exactly that amount.

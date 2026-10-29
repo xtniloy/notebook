@@ -6,18 +6,28 @@ add_library(notesapp_core STATIC
     app/AppContext.h
     app/AppIdentity.cpp
     app/AppIdentity.h
+    app/IClock.h
     app/SingleInstance.cpp
     app/SingleInstance.h
+    app/SystemClock.cpp
+    app/SystemClock.h
     crypto/Sodium.cpp
     crypto/Sodium.h
+    models/Attachment.h
     models/DateGrouping.cpp
     models/DateGrouping.h
     models/FakeNoteListModel.cpp
     models/FakeNoteListModel.h
     models/FakeSidebarModel.cpp
     models/FakeSidebarModel.h
+    models/Folder.h
+    models/Note.h
     models/NoteListRoles.h
     models/SidebarRoles.h
+    models/SyncState.h
+    models/Tag.h
+    models/Uuid.cpp
+    models/Uuid.h
     storage/SqlCipher.cpp
     storage/SqlCipher.h)
 target_include_directories(notesapp_core PUBLIC
