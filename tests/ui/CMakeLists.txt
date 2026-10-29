@@ -3,3 +3,4 @@ notes_add_test(NAME tst_toolbar SOURCES tst_toolbar.cpp LABELS ui LIBS notesapp_
 notes_add_test(NAME tst_sidebar SOURCES tst_sidebar.cpp LABELS ui LIBS notesapp_ui)
 notes_add_test(NAME tst_notelistview SOURCES tst_notelistview.cpp LABELS ui LIBS notesapp_ui)
 notes_add_test(NAME tst_editorview SOURCES tst_editorview.cpp LABELS ui LIBS notesapp_ui)
+notes_add_test(NAME tst_thememanager SOURCES tst_thememanager.cpp LABELS ui LIBS notesapp_ui)

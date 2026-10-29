@@ -77,7 +77,8 @@ void SidebarDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
     if (const std::optional<Icon> iconId = iconFor(kind)) {
         const QRect iconRect(rect.left(), rect.center().y() - (kIconSize / 2) + 1, kIconSize,
                              kIconSize);
-        icon(*iconId).paint(painter, iconRect);
+        icon(*iconId).paint(painter, iconRect, Qt::AlignCenter,
+                            selected ? QIcon::Selected : QIcon::Normal);
         rect.setLeft(iconRect.right() + kPadding + 1);
     }
 

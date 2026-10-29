@@ -294,10 +294,10 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 1.8 Themes (light/dark) `M`
 
-- [ ] `resources/themes/light.qss` and `dark.qss` using shared color tokens (accent color from Plan §3.6)
-- [ ] `ThemeManager` follows the system setting and reacts live to changes (`QStyleHints::colorSchemeChanged`, or D-Bus fallback per ADR 0001)
-- [ ] Manual override in settings: System / Light / Dark
-- [ ] 150 ms fade limit for any animation
+- [x] `resources/themes/light.qss` and `dark.qss` using shared color tokens (accent color from Plan §3.6) *(one shared `theme.qss` with `${token}` placeholders, filled from each theme's `ThemeColors`, so the two themes can't drift apart; the same tokens build the `QPalette` that custom-painted delegates use. Accent: amber `#F2A900`, dark text on it. Icons are tinted with the palette at paint time, so they stay visible in dark mode)*
+- [x] `ThemeManager` follows the system setting and reacts live to changes (`QStyleHints::colorSchemeChanged`, or D-Bus fallback per ADR 0001) *(no D-Bus fallback needed: ADR 0001 requires Qt 6.8)*
+- [x] Manual override in settings: System / Light / Dark *(View → Appearance; saved as `appearance/theme`)*
+- [x] 150 ms fade limit for any animation *(`ThemeManager::kMaxAnimationMs`; theme switches cross-fade in 150 ms; Qt's own menu/combo/tooltip animations are turned off)*
 
 **Tests**
 - `TC-UI-018` (UI) Forcing dark mode applies `dark.qss` (check a known widget's palette color).

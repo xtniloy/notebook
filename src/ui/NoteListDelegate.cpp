@@ -111,12 +111,15 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
     const QColor textColor = palette.color(selected ? QPalette::HighlightedText : QPalette::Text);
     const QColor mutedColor = selected ? textColor : palette.color(QPalette::PlaceholderText);
 
+    const QIcon::Mode iconMode = selected ? QIcon::Selected : QIcon::Normal;
     if (locked) {
-        icon(Icon::Lock).paint(painter, iconRect(titleLine.left(), titleLine));
+        icon(Icon::Lock)
+            .paint(painter, iconRect(titleLine.left(), titleLine), Qt::AlignCenter, iconMode);
         titleLine.setLeft(titleLine.left() + kIconSize + kIconGap);
     }
     if (index.data(models::kPinnedRole).toBool()) {
-        icon(Icon::Pin).paint(painter, iconRect(titleLine.right() - kIconSize + 1, titleLine));
+        icon(Icon::Pin).paint(painter, iconRect(titleLine.right() - kIconSize + 1, titleLine),
+                              Qt::AlignCenter, iconMode);
         titleLine.setRight(titleLine.right() - kIconSize - kIconGap);
     }
 

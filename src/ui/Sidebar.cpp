@@ -41,13 +41,38 @@ void forEachRow(const QAbstractItemModel& model,
     }
 }
 
+// Draws the expand/collapse arrows with the themed icons; a style sheet
+// `image: url(...)` can't follow the palette, so the arrows vanished in dark mode.
+class SidebarTree : public QTreeView
+{
+public:
+    using QTreeView::QTreeView;
+
+protected:
+    void drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const override
+    {
+        if (model() == nullptr || !model()->hasChildren(index)) {
+            return;
+        }
+        const int side = indentation();
+        const QRect arrow(rect.right() - side + 1, rect.top(), side, rect.height());
+        const bool selected = selectionModel() != nullptr && selectionModel()->isSelected(index);
+        icon(isExpanded(index) ? Icon::Collapse : Icon::Expand)
+            .paint(painter, arrow.adjusted(4, 4, -4, -4), Qt::AlignCenter,
+                   selected ? QIcon::Selected : QIcon::Normal);
+    }
+};
+
 } // namespace
 
 Sidebar::Sidebar(QWidget* parent)
     : QWidget(parent)
-    , m_tree(new QTreeView(this))
+    , m_tree(new SidebarTree(this))
     , m_newFolderButton(new QToolButton(this))
 {
+    // Lets the style sheet paint the pane background (#sidebarPane).
+    setAttribute(Qt::WA_StyledBackground);
+
     m_tree->setObjectName(QStringLiteral("sidebarTree"));
     m_tree->setHeaderHidden(true);
     // Section headers sit flush left without an expand arrow.
@@ -62,10 +87,7 @@ Sidebar::Sidebar(QWidget* parent)
     // out of the row and branch area. Theme colors come with task 1.8.
     m_tree->setStyleSheet(
         QStringLiteral("QTreeView { background: transparent; show-decoration-selected: 0; }"
-                       "QTreeView::item:selected { background: transparent; }"
-                       "QTreeView::branch:has-children:closed { image: url(%1); }"
-                       "QTreeView::branch:has-children:open { image: url(%2); }")
-            .arg(iconPath(Icon::Expand), iconPath(Icon::Collapse)));
+                       "QTreeView::item:selected { background: transparent; }"));
 
     connect(m_tree, &QTreeView::expanded, this,
             [this](const QModelIndex& index) { onExpandedChanged(index, true); });

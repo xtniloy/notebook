@@ -1,0 +1,81 @@
+/*
+ * App style sheet, shared by the light and dark themes. Placeholders (a dollar
+ * sign followed by a ThemeColors field name in braces) are replaced with that
+ * theme's colors by ThemeManager::styleSheet().
+ * Most colors come from the palette; this file only styles what the palette
+ * can't reach.
+ */
+
+QMainWindow {
+    background: ${window};
+}
+
+/* Toolbar: flat, with a hairline under it. */
+QToolBar#mainToolBar {
+    background: ${window};
+    border: none;
+    border-bottom: 1px solid ${separator};
+    padding: 4px 8px;
+    spacing: 2px;
+}
+
+QToolBar#mainToolBar QToolButton {
+    border: none;
+    border-radius: 6px;
+    padding: 4px;
+}
+
+QToolBar#mainToolBar QToolButton:hover,
+QToolBar#mainToolBar QToolButton:checked {
+    background: ${hover};
+}
+
+QToolBar#mainToolBar::separator {
+    width: 1px;
+    margin: 6px 6px;
+    background: ${separator};
+}
+
+QLineEdit#searchField {
+    background: ${base};
+    color: ${text};
+    border: 1px solid ${separator};
+    border-radius: 7px;
+    padding: 3px 4px;
+    selection-background-color: ${accent};
+    selection-color: ${accentText};
+}
+
+QLineEdit#searchField:focus {
+    border-color: ${accent};
+}
+
+/* Panes. */
+#sidebarPane {
+    background: ${sidebar};
+}
+
+#sidebarPane QToolButton {
+    color: ${text};
+    border: none;
+    padding: 4px 8px;
+}
+
+#sidebarPane QToolButton:disabled {
+    color: ${mutedText};
+}
+
+#noteListPane,
+#editorPane,
+#noteTextEdit {
+    background: ${base};
+    border: none;
+}
+
+/* A 1 px line in the middle of a wider, easier to grab, splitter handle. */
+QSplitter#mainSplitter::handle {
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
+                                stop: 0 ${base}, stop: 0.4 ${base},
+                                stop: 0.4 ${separator}, stop: 0.6 ${separator},
+                                stop: 0.6 ${base}, stop: 1 ${base});
+}

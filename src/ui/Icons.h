@@ -40,6 +40,8 @@ enum class Icon : std::uint8_t {
 // Resource path, e.g. ":/icons/search.svg".
 QString iconPath(Icon icon);
 
+// Drawn in the application palette's text color (HighlightedText for
+// QIcon::Selected, the disabled text color for QIcon::Disabled).
 QIcon icon(Icon icon);
 
 } // namespace notes::ui

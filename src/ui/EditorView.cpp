@@ -33,9 +33,11 @@ EditorView::EditorView(QWidget* parent)
     , m_textEdit(new NoteTextEdit(m_pages))
     , m_placeholder(createMutedLabel(QStringLiteral("editorPlaceholder"), m_pages))
 {
-    // One white page: the margins around the text get the text background too.
+    // One page: the margins around the text get the text background too (Base
+    // in the palette; the style sheet's #editorPane rule needs WA_StyledBackground).
     setBackgroundRole(QPalette::Base);
     setAutoFillBackground(true);
+    setAttribute(Qt::WA_StyledBackground);
 
     m_textEdit->setObjectName(QStringLiteral("noteTextEdit"));
     m_pages->addWidget(m_textEdit);

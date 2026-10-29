@@ -21,6 +21,7 @@ class ActionRegistry;
 class EditorView;
 class NoteListView;
 class Sidebar;
+class ThemeManager;
 
 // Three-pane main window (Plan §3.1): sidebar | note list | editor.
 // Window size, pane widths and sidebar visibility persist in QSettings.
@@ -41,6 +42,7 @@ public:
     ~MainWindow() override;
 
     [[nodiscard]] ActionRegistry& actions() const { return *m_actions; }
+    [[nodiscard]] ThemeManager& themes() const { return *m_themes; }
 
 protected:
     void showEvent(QShowEvent* event) override;
@@ -59,6 +61,8 @@ private:
     void showAbout();
 
     app::AppContext& m_context;
+    // First, so widgets are created with the theme's palette already in place.
+    ThemeManager* m_themes;
     ActionRegistry* m_actions;
     // Declaration order matters: the panes are created inside m_splitter.
     QSplitter* m_splitter;

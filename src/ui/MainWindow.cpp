@@ -9,9 +9,11 @@
 #include "ui/Icons.h"
 #include "ui/NoteListView.h"
 #include "ui/Sidebar.h"
+#include "ui/ThemeManager.h"
 #include "ui/dialogs/AboutDialog.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QDateTime>
 #include <QLineEdit>
 #include <QMenuBar>
@@ -38,6 +40,8 @@ constexpr int kMaxRestoredPaneWidth = 2000;
 constexpr int kSearchFieldWidth = 220;
 // Enough to show that the list is virtualized (Plan §10, TC-PERF-001).
 constexpr int kFakeNoteCount = 10'000;
+// The style sheet draws a 1 px line in the middle; the rest is grab area.
+constexpr int kSplitterHandleWidth = 5;
 
 // Splitter positions.
 constexpr int kSidebarIndex = 0;
@@ -69,6 +73,7 @@ int restoredWidth(const QVariantList& widths, int index, int minimum, int fallba
 MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     : QMainWindow(parent)
     , m_context(context)
+    , m_themes(new ThemeManager(context.settings(), this))
     , m_actions(new ActionRegistry(this))
     , m_splitter(new QSplitter(Qt::Horizontal, this))
     , m_sidebar(
@@ -86,6 +91,7 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
 
     m_splitter->setObjectName(QStringLiteral("mainSplitter"));
     m_splitter->setChildrenCollapsible(false);
+    m_splitter->setHandleWidth(kSplitterHandleWidth);
     m_splitter->addWidget(m_sidebar);
     m_splitter->addWidget(m_noteList);
     m_splitter->addWidget(m_editor);
@@ -176,6 +182,23 @@ void MainWindow::createMenus()
     add(viewMenu, {ActionId::ListView, ActionId::GalleryView});
     viewMenu->addSeparator();
     add(viewMenu, {ActionId::ToggleSidebar});
+    viewMenu->addSeparator();
+
+    // Appearance: System / Light / Dark (task 1.8), saved by the ThemeManager.
+    QMenu* appearance = viewMenu->addMenu(tr("&Appearance"));
+    auto* group = new QActionGroup(appearance);
+    const auto addTheme = [&](const QString& text, const char* name, ThemePreference preference) {
+        QAction* action = appearance->addAction(text);
+        action->setObjectName(QLatin1StringView(name));
+        action->setCheckable(true);
+        action->setChecked(m_themes->preference() == preference);
+        group->addAction(action);
+        connect(action, &QAction::triggered, this,
+                [this, preference] { m_themes->setPreference(preference); });
+    };
+    addTheme(tr("Match &System"), "themeSystemAction", ThemePreference::System);
+    addTheme(tr("&Light"), "themeLightAction", ThemePreference::Light);
+    addTheme(tr("&Dark"), "themeDarkAction", ThemePreference::Dark);
 
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction* about = helpMenu->addAction(tr("&About %1").arg(windowTitle()));

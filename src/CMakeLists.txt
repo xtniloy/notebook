@@ -52,8 +52,10 @@ add_library(notesapp_ui STATIC
     ui/Sidebar.cpp
     ui/Sidebar.h
     ui/SidebarDelegate.cpp
-    ui/SidebarDelegate.h)
-target_link_libraries(notesapp_ui PUBLIC notesapp_core Qt6::Widgets)
+    ui/SidebarDelegate.h
+    ui/ThemeManager.cpp
+    ui/ThemeManager.h)
+target_link_libraries(notesapp_ui PUBLIC notesapp_core Qt6::Widgets PRIVATE Qt6::Svg)
 
 # Bundled assets (resources/SOURCES.md). qt_add_resources() on a static library
 # propagates the resource objects to every executable that links it, so no
@@ -81,6 +83,11 @@ qt_add_resources(notesapp_ui "icons"
     PREFIX "/icons"
     BASE "${resource_dir}/icons"
     FILES ${icon_files})
+
+qt_add_resources(notesapp_ui "themes"
+    PREFIX "/themes"
+    BASE "${resource_dir}/themes"
+    FILES "${resource_dir}/themes/theme.qss")
 
 file(GLOB license_files CONFIGURE_DEPENDS "${resource_dir}/licenses/*.txt")
 qt_add_resources(notesapp_ui "licenses"
