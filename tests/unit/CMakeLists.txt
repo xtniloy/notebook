@@ -12,3 +12,4 @@ notes_add_test(NAME tst_fakenotelistmodel SOURCES tst_fakenotelistmodel.cpp LABE
 notes_add_test(NAME tst_clock SOURCES tst_clock.cpp LABELS unit)
 notes_add_test(NAME tst_models SOURCES tst_models.cpp LABELS unit)
 notes_add_test(NAME tst_database SOURCES tst_database.cpp LABELS unit)
+notes_add_test(NAME tst_migrator SOURCES tst_migrator.cpp LABELS unit)

@@ -354,10 +354,10 @@ Record each in `docs/adr/`:
 
 ### 2.4 Migrations `M`
 
-- [ ] `migrations/001_initial.sql` = schema from **Plan §7**
-- [ ] `Migrator`: reads `meta.schema_version`, applies newer numbered scripts in order, each in a transaction
-- [ ] Migration scripts embedded via `.qrc`
-- [ ] If the DB's version is **newer** than the app knows: refuse to open and show a clear error (prevents an old app version from damaging data)
+- [x] `migrations/001_initial.sql` = schema from **Plan §7** *(`src/storage/migrations/`. Without `notes_fts`: task 5.1 adds it together with the sync triggers an external-content FTS table needs. `note_tags` also gets foreign keys with `ON DELETE CASCADE`)*
+- [x] `Migrator`: reads `meta.schema_version`, applies newer numbered scripts in order, each in a transaction *(the version update is in the same transaction; foreign keys are off while migrating and `PRAGMA foreign_key_check` runs before each commit; files must be `NNN_name.sql` with no gaps)*
+- [x] Migration scripts embedded via `.qrc` *(`qt_add_resources()` on `notesapp_core`, as in 1.2)*
+- [ ] If the DB's version is **newer** than the app knows: refuse to open and show a clear error (prevents an old app version from damaging data) *(`Migrator` side done: returns `TooNew` and writes nothing. The error dialog needs the app's startup path that opens the database, which no task lists yet; it belongs with 2.11's wiring)*
 
 **Tests**
 - `TC-MIG-001` (U) Empty DB → after migrate, `schema_version` = latest and all tables/indexes from Plan §7 exist.

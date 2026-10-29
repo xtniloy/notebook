@@ -33,6 +33,8 @@ add_library(notesapp_core STATIC
     storage/DbResult.h
     storage/DbThread.cpp
     storage/DbThread.h
+    storage/Migrator.cpp
+    storage/Migrator.h
     storage/SqlCipher.cpp
     storage/SqlCipher.h
     storage/SqliteError.cpp
@@ -41,6 +43,16 @@ add_library(notesapp_core STATIC
     storage/Statement.h
     storage/Transaction.cpp
     storage/Transaction.h)
+# Schema migrations (task 2.4), read by storage::Migrator from :/migrations.
+# Like the UI resources below, qt_add_resources() on a static library needs no
+# Q_INIT_RESOURCE() in the executables that link it.
+file(GLOB migration_files CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/storage/migrations/*.sql")
+qt_add_resources(notesapp_core "migrations"
+    PREFIX "/migrations"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}/storage/migrations"
+    FILES ${migration_files})
+
 target_include_directories(notesapp_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_BINARY_DIR}/generated")
