@@ -35,6 +35,8 @@ add_library(notesapp_ui STATIC
     ui/ActionRegistry.h
     ui/dialogs/AboutDialog.cpp
     ui/dialogs/AboutDialog.h
+    ui/EditorView.cpp
+    ui/EditorView.h
     ui/Fonts.cpp
     ui/Fonts.h
     ui/Icons.cpp
@@ -45,6 +47,8 @@ add_library(notesapp_ui STATIC
     ui/NoteListDelegate.h
     ui/NoteListView.cpp
     ui/NoteListView.h
+    ui/NoteTextEdit.cpp
+    ui/NoteTextEdit.h
     ui/Sidebar.cpp
     ui/Sidebar.h
     ui/SidebarDelegate.cpp

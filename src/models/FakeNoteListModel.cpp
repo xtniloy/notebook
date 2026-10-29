@@ -23,6 +23,8 @@ constexpr int kLockedEvery = 13;
 constexpr int kThumbnailEvery = 9;
 constexpr int kMinPreviewWords = 5;
 constexpr int kMaxPreviewWords = 14;
+constexpr int kMinBodyLines = 2;
+constexpr int kMaxBodyLines = 6;
 
 // Sample content, not UI text, so not translated.
 constexpr std::array kTitles{
@@ -104,9 +106,39 @@ FakeNoteListModel::FakeNoteListModel(int count, qint64 nowMs, const QTimeZone& z
         }
         m_rows.push_back(std::move(note));
     }
+
+    m_rowById.reserve(m_noteCount);
+    for (std::size_t row = 0; row < m_rows.size(); ++row) {
+        if (!m_rows[row].isHeader) {
+            m_rowById.insert(m_rows[row].id, static_cast<int>(row));
+        }
+    }
 }
 
 FakeNoteListModel::~FakeNoteListModel() = default;
+
+std::optional<FakeNoteListModel::FakeNote> FakeNoteListModel::note(qint64 noteId) const
+{
+    const auto found = m_rowById.constFind(noteId);
+    if (found == m_rowById.constEnd()) {
+        return std::nullopt;
+    }
+    const Row& row = m_rows.at(static_cast<std::size_t>(*found));
+    FakeNote note{.text = {}, .modifiedMs = row.modifiedMs, .locked = row.locked};
+    if (row.locked) {
+        return note;
+    }
+
+    // Generated on demand from the id, so 10,000 bodies never sit in memory.
+    QRandomGenerator rng(kSeed ^ static_cast<quint32>(noteId));
+    QStringList lines{row.title, row.preview};
+    const int extra = rng.bounded(kMinBodyLines, kMaxBodyLines + 1);
+    for (int i = 0; i < extra; ++i) {
+        lines.append(makePreview(rng));
+    }
+    note.text = lines.join(QLatin1Char('\n'));
+    return note;
+}
 
 int FakeNoteListModel::rowCount(const QModelIndex& parent) const
 {

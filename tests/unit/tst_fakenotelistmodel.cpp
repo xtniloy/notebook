@@ -41,6 +41,8 @@ private slots:
     void lockedNotesHaveNoPreview();
     void sameArgumentsSameNotes();
     void emptyModel();
+    void noteTextStartsWithTitleAndPreview();
+    void lockedNoteHasNoText();
 };
 
 void tst_FakeNoteListModel::passesModelTester_data()
@@ -182,6 +184,55 @@ void tst_FakeNoteListModel::emptyModel()
     const FakeNoteListModel model(0, notes::test::FakeClock().nowMs(), kUtc);
     QCOMPARE(model.rowCount(), 0);
     QCOMPARE(model.noteCount(), 0);
+}
+
+// The editor's text for a note (task 1.7) agrees with its list row.
+void tst_FakeNoteListModel::noteTextStartsWithTitleAndPreview()
+{
+    const notes::test::FakeClock clock;
+    const FakeNoteListModel model(300, clock.nowMs(), kUtc);
+    int checked = 0;
+    for (int row = 0; row < model.rowCount(); ++row) {
+        const QModelIndex index = model.index(row);
+        if (isHeader(index) || index.data(roles::kLockedRole).toBool()) {
+            continue;
+        }
+        const qint64 id = index.data(roles::kNoteIdRole).toLongLong();
+        const auto found = model.note(id);
+        if (!found) {
+            QFAIL("note not found");
+        }
+        const FakeNoteListModel::FakeNote& note = *found;
+        QVERIFY(!note.locked);
+        QCOMPARE(note.modifiedMs, index.data(roles::kModifiedRole).toLongLong());
+        const QStringList lines = note.text.split(QLatin1Char('\n'));
+        QVERIFY(lines.size() >= 4);
+        QCOMPARE(lines.at(0), index.data().toString());
+        QCOMPARE(lines.at(1), index.data(roles::kPreviewRole).toString());
+        const auto again = model.note(id);
+        QVERIFY(again && again->text == note.text); // same text every time
+        ++checked;
+    }
+    QVERIFY(checked > 200);
+    QVERIFY(!model.note(0));
+    QVERIFY(!model.note(301));
+}
+
+void tst_FakeNoteListModel::lockedNoteHasNoText()
+{
+    const notes::test::FakeClock clock;
+    const FakeNoteListModel model(300, clock.nowMs(), kUtc);
+    const QModelIndex locked =
+        model.match(model.index(0), roles::kLockedRole, true, 1, Qt::MatchExactly).value(0);
+    QVERIFY(locked.isValid());
+    const auto found = model.note(locked.data(roles::kNoteIdRole).toLongLong());
+    if (!found) {
+        QFAIL("note not found");
+    }
+    const FakeNoteListModel::FakeNote& note = *found;
+    QVERIFY(note.locked);
+    QVERIFY(note.text.isEmpty());
+    QCOMPARE(note.modifiedMs, locked.data(roles::kModifiedRole).toLongLong());
 }
 
 QTEST_MAIN(tst_FakeNoteListModel)

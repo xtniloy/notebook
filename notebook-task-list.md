@@ -282,9 +282,9 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 1.7 Editor view (plain) `S`
 
-- [ ] `EditorView`: date/time header label (centered, light gray) + `NoteTextEdit` (subclass of `QTextEdit`)
-- [ ] Empty state ("No note selected")
-- [ ] Shows fake note content when a list row is selected
+- [x] `EditorView`: date/time header label (centered, light gray) + `NoteTextEdit` (subclass of `QTextEdit`) *(plain text: `acceptRichText(false)` until the Phase 3 document model)*
+- [x] Empty state ("No note selected")
+- [x] Shows fake note content when a list row is selected *(text comes from `FakeNoteListModel::note(id)`, standing in for `NoteService::get(id)`; list rows never carry bodies. Locked notes show "This note is locked." until the lock screen in 6.4)*
 
 **Tests**
 - `TC-UI-016` (UI) Selecting a note in the list shows its text in the editor and its date in the header.

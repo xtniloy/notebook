@@ -18,6 +18,7 @@ class FakeSidebarModel;
 namespace notes::ui {
 
 class ActionRegistry;
+class EditorView;
 class NoteListView;
 class Sidebar;
 
@@ -48,6 +49,7 @@ private:
     void createToolBar();
     void createMenus();
     void focusSearch();
+    void openNote(qint64 noteId);
     void setSidebarVisible(bool visible);
     // Sets exact pane widths; the editor gets the remaining space. QSplitter's
     // own setSizes() spreads any difference proportionally across all panes.
@@ -62,7 +64,7 @@ private:
     QSplitter* m_splitter;
     Sidebar* m_sidebar;
     NoteListView* m_noteList;
-    QWidget* m_editor;
+    EditorView* m_editor;
     QAction* m_toggleSidebar;
     // Sample data until FolderTreeModel and NoteListModel (task 2.8).
     models::FakeSidebarModel* m_sidebarModel;

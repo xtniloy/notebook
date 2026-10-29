@@ -5,6 +5,7 @@
 #include "models/FakeNoteListModel.h"
 #include "models/FakeSidebarModel.h"
 #include "ui/ActionRegistry.h"
+#include "ui/EditorView.h"
 #include "ui/Icons.h"
 #include "ui/NoteListView.h"
 #include "ui/Sidebar.h"
@@ -21,6 +22,7 @@
 
 #include <algorithm>
 #include <initializer_list>
+#include <optional>
 
 namespace notes::ui {
 
@@ -73,8 +75,8 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
           createPane<Sidebar>(QLatin1StringView("sidebarPane"), kSidebarMinimumWidth, m_splitter))
     , m_noteList(createPane<NoteListView>(QLatin1StringView("noteListPane"), kNoteListMinimumWidth,
                                           m_splitter))
-    // Placeholder until the EditorView (1.7).
-    , m_editor(createPane(QLatin1StringView("editorPane"), kEditorMinimumWidth, m_splitter))
+    , m_editor(
+          createPane<EditorView>(QLatin1StringView("editorPane"), kEditorMinimumWidth, m_splitter))
     , m_toggleSidebar(m_actions->action(ActionId::ToggleSidebar))
     , m_sidebarModel(new models::FakeSidebarModel(this))
     , m_noteListModel(new models::FakeNoteListModel(
@@ -94,6 +96,11 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     setCentralWidget(m_splitter);
     m_sidebar->setModel(m_sidebarModel);
     m_noteList->setModel(m_noteListModel);
+    connect(m_noteList, &NoteListView::noteSelected, this, &MainWindow::openNote);
+    // The list selects its first note without a signal, before anyone listens.
+    if (const std::optional<qint64> current = m_noteList->currentNote()) {
+        openNote(*current);
+    }
 
     m_toggleSidebar->setChecked(true);
     connect(m_toggleSidebar, &QAction::toggled, this, &MainWindow::setSidebarVisible);
@@ -181,6 +188,22 @@ void MainWindow::focusSearch()
 {
     m_searchField->setFocus(Qt::ShortcutFocusReason);
     m_searchField->selectAll();
+}
+
+void MainWindow::openNote(qint64 noteId)
+{
+    // Becomes NoteService::get(id) in task 2.7.
+    const std::optional<models::FakeNoteListModel::FakeNote> note = m_noteListModel->note(noteId);
+    if (!note) {
+        m_editor->clear();
+        return;
+    }
+    const QDateTime modified = QDateTime::fromMSecsSinceEpoch(note->modifiedMs);
+    if (note->locked) {
+        m_editor->showLockedNote(modified);
+    } else {
+        m_editor->showNote(note->text, modified);
+    }
 }
 
 void MainWindow::showEvent(QShowEvent* event)
