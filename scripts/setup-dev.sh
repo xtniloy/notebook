@@ -31,7 +31,7 @@ PACKAGES=(
     # Compilers and static analysis
     clang libclang-rt-dev clang-tidy clang-format cppcheck
     # Qt 6
-    qt6-base-dev qt6-tools-dev qt6-svg-dev qt6-networkauth-dev qt6-httpserver-dev
+    qt6-base-dev qt6-tools-dev qt6-svg-dev qt6-svg-plugins qt6-networkauth-dev qt6-httpserver-dev
     # Crypto and storage
     libsqlcipher-dev libsodium-dev qtkeychain-qt6-dev
 )

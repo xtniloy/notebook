@@ -17,6 +17,8 @@ public:
     explicit MainWindow(app::AppContext& context, QWidget* parent = nullptr);
 
 private:
+    void showAbout();
+
     app::AppContext& m_context;
 };
 

@@ -4,13 +4,33 @@
 #include "app/AppIdentity.h"
 #include "app/Config.h"
 #include "app/SingleInstance.h"
+#include "ui/Fonts.h"
 #include "ui/MainWindow.h"
 
+#include <QLoggingCategory>
 #include <QMessageBox>
 
 #include <cstdlib>
 
 namespace notes::app {
+
+namespace {
+
+Q_LOGGING_CATEGORY(lcApp, "notes.app")
+
+void loadFonts()
+{
+    const QStringList failed = ui::loadBundledFonts();
+    if (!failed.isEmpty()) {
+        qCWarning(lcApp) << "Falling back to system fonts; could not load" << failed;
+    }
+    // Keep the system's size, swap the family (Plan §3.6).
+    QFont uiFont = QApplication::font();
+    uiFont.setFamilies({QString::fromLatin1(ui::kUiFontFamily)});
+    QApplication::setFont(uiFont);
+}
+
+} // namespace
 
 Application::Application(int& argc, char** argv)
     : QApplication(argc, argv)
@@ -36,6 +56,8 @@ int Application::run()
         return EXIT_FAILURE;
     }
 
+    // After the single-instance check, so a second launch doesn't pay for it.
+    loadFonts();
     m_context = AppContext::createDefault();
     m_window = std::make_unique<ui::MainWindow>(*m_context);
     connect(instance, &SingleInstance::activationRequested, this, &Application::activateMainWindow);

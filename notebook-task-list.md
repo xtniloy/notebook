@@ -212,10 +212,10 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 1.2 Resources: fonts and icons `S`
 
-- [ ] Add **Inter** and **JetBrains Mono** (SIL OFL) to `resources/fonts/`, load with `QFontDatabase::addApplicationFont`
-- [ ] Add the needed **Lucide** (or Phosphor) SVG icons to `resources/icons/`
-- [ ] Put font/icon license texts in `resources/licenses/` and an "About → Licenses" entry (stub)
-- [ ] `resources.qrc` with aliases
+- [x] Add **Inter** and **JetBrains Mono** (SIL OFL) to `resources/fonts/`, load with `QFontDatabase::addApplicationFont` *(static TTFs, not variable: Qt 6.10 ignores the `wght` axis of application fonts and fakes bold; see `resources/SOURCES.md`)*
+- [x] Add the needed **Lucide** (or Phosphor) SVG icons to `resources/icons/` *(needs `qt6-svg-plugins` at runtime; add it to the `.deb` dependencies in Phase 11)*
+- [x] Put font/icon license texts in `resources/licenses/` and an "About → Licenses" entry (stub)
+- [x] `resources.qrc` with aliases *(done with `qt_add_resources()` in CMake instead: a `.qrc` in a static library needs a manual `Q_INIT_RESOURCE()` in every executable, including each test; fonts are zstd-compressed to keep the binary at 1.2 MB)*
 
 **Tests**
 - `TC-UI-003` (U) Both font families are available after loading.

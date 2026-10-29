@@ -1,2 +1,6 @@
 # LeakSanitizer suppressions for leaks inside system libraries we do not control.
 # Never suppress a leak in first-party code; fix it instead.
+
+# fontconfig keeps its parsed config for the life of the process and never frees
+# it. Reached via QFontDatabase::addApplicationFont().
+leak:libfontconfig.so
