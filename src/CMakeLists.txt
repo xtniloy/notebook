@@ -10,8 +10,13 @@ add_library(notesapp_core STATIC
     app/SingleInstance.h
     crypto/Sodium.cpp
     crypto/Sodium.h
+    models/DateGrouping.cpp
+    models/DateGrouping.h
+    models/FakeNoteListModel.cpp
+    models/FakeNoteListModel.h
     models/FakeSidebarModel.cpp
     models/FakeSidebarModel.h
+    models/NoteListRoles.h
     models/SidebarRoles.h
     storage/SqlCipher.cpp
     storage/SqlCipher.h)
@@ -36,6 +41,10 @@ add_library(notesapp_ui STATIC
     ui/Icons.h
     ui/MainWindow.cpp
     ui/MainWindow.h
+    ui/NoteListDelegate.cpp
+    ui/NoteListDelegate.h
+    ui/NoteListView.cpp
+    ui/NoteListView.h
     ui/Sidebar.cpp
     ui/Sidebar.h
     ui/SidebarDelegate.cpp

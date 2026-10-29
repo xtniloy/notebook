@@ -11,12 +11,14 @@ class AppContext;
 }
 
 namespace notes::models {
+class FakeNoteListModel;
 class FakeSidebarModel;
-}
+} // namespace notes::models
 
 namespace notes::ui {
 
 class ActionRegistry;
+class NoteListView;
 class Sidebar;
 
 // Three-pane main window (Plan §3.1): sidebar | note list | editor.
@@ -59,11 +61,12 @@ private:
     // Declaration order matters: the panes are created inside m_splitter.
     QSplitter* m_splitter;
     Sidebar* m_sidebar;
-    QWidget* m_noteList;
+    NoteListView* m_noteList;
     QWidget* m_editor;
     QAction* m_toggleSidebar;
-    // Sample data until FolderTreeModel (task 2.8).
+    // Sample data until FolderTreeModel and NoteListModel (task 2.8).
     models::FakeSidebarModel* m_sidebarModel;
+    models::FakeNoteListModel* m_noteListModel;
     QLineEdit* m_searchField = nullptr;
 
     // Kept while the sidebar is hidden, so it comes back at the same width.

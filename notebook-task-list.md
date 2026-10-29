@@ -268,10 +268,10 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 1.6 Note list view and delegate `M`
 
-- [ ] `NoteListView` (`QListView`, `setUniformItemSizes(true)`)
-- [ ] `NoteListDelegate`: bold title, time + first line of preview, thumbnail slot, pin icon, lock icon
-- [ ] Section headers: Pinned, Today, Yesterday, Previous 7 Days, Previous 30 Days, month names, years
-- [ ] Fake model that can generate **10,000** items, to prove virtualization early
+- [x] `NoteListView` (`QListView`, `setUniformItemSizes(true)`) *(works with any model that provides the roles in `models/NoteListRoles.h`)*
+- [x] `NoteListDelegate`: bold title, time + first line of preview, thumbnail slot, pin icon, lock icon *(the slot is a placeholder until attachments; locked notes show "Locked" and their model never holds a preview)*
+- [x] Section headers: Pinned, Today, Yesterday, Previous 7 Days, Previous 30 Days, month names, years *(headers are disabled rows of the same height as notes, so uniform item sizes still hold; clicks and arrow keys skip them. Previous 7 Days = 2–7 calendar days ago, Previous 30 Days = 8–30; months only for the current year)*
+- [x] Fake model that can generate **10,000** items, to prove virtualization early *(the app shows 10,000; generating them takes ~11 ms)*
 
 **Tests**
 - `TC-UI-014` (U) `DateGrouping::sectionFor(timestamp, now)` returns the correct section for boundary times (midnight, exactly 7 days ago, year change). Use `FakeClock`.

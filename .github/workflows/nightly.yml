@@ -1,0 +1,30 @@
+name: Nightly
+
+# Scheduled runs use the default branch (main). Run on another branch from the
+# Actions tab with "Run workflow".
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Performance budgets from Plan §10 (TC-PERF-*), with release flags.
+  bench:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          ccache-key: bench
+      - run: cmake --preset bench
+      - run: cmake --build --preset bench
+      - run: ctest --preset bench
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-logs
+          path: build/bench/Testing/Temporary/

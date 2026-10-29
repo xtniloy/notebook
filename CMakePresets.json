@@ -39,6 +39,12 @@
       }
     },
     {
+      "name": "bench",
+      "displayName": "Benchmarks (release flags)",
+      "inherits": "release",
+      "cacheVariables": { "NOTES_ENABLE_BENCH": "ON" }
+    },
+    {
       "name": "fuzz",
       "displayName": "Fuzzing (clang + libFuzzer)",
       "inherits": "base",
@@ -54,6 +60,7 @@
     { "name": "debug", "configurePreset": "debug" },
     { "name": "debug-asan", "configurePreset": "debug-asan" },
     { "name": "release", "configurePreset": "release" },
+    { "name": "bench", "configurePreset": "bench" },
     { "name": "fuzz", "configurePreset": "fuzz" }
   ],
   "testPresets": [
@@ -62,6 +69,12 @@
       "configurePreset": "debug",
       "output": { "outputOnFailure": true },
       "execution": { "noTestsAction": "error" }
+    },
+    {
+      "name": "bench",
+      "inherits": "debug",
+      "configurePreset": "bench",
+      "filter": { "include": { "label": "bench" } }
     },
     {
       "name": "debug-asan",

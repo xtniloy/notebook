@@ -56,6 +56,7 @@ Tests run headless in the container. Showing the app's window from the container
 | `debug` | Day-to-day development. Warnings are errors. |
 | `debug-asan` | Same, with AddressSanitizer + UBSan. Run before every PR: `cmake --preset debug-asan && cmake --build --preset debug-asan && ctest --preset debug-asan` |
 | `release` | `-O2`, LTO, stripped binary. No tests. |
+| `bench` | Release flags plus the `tests/bench/` performance budgets (Plan §10): `cmake --preset bench && cmake --build --preset bench && ctest --preset bench`. CI runs it nightly. |
 | `fuzz` | clang + libFuzzer instrumentation for `tests/fuzz/` targets. |
 
 Build output goes to `build/<preset>/`.

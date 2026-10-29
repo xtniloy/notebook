@@ -51,14 +51,15 @@ jobs:
           name: test-logs-debug-asan
           path: build/debug-asan/Testing/Temporary/
 
-  # TC-BLD-002: every other preset builds with zero warnings.
+  # TC-BLD-002: every other preset builds with zero warnings. `bench` is only
+  # compiled here; nightly.yml runs it.
   presets:
     runs-on: ubuntu-latest
     container: ubuntu:26.04
     strategy:
       fail-fast: false
       matrix:
-        preset: [release, fuzz]
+        preset: [release, bench, fuzz]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup

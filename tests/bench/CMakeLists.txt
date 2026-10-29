@@ -1,5 +1,9 @@
-# Benchmarks use Qt Test's QBENCHMARK and run nightly in release mode:
+# Benchmarks run nightly with release flags (preset `bench`):
 #
-#   notes_add_test(NAME bench_x SOURCES bench_x.cpp LABELS bench)
+#   cmake --preset bench && cmake --build --preset bench && ctest --preset bench
 #
-# First benchmark: TC-PERF-001 (task 1.6).
+# Add one with: notes_add_test(NAME bench_x SOURCES bench_x.cpp LABELS bench)
+
+# TC-PERF-001: note list scrolls 10,000 notes at < 16 ms per frame.
+notes_add_test(NAME bench_notelistscroll SOURCES bench_notelistscroll.cpp LABELS bench
+               LIBS notesapp_ui)

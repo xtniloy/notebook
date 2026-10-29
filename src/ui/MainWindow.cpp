@@ -2,13 +2,16 @@
 
 #include "app/AppContext.h"
 #include "app/Config.h"
+#include "models/FakeNoteListModel.h"
 #include "models/FakeSidebarModel.h"
 #include "ui/ActionRegistry.h"
 #include "ui/Icons.h"
+#include "ui/NoteListView.h"
 #include "ui/Sidebar.h"
 #include "ui/dialogs/AboutDialog.h"
 
 #include <QAction>
+#include <QDateTime>
 #include <QLineEdit>
 #include <QMenuBar>
 #include <QSettings>
@@ -31,6 +34,8 @@ constexpr QSize kDefaultWindowSize(1100, 720);
 // Restored widths beyond this are treated as corrupt settings.
 constexpr int kMaxRestoredPaneWidth = 2000;
 constexpr int kSearchFieldWidth = 220;
+// Enough to show that the list is virtualized (Plan §10, TC-PERF-001).
+constexpr int kFakeNoteCount = 10'000;
 
 // Splitter positions.
 constexpr int kSidebarIndex = 0;
@@ -66,11 +71,14 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     , m_splitter(new QSplitter(Qt::Horizontal, this))
     , m_sidebar(
           createPane<Sidebar>(QLatin1StringView("sidebarPane"), kSidebarMinimumWidth, m_splitter))
-    // Placeholders until the NoteListView (1.6) and EditorView (1.7).
-    , m_noteList(createPane(QLatin1StringView("noteListPane"), kNoteListMinimumWidth, m_splitter))
+    , m_noteList(createPane<NoteListView>(QLatin1StringView("noteListPane"), kNoteListMinimumWidth,
+                                          m_splitter))
+    // Placeholder until the EditorView (1.7).
     , m_editor(createPane(QLatin1StringView("editorPane"), kEditorMinimumWidth, m_splitter))
     , m_toggleSidebar(m_actions->action(ActionId::ToggleSidebar))
     , m_sidebarModel(new models::FakeSidebarModel(this))
+    , m_noteListModel(new models::FakeNoteListModel(
+          kFakeNoteCount, QDateTime::currentMSecsSinceEpoch(), QTimeZone::LocalTime, this))
 {
     setWindowTitle(QString::fromLatin1(config::kDisplayName));
 
@@ -85,6 +93,7 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     m_splitter->setStretchFactor(kEditorIndex, 1);
     setCentralWidget(m_splitter);
     m_sidebar->setModel(m_sidebarModel);
+    m_noteList->setModel(m_noteListModel);
 
     m_toggleSidebar->setChecked(true);
     connect(m_toggleSidebar, &QAction::toggled, this, &MainWindow::setSidebarVisible);
