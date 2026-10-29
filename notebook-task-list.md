@@ -317,10 +317,10 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 Record each in `docs/adr/`:
 
-- [ ] **ADR 0002: Database access.** Use the **SQLite C API through a thin C++ wrapper, linked against SQLCipher from day one** (unkeyed until Phase 4). Reason: Qt's `QSQLITE` driver links the system SQLite, not SQLCipher, so using `QSqlDatabase` now would mean rewriting storage in Phase 4.
-- [ ] **ADR 0003: Threading.** All DB access runs on one dedicated DB thread; services expose async calls returning `QFuture`. The UI thread never blocks on disk.
-- [ ] **ADR 0004: Time.** Timestamps are UTC milliseconds since epoch (`int64`). All code reads time through `IClock`.
-- [ ] **ADR 0005: IDs.** `uuid` (`QUuid::createUuid()`, string form) is the stable identity across devices; integer `id` is local only.
+- [x] **ADR 0002: Database access.** Use the **SQLite C API through a thin C++ wrapper, linked against SQLCipher from day one** (unkeyed until Phase 4). Reason: Qt's `QSQLITE` driver links the system SQLite, not SQLCipher, so using `QSqlDatabase` now would mean rewriting storage in Phase 4.
+- [x] **ADR 0003: Threading.** All DB access runs on one dedicated DB thread; services expose async calls returning `QFuture`. The UI thread never blocks on disk.
+- [x] **ADR 0004: Time.** Timestamps are UTC milliseconds since epoch (`int64`). All code reads time through `IClock`. *(also decided: local time only at the UI edge; auto-relock treats a backwards clock jump as expired)*
+- [x] **ADR 0005: IDs.** `uuid` (`QUuid::createUuid()`, string form) is the stable identity across devices; integer `id` is local only. *(also decided: lowercase without braces; the default "Notes" folder gets a fixed well-known UUID so devices don't end up with two "Notes" folders after sync)*
 
 **Done when:** ADRs merged.
 
