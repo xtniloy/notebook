@@ -10,7 +10,7 @@ void applyAppIdentity()
 {
     QCoreApplication::setOrganizationName(QString::fromLatin1(config::kOrgName));
     QCoreApplication::setOrganizationDomain(QString::fromLatin1(config::kOrgDomain));
-    QCoreApplication::setApplicationName(QString::fromLatin1(config::kAppName));
+    QCoreApplication::setApplicationName(QString::fromLatin1(config::kStorageName));
     QCoreApplication::setApplicationVersion(QString::fromLatin1(config::kAppVersion));
 }
 

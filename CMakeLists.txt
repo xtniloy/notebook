@@ -5,7 +5,16 @@ project(NotesApp
     DESCRIPTION "Secure notes app for Ubuntu"
     LANGUAGES CXX)
 
-set(NOTES_APP_ID "io.augmex.NotesApp")
+# User-visible name: window titles, About, the .desktop entry. Safe to change
+# at any time; nothing on disk depends on it.
+set(NOTES_DISPLAY_NAME "Notes")
+
+# Stable identifiers. They locate the user's settings, notes database, keyring
+# entries and single-instance lock. Changing any of them after people have data
+# orphans that data (and the database key), so add a migration first.
+# tst_appcontext fails if one changes by accident.
+set(NOTES_APP_ID "io.augmex.NotesApp")    # reverse-DNS: .desktop file, Flatpak, keyring
+set(NOTES_STORAGE_NAME "NotesApp")        # ~/.config/augmex/NotesApp.conf, ~/.local/share/augmex/NotesApp/
 set(NOTES_ORG_NAME "augmex")
 set(NOTES_ORG_DOMAIN "augmex.io")
 

@@ -26,7 +26,7 @@ void tst_MainWindow::showsWithAppTitle()
     notes::ui::MainWindow window(*context);
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
-    QCOMPARE(window.windowTitle(), QString::fromLatin1(notes::config::kAppName));
+    QCOMPARE(window.windowTitle(), QString::fromLatin1(notes::config::kDisplayName));
 }
 
 void tst_MainWindow::aboutListsThirdPartyLicenses()

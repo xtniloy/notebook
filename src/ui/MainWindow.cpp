@@ -12,7 +12,7 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     : QMainWindow(parent)
     , m_context(context)
 {
-    setWindowTitle(QString::fromLatin1(config::kAppName));
+    setWindowTitle(QString::fromLatin1(config::kDisplayName));
     resize(1100, 720);
 
     // Moves into the ActionRegistry in task 1.4.

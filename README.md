@@ -1,4 +1,4 @@
-# NotesApp
+# Notes (working name)
 
 A native Ubuntu notes app with the layout and workflow of macOS Notes, encrypted by default.
 C++20 · Qt 6 Widgets · SQLCipher · libsodium.
@@ -9,6 +9,12 @@ C++20 · Qt 6 Widgets · SQLCipher · libsodium.
 - [Contributing](docs/contributing.md)
 
 > Status: **Phase 0** (project setup). The app opens an empty window.
+
+## Naming
+
+The name users see is `NOTES_DISPLAY_NAME` in the top-level `CMakeLists.txt` (currently "Notes", a placeholder that can't ship: GNOME and Apple both have apps called Notes). Change it any time.
+
+Never change `NOTES_APP_ID`, `NOTES_STORAGE_NAME` or `NOTES_ORG_*` once people have data: they decide where settings, notes and keyring entries live. `tst_appcontext` fails if they change.
 
 ## Building
 

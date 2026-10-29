@@ -3,9 +3,14 @@
 
 namespace notes::config {
 
-inline constexpr char kAppName[] = "@PROJECT_NAME@";
+// Shown to users. Safe to change; see the top-level CMakeLists.txt.
+inline constexpr char kDisplayName[] = "@NOTES_DISPLAY_NAME@";
 inline constexpr char kAppVersion[] = "@PROJECT_VERSION@";
+
+// Stable identifiers for everything stored on disk or in the keyring.
+// Never use kDisplayName for these.
 inline constexpr char kAppId[] = "@NOTES_APP_ID@";
+inline constexpr char kStorageName[] = "@NOTES_STORAGE_NAME@";
 inline constexpr char kOrgName[] = "@NOTES_ORG_NAME@";
 inline constexpr char kOrgDomain[] = "@NOTES_ORG_DOMAIN@";
 

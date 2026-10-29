@@ -36,6 +36,7 @@ Application::Application(int& argc, char** argv)
     : QApplication(argc, argv)
 {
     applyAppIdentity();
+    setApplicationDisplayName(QString::fromLatin1(config::kDisplayName));
     setDesktopFileName(QString::fromLatin1(config::kAppId));
 }
 
@@ -49,10 +50,10 @@ int Application::run()
         if (instance->activatePrimary(qgetenv("XDG_ACTIVATION_TOKEN"))) {
             return EXIT_SUCCESS;
         }
-        QMessageBox::warning(nullptr, applicationName(),
+        QMessageBox::warning(nullptr, applicationDisplayName(),
                              tr("%1 is already running but is not responding.\n"
                                 "Close it and try again.")
-                                 .arg(applicationName()));
+                                 .arg(applicationDisplayName()));
         return EXIT_FAILURE;
     }
 

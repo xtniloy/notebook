@@ -1,5 +1,7 @@
 #include "ui/dialogs/AboutDialog.h"
 
+#include "app/Config.h"
+
 #include <QApplication>
 #include <QDialogButtonBox>
 #include <QFile>
@@ -48,11 +50,12 @@ QString licenseText()
 AboutDialog::AboutDialog(QWidget* parent)
     : QDialog(parent)
 {
-    setWindowTitle(tr("About %1").arg(QApplication::applicationName()));
+    const QString displayName = QString::fromLatin1(config::kDisplayName);
+    setWindowTitle(tr("About %1").arg(displayName));
 
     auto* title = new QLabel(QStringLiteral("<b>%1</b> %2")
-                                 .arg(QApplication::applicationName().toHtmlEscaped(),
-                                      QApplication::applicationVersion().toHtmlEscaped()),
+                                 .arg(displayName.toHtmlEscaped(),
+                                      QString::fromLatin1(config::kAppVersion).toHtmlEscaped()),
                              this);
     auto* qtNotice = new QLabel(tr("Built with Qt %1, used under the GNU LGPL version 3.")
                                     .arg(QString::fromLatin1(qVersion())),

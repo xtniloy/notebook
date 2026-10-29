@@ -13,7 +13,7 @@ class QLockFile;
 
 namespace notes::app {
 
-// Keeps NotesApp to one process per user, so two processes never write the same
+// Keeps the app to one process per user, so two processes never write the same
 // database or run two sync engines. A second launch asks the running instance to
 // show its window, then exits.
 //
