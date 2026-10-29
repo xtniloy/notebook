@@ -2,20 +2,36 @@
 
 #include <QString>
 
+#include <cstdint>
 #include <optional>
 #include <utility>
 
 namespace notes::storage {
 
 // A failed database operation (ADR 0002). Values, not exceptions, so errors can
-// cross from the DB thread to the UI (ADR 0003). The message comes from SQLite
-// and names tables and columns, never bound values, so it is safe to log.
+// cross from the DB thread to the UI (ADR 0003). Messages name tables, columns
+// and ids, never note content or bound values, so they are safe to log.
 struct DbError
 {
+    // Why it failed: SQLite itself, or a rule enforced by a repository.
+    enum class Kind : std::uint8_t {
+        Sqlite,          // see `code`
+        NotFound,        // no such row (or it was deleted)
+        InvalidArgument, // e.g. an empty folder name
+        Cycle,           // a folder moved into its own subtree (TC-STO-008)
+        Protected,       // e.g. deleting the default "Notes" folder (TC-STO-011)
+    };
+
     int code = 0; // SQLite extended result code, e.g. SQLITE_CONSTRAINT_UNIQUE
     QString message;
+    Kind kind = Kind::Sqlite;
 
     [[nodiscard]] int primaryCode() const { return code & 0xff; }
+
+    [[nodiscard]] static DbError make(Kind kind, QString message)
+    {
+        return {.code = 0, .message = std::move(message), .kind = kind};
+    }
 };
 
 // Either a value or a DbError (C++20 has no std::expected).

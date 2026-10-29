@@ -370,10 +370,10 @@ Record each in `docs/adr/`:
 
 ### 2.5 Folder repository `M`
 
-- [ ] `FolderRepository`: `create`, `rename`, `move(newParent)`, `softDelete`, `listTree`, `reorder`
-- [ ] Every change bumps `version`, sets `updated_at`, and sets `sync_state = 0`
-- [ ] Prevent cycles (moving a folder into its own descendant)
-- [ ] Create default **Notes** folder on first run
+- [x] `FolderRepository`: `create`, `rename`, `move(newParent)`, `softDelete`, `listTree`, `reorder` *(names are trimmed; `softDelete` tombstones the whole subtree and moves its notes to Recently Deleted, keeping their `folder_id` for restore. Errors carry a `DbError::Kind`: NotFound, InvalidArgument, Cycle, Protected)*
+- [x] Every change bumps `version`, sets `updated_at`, and sets `sync_state = 0` *(times from `IClock`; `reorder` only touches rows whose position changes)*
+- [x] Prevent cycles (moving a folder into its own descendant)
+- [x] Create default **Notes** folder on first run *(`ensureDefaultFolder()`, with the fixed UUID `d5cf1c5f-0bc7-419e-b2f2-096709ed4f5b` from ADR 0005; it can't be deleted, moved or renamed, as in macOS Notes. Calling it at startup comes with the 2.11 wiring)*
 
 **Tests**
 - `TC-STO-007` (U) Create nested folders 3 levels deep → `listTree` returns the correct hierarchy.

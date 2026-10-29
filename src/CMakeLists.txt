@@ -33,6 +33,8 @@ add_library(notesapp_core STATIC
     storage/DbResult.h
     storage/DbThread.cpp
     storage/DbThread.h
+    storage/FolderRepository.cpp
+    storage/FolderRepository.h
     storage/Migrator.cpp
     storage/Migrator.h
     storage/SqlCipher.cpp
