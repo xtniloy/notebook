@@ -33,6 +33,22 @@ ctest --preset debug
 ./build/debug/src/notesapp
 ```
 
+### Other systems: the dev container
+
+On anything other than Ubuntu 26.04+ (another distro, an older Ubuntu, Windows with WSL 2, macOS), build in the Ubuntu 26.04 container instead. It has the same packages as `setup-dev.sh` and CI. You need Docker.
+
+- **VS Code:** install *Dev Containers*, then *Reopen in Container*. **CLion:** open `.devcontainer/devcontainer.json` and choose *Create Dev Container*. Both use the presets below unchanged.
+- **Any terminal:**
+
+  ```bash
+  scripts/dev-container.sh                     # shell inside the container
+  scripts/dev-container.sh bash -c 'cmake --preset debug && cmake --build --preset debug && ctest --preset debug'
+  ```
+
+The first run builds the image (a few minutes); later runs start in seconds. Container builds go to the `notesapp-build` Docker volume, not to `./build`, so they never collide with a native build (`docker volume rm notesapp-build` clears them).
+
+Tests run headless in the container. Showing the app's window from the container needs X11/Wayland forwarding, which is not set up; for GUI work and debugging, a native Ubuntu 26.04 install is the smoothest option. Ubuntu developers can also use `scripts/dev-container.sh` to check a change in a clean environment before opening a PR.
+
 ### Presets
 
 | Preset | Use |

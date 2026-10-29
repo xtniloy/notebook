@@ -1,0 +1,4 @@
+# The dev image only needs the setup script; keep build/ (hundreds of MB) out of
+# the build context.
+*
+!scripts/setup-dev.sh
