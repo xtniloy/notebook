@@ -1,0 +1,40 @@
+name: Set up build environment
+description: >
+  Installs dependencies with scripts/setup-dev.sh inside the ubuntu:26.04 job
+  container, with cached .deb downloads and a per-configuration ccache.
+
+inputs:
+  ccache-key:
+    description: Separates ccache caches per build configuration (e.g. the preset name).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Keep downloaded packages so they can be cached
+      shell: bash
+      run: rm -f /etc/apt/apt.conf.d/docker-clean
+
+    - name: Restore apt cache
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt/archives/*.deb
+        key: apt-ubuntu2604-${{ hashFiles('scripts/setup-dev.sh') }}
+
+    - name: Install dependencies
+      shell: bash
+      run: scripts/setup-dev.sh --ci
+
+    - name: Restore ccache
+      uses: actions/cache@v4
+      with:
+        path: .ccache
+        key: ccache-${{ inputs.ccache-key }}-${{ github.sha }}
+        restore-keys: ccache-${{ inputs.ccache-key }}-
+
+    - name: Use ccache
+      shell: bash
+      run: |
+        echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
+        echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+        echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> "$GITHUB_ENV"

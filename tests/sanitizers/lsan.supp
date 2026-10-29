@@ -1,0 +1,2 @@
+# LeakSanitizer suppressions for leaks inside system libraries we do not control.
+# Never suppress a leak in first-party code; fix it instead.

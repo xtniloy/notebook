@@ -89,12 +89,12 @@
 
 Ubuntu 24.04 ships **Qt 6.4**, which is missing APIs this plan relies on: `QStyleHints::colorScheme()` (Qt 6.5+) for dark mode and built-in PKCE in Qt Network Authorization (Qt 6.8+). Decide now, because it affects code from Phase 1 on.
 
-- [ ] Check Qt versions shipped by Ubuntu 24.04 LTS and 26.04 LTS (`apt policy qt6-base-dev`)
-- [ ] Check the Qt version in the current KDE Flatpak runtime
-- [ ] Choose one option and record it in `docs/adr/0001-minimum-platform.md`:
+- [x] Check Qt versions shipped by Ubuntu 24.04 LTS and 26.04 LTS (`apt policy qt6-base-dev`)
+- [x] Check the Qt version in the current KDE Flatpak runtime
+- [x] Choose one option and record it in `docs/adr/0001-minimum-platform.md`:
   - **A:** `.deb` targets Ubuntu 26.04+ only; Flatpak covers older systems *(recommended)*
   - **B:** Support Qt 6.4 and write fallbacks (manual PKCE, D-Bus theme detection)
-- [ ] Set `find_package(Qt6 <version> REQUIRED ...)` to match
+- [x] Set `find_package(Qt6 <version> REQUIRED ...)` to match
 
 **Tests**
 - `TC-ENV-001` (M) Build on the chosen minimum Ubuntu version in a clean container succeeds.
@@ -103,10 +103,10 @@ Ubuntu 24.04 ships **Qt 6.4**, which is missing APIs this plan relies on: `QStyl
 
 ### 0.2 Development environment `S`
 
-- [ ] Write `scripts/setup-dev.sh` that installs: `build-essential cmake ninja-build clang clang-tidy cppcheck gdb valgrind heaptrack linux-tools-generic`, `qt6-base-dev qt6-tools-dev qt6-svg-dev libqt6networkauth6-dev qt6-httpserver-dev`, `libsqlcipher-dev libsodium-dev qtkeychain-qt6-dev`
-- [ ] Make the script idempotent (safe to run twice)
+- [x] Write `scripts/setup-dev.sh` that installs: `build-essential cmake ninja-build clang clang-tidy cppcheck gdb valgrind heaptrack linux-tools-generic`, `qt6-base-dev qt6-tools-dev qt6-svg-dev qt6-networkauth-dev qt6-httpserver-dev`, `libsqlcipher-dev libsodium-dev qtkeychain-qt6-dev`, `pkgconf ccache libclang-rt-dev` *(package names corrected for Ubuntu 26.04: `libqt6networkauth6-dev` does not exist; `libclang-rt-dev` is needed for sanitizers/libFuzzer with clang)*
+- [x] Make the script idempotent (safe to run twice)
 - [ ] Install Qt Creator or configure CLion/VS Code with clangd
-- [ ] Document the steps in `README.md` → "Building"
+- [x] Document the steps in `README.md` → "Building"
 
 **Tests**
 - `TC-ENV-002` (M) Run `setup-dev.sh` in a fresh `ubuntu` Docker container, then build. Succeeds with no manual steps.
@@ -133,10 +133,10 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 0.4 Repository skeleton `S`
 
-- [ ] Create the folder layout from **Plan §11** (`src/{app,ui,editor,models,services,storage,crypto,sync}`, `tests/{unit,integration,ui,bench,fuzz}`, `resources/`, `packaging/`, `docs/`, `cmake/`, `tools/`)
+- [x] Create the folder layout from **Plan §11** (`src/{app,ui,editor,models,services,storage,crypto,sync}`, `tests/{unit,integration,ui,bench,fuzz}`, `resources/`, `packaging/`, `docs/`, `cmake/`, `tools/`)
 - [ ] Add `LICENSE` (choose: GPLv3, MIT, or proprietary; Qt is LGPL and dynamically linked either way, see Plan §5)
-- [ ] Add `.clang-format`, `.clang-tidy`, `.editorconfig`
-- [ ] Add `docs/contributing.md`: naming, smart pointers only (except Qt parent-owned widgets), wrap all user-visible strings in `tr()`, **never log note content**
+- [x] Add `.clang-format`, `.clang-tidy`, `.editorconfig`
+- [x] Add `docs/contributing.md`: naming, smart pointers only (except Qt parent-owned widgets), wrap all user-visible strings in `tr()`, **never log note content**
 
 **Tests**
 - `TC-BLD-001` (U) `clang-format --dry-run --Werror` on all sources passes (runs in CI).
@@ -145,15 +145,15 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 0.5 CMake project `M`
 
-- [ ] Top-level `CMakeLists.txt` with C++20, `-Wall -Wextra -Wpedantic -Werror` (debug), `-O2` + LTO (release)
-- [ ] `cmake/FindSQLCipher.cmake` and `cmake/FindSodium.cmake` (or `pkg_check_modules`)
-- [ ] Targets:
+- [x] Top-level `CMakeLists.txt` with C++20, `-Wall -Wextra -Wpedantic -Werror` (debug), `-O2` + LTO (release)
+- [x] `cmake/FindSQLCipher.cmake` and `cmake/FindSodium.cmake` (or `pkg_check_modules`)
+- [x] Targets:
   - `notesapp_core` static library: storage, crypto, services, sync (**no widgets**, so tests link without a GUI)
   - `notesapp_ui` static library: widgets
   - `notesapp` executable: `main.cpp` only
-- [ ] Options: `NOTES_ENABLE_TESTS`, `NOTES_ENABLE_ASAN`, `NOTES_ENABLE_FUZZ`, `NOTES_ENABLE_BENCH`
-- [ ] `CMakePresets.json` with presets: `debug`, `debug-asan`, `release`, `fuzz` (clang)
-- [ ] `main.cpp` shows an empty `QMainWindow`
+- [x] Options: `NOTES_ENABLE_TESTS`, `NOTES_ENABLE_ASAN`, `NOTES_ENABLE_FUZZ`, `NOTES_ENABLE_BENCH`
+- [x] `CMakePresets.json` with presets: `debug`, `debug-asan`, `release`, `fuzz` (clang)
+- [x] `main.cpp` shows an empty `QMainWindow`
 
 **Tests**
 - `TC-BLD-002` (I) Each preset configures and builds with zero warnings.
@@ -164,10 +164,10 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 0.6 Test harness `S`
 
-- [ ] `tests/CMakeLists.txt` with helper `notes_add_test(NAME tst_x SOURCES ... LABELS unit)`
-- [ ] Set `QT_QPA_PLATFORM=offscreen` for all tests via CTest environment
-- [ ] `tests/common/`: `TestHelpers.h` (temp DB factory, marker string constant), stubs for `FakeClock`, `InMemoryKeyStore`
-- [ ] First smoke test `tst_smoke.cpp`
+- [x] `tests/CMakeLists.txt` with helper `notes_add_test(NAME tst_x SOURCES ... LABELS unit)`
+- [x] Set `QT_QPA_PLATFORM=offscreen` for all tests via CTest environment
+- [x] `tests/common/`: `TestHelpers.h` (temp DB factory, marker string constant), stubs for `FakeClock`, `InMemoryKeyStore`
+- [x] First smoke test `tst_smoke.cpp`
 
 **Tests**
 - `TC-BLD-005` (U) `ctest -L unit` runs and passes the smoke test.
@@ -177,13 +177,13 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 0.7 Continuous integration `M`
 
-- [ ] `.github/workflows/ci.yml` with jobs:
+- [x] `.github/workflows/ci.yml` with jobs:
   - `build-test`: debug build + `ctest -L "unit|integration|ui"`
   - `sanitizers`: `debug-asan` preset + full test suite
   - `static-analysis`: `clang-tidy` + `cppcheck`, warnings as errors
   - `format`: `clang-format` check
-- [ ] Cache apt packages and the build dir
-- [ ] Upload test logs as artifacts on failure
+- [x] Cache apt packages and the build dir *(build dir cached via ccache)*
+- [x] Upload test logs as artifacts on failure
 - [ ] Branch protection on `main`: CI must pass
 
 **Tests**

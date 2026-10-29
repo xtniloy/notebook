@@ -224,3 +224,6 @@ SHA256SUMS*
 Thumbs.db
 .directory
 .Trash-*
+
+# ccache (CI keeps it in the workspace)
+.ccache/

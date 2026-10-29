@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Every job builds inside Ubuntu 26.04, the minimum platform (docs/adr/0001-minimum-platform.md).
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          ccache-key: debug
+      - run: cmake --preset debug
+      - run: cmake --build --preset debug
+      - run: ctest --preset debug -L "unit|integration|ui"
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-debug
+          path: build/debug/Testing/Temporary/
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:26.04
+      # LeakSanitizer needs ptrace to inspect threads at exit.
+      options: --cap-add SYS_PTRACE
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          ccache-key: debug-asan
+      - run: cmake --preset debug-asan
+      - run: cmake --build --preset debug-asan
+      - run: ctest --preset debug-asan
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-debug-asan
+          path: build/debug-asan/Testing/Temporary/
+
+  # TC-BLD-002: every other preset builds with zero warnings.
+  presets:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [release, fuzz]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          ccache-key: ${{ matrix.preset }}
+      - run: cmake --preset ${{ matrix.preset }} -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+      - run: cmake --build --preset ${{ matrix.preset }}
+      # TC-BLD-004: release binary is stripped; size is the baseline for Plan §10 (< 3 MB).
+      - name: Report binary size
+        if: matrix.preset == 'release'
+        shell: bash
+        run: |
+          bin=build/release/src/notesapp
+          if readelf -S "$bin" | grep -q '\.symtab'; then
+            echo "::error::$bin is not stripped"
+            exit 1
+          fi
+          size=$(stat -c %s "$bin")
+          echo "notesapp (release, stripped): $size bytes"
+          echo "**notesapp** release binary: \`$size\` bytes (budget: 3 MB)" >> "$GITHUB_STEP_SUMMARY"
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          ccache-key: debug
+      - run: cmake --preset debug
+      - run: scripts/static-analysis.sh build/debug
+
+  format:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: apt-get update && apt-get install -y --no-install-recommends clang-format
+      - run: scripts/check-format.sh

@@ -1,0 +1,5 @@
+---
+InheritParentConfig: true
+# Qt Test discovers test functions as private slots, so they can't be static.
+Checks: >
+  -readability-convert-member-functions-to-static

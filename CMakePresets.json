@@ -1,0 +1,77 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "NOTES_ENABLE_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "debug-asan",
+      "displayName": "Debug + ASan/UBSan",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NOTES_ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (-O2, LTO, stripped)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_FLAGS_RELEASE": "-O2 -DNDEBUG",
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
+        "NOTES_ENABLE_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "fuzz",
+      "displayName": "Fuzzing (clang + libFuzzer)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "NOTES_ENABLE_TESTS": "OFF",
+        "NOTES_ENABLE_FUZZ": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "debug-asan", "configurePreset": "debug-asan" },
+    { "name": "release", "configurePreset": "release" },
+    { "name": "fuzz", "configurePreset": "fuzz" }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error" }
+    },
+    {
+      "name": "debug-asan",
+      "inherits": "debug",
+      "configurePreset": "debug-asan",
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1:strict_string_checks=1",
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1",
+        "LSAN_OPTIONS": "suppressions=${sourceDir}/tests/sanitizers/lsan.supp:print_suppressions=0"
+      }
+    }
+  ]
+}
