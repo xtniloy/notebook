@@ -28,8 +28,19 @@ add_library(notesapp_core STATIC
     models/Tag.h
     models/Uuid.cpp
     models/Uuid.h
+    storage/Database.cpp
+    storage/Database.h
+    storage/DbResult.h
+    storage/DbThread.cpp
+    storage/DbThread.h
     storage/SqlCipher.cpp
-    storage/SqlCipher.h)
+    storage/SqlCipher.h
+    storage/SqliteError.cpp
+    storage/SqliteError.h
+    storage/Statement.cpp
+    storage/Statement.h
+    storage/Transaction.cpp
+    storage/Transaction.h)
 target_include_directories(notesapp_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_BINARY_DIR}/generated")

@@ -336,12 +336,12 @@ Record each in `docs/adr/`:
 
 ### 2.3 Database wrapper `M`
 
-- [ ] `Database` class: open/close, `exec`, prepared `Statement` class with typed `bind()`/`column()`
-- [ ] Prepared-statement cache
-- [ ] RAII `Transaction` guard (commits on `commit()`, rolls back in destructor otherwise)
-- [ ] On open: `PRAGMA journal_mode=WAL`, `foreign_keys=ON`, `synchronous=NORMAL`
-- [ ] Errors returned as a `DbError` type (no exceptions crossing threads)
-- [ ] `DbThread` that owns the `Database` and runs jobs from a queue
+- [x] `Database` class: open/close, `exec`, prepared `Statement` class with typed `bind()`/`column()` *(`QString`/`QByteArray` always bind as non-NULL; `std::optional` for NULL. Open also refuses to run without SQLCipher)*
+- [x] Prepared-statement cache *(`prepare()` hands out a `ScopedStatement` that resets on scope exit, so a half-read statement can't hold a WAL read snapshot; nested use of the same SQL gets a throwaway statement)*
+- [x] RAII `Transaction` guard (commits on `commit()`, rolls back in destructor otherwise) *(`BEGIN IMMEDIATE`; no nesting)*
+- [x] On open: `PRAGMA journal_mode=WAL`, `foreign_keys=ON`, `synchronous=NORMAL`
+- [x] Errors returned as a `DbError` type (no exceptions crossing threads) *(`DbResult<T>` / `DbStatus`, extended SQLite codes)*
+- [x] `DbThread` that owns the `Database` and runs jobs from a queue *(`post()` returns a `QFuture`; `stop()` drains the queue before closing)*
 
 **Tests**
 - `TC-STO-002` (U) Open a new DB in a temp dir → `journal_mode` is `wal`, `foreign_keys` is `1`.
