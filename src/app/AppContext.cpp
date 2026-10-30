@@ -4,6 +4,7 @@
 #include "app/SystemClock.h"
 #include "services/FolderService.h"
 #include "services/NoteService.h"
+#include "services/TrashPurger.h"
 #include "storage/DbThread.h"
 #include "storage/Migrator.h"
 
@@ -52,6 +53,8 @@ void AppContext::openDatabase(const QString& path)
     m_notes = std::make_unique<services::NoteService>(*m_db, *m_clock);
     m_folders = std::make_unique<services::FolderService>(*m_db, *m_clock);
     (void)m_folders->ensureDefaultFolder();
+    m_trashPurger = std::make_unique<services::TrashPurger>(*m_notes);
+    m_trashPurger->start();
 }
 
 QString AppContext::defaultDatabasePath()

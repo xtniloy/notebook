@@ -9,6 +9,7 @@ class QSettings;
 namespace notes::services {
 class FolderService;
 class NoteService;
+class TrashPurger;
 } // namespace notes::services
 
 namespace notes::storage {
@@ -45,9 +46,9 @@ public:
     [[nodiscard]] const IClock& clock() const { return *m_clock; }
 
     // Starts the DB thread on `path` (created if missing), queues the schema
-    // migration and the default "Notes" folder, and creates the services. Jobs
-    // run in order, so anything posted afterwards sees a migrated database.
-    // Call once.
+    // migration, the default "Notes" folder and emptying Recently Deleted of
+    // notes older than 30 days (then daily), and creates the services. Jobs run
+    // in order, so anything posted afterwards sees a migrated database. Call once.
     void openDatabase(const QString& path);
     // The user's database: notes.db in the app's data directory (made 0700).
     [[nodiscard]] static QString defaultDatabasePath();
@@ -64,6 +65,7 @@ private:
     std::unique_ptr<storage::DbThread> m_db;
     std::unique_ptr<services::NoteService> m_notes;
     std::unique_ptr<services::FolderService> m_folders;
+    std::unique_ptr<services::TrashPurger> m_trashPurger;
 };
 
 } // namespace notes::app

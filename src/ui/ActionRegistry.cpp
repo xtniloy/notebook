@@ -55,7 +55,8 @@ ActionSpec specFor(ActionId id)
                 .text = ActionRegistry::tr("&Delete Note"),
                 .icon = Icon::Trash,
                 .shortcut = QKeySequence(Qt::Key_Delete),
-                .toolTip = ActionRegistry::tr("Move Note to Recently Deleted")};
+                .toolTip = ActionRegistry::tr("Move Note to Recently Deleted"),
+                .enabled = true}; // task 2.10
     case ActionId::NewNote:
         return {.objectName = "newNoteAction",
                 .text = ActionRegistry::tr("&New Note"),

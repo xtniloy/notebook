@@ -64,6 +64,7 @@ private slots:
     void editingMovesNoteToTop();
     void followsFolderMovesAndTrash();
     void recentlyDeletedList();
+    void daysRemaining();
     void sortByTitle();
     void staleResultsAreDropped();
 
@@ -320,6 +321,32 @@ void tst_NoteListModel::recentlyDeletedList()
     settle(model);
     QCOMPARE(rows(model), (QStringList{QStringLiteral("[Today]"), QStringLiteral("Third"),
                                        QStringLiteral("Second")}));
+}
+
+// Task 2.10: Recently Deleted rows count down to the purge.
+void tst_NoteListModel::daysRemaining()
+{
+    constexpr qint64 kDay = 24LL * 60 * 60 * 1000;
+    const qint64 trashed = notes::test::FakeClock::kDefaultStartMs;
+    QCOMPARE(NoteListModel::daysRemainingText(trashed, trashed),
+             QStringLiteral("30 days remaining"));
+    QCOMPARE(NoteListModel::daysRemainingText(trashed, trashed + 1),
+             QStringLiteral("30 days remaining"));
+    QCOMPARE(NoteListModel::daysRemainingText(trashed, trashed + (29 * kDay)),
+             QStringLiteral("1 day remaining"));
+    QCOMPARE(NoteListModel::daysRemainingText(trashed, trashed + (29 * kDay) + 1),
+             QStringLiteral("1 day remaining"));
+    QCOMPARE(NoteListModel::daysRemainingText(trashed, trashed + (30 * kDay)),
+             QStringLiteral("0 days remaining"));
+
+    const Note note = addNote(m_work, QStringLiteral("Doomed"));
+    QVERIFY(await(m_notes->trash(note.id)));
+    m_clock.advance(std::chrono::days(3));
+    NoteListModel model(*m_notes, m_clock);
+    model.setFolder(roles::kRecentlyDeletedFolderId);
+    settle(model);
+    QCOMPARE(model.index(1).data(roles::kTimeTextRole).toString(),
+             QStringLiteral("27 days remaining"));
 }
 
 void tst_NoteListModel::sortByTitle()

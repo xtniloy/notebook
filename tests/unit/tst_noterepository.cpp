@@ -77,6 +77,7 @@ private slots:
     void trashAndRestore();
     void restoreFallsBackToDefaultFolder();
     void purgeLeavesContentFreeTombstone();
+    void purgeExpiredAfterThirtyDays();
     void stateRules();
     void paging();
 
@@ -342,6 +343,7 @@ void tst_NoteRepository::moveToFolder()
     QCOMPARE(m_notes->get(note.id).value().folderId, other);
 }
 
+// TC-STO-029
 void tst_NoteRepository::trashAndRestore()
 {
     const Note note = create(QStringLiteral("Note"));
@@ -364,6 +366,7 @@ void tst_NoteRepository::trashAndRestore()
     QVERIFY(titles(m_notes->listTrashed()).isEmpty());
 }
 
+// TC-STO-030
 void tst_NoteRepository::restoreFallsBackToDefaultFolder()
 {
     const Note note = create(QStringLiteral("Note"));
@@ -377,6 +380,7 @@ void tst_NoteRepository::restoreFallsBackToDefaultFolder()
              QStringList{QStringLiteral("Note")});
 }
 
+// TC-STO-032 (attachments and tags go with the note)
 void tst_NoteRepository::purgeLeavesContentFreeTombstone()
 {
     const Note note = create(QStringLiteral("Secret"));
@@ -417,6 +421,37 @@ void tst_NoteRepository::purgeLeavesContentFreeTombstone()
     QCOMPARE(m_notes->restore(note.id).error().kind, Kind::NotFound);
     QCOMPARE(m_notes->updateBody(note.id, content(QStringLiteral("x"))).error().kind,
              Kind::NotFound);
+}
+
+// TC-STO-031
+void tst_NoteRepository::purgeExpiredAfterThirtyDays()
+{
+    const Note old = create(QStringLiteral("Old"));
+    const Note recent = create(QStringLiteral("Recent"));
+    const Note live = create(QStringLiteral("Live"));
+    QVERIFY(m_notes->trash(old.id));
+    m_clock.advance(1h);
+    QVERIFY(m_notes->trash(recent.id));
+
+    // 29 days after the first trash: nothing is due.
+    m_clock.advance(std::chrono::days(29) - 1h);
+    QCOMPARE(m_notes->purgeExpired().value(), QList<qint64>{});
+    // Exactly 30 days: still there.
+    m_clock.advance(std::chrono::days(1));
+    QCOMPARE(m_notes->purgeExpired().value(), QList<qint64>{});
+    QCOMPARE(titles(m_notes->listTrashed()),
+             (QStringList{QStringLiteral("Recent"), QStringLiteral("Old")}));
+    // 30 days and 1 ms: purged, like a manual purge (a tombstone).
+    m_clock.advance(1ms);
+    QCOMPARE(m_notes->purgeExpired().value(), QList<qint64>{old.id});
+    QVERIFY(m_notes->get(old.id).value().deletedAt.has_value());
+    QCOMPARE(titles(m_notes->listTrashed()), QStringList{QStringLiteral("Recent")});
+
+    // The other one's turn an hour later; live notes never expire.
+    m_clock.advance(1h);
+    QCOMPARE(m_notes->purgeExpired().value(), QList<qint64>{recent.id});
+    QCOMPARE(titles(m_notes->listAll(NoteSort::Title)), QStringList{QStringLiteral("Live")});
+    QCOMPARE(m_notes->get(live.id).value().deletedAt, std::nullopt);
 }
 
 void tst_NoteRepository::stateRules()

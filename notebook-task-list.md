@@ -475,11 +475,11 @@ Record each in `docs/adr/`:
 
 ### 2.10 Recently Deleted `M`
 
-- [ ] Trash sets `trashed_at`; note leaves its folder and appears in Recently Deleted
-- [ ] Restore returns it to its original folder (or "Notes" if that folder is gone)
-- [ ] "Delete Permanently" with confirmation
-- [ ] Auto-purge items older than 30 days: on startup and once per day
-- [ ] List shows "N days remaining"
+- [x] Trash sets `trashed_at`; note leaves its folder and appears in Recently Deleted *(Delete toolbar button / Edit menu / note right-click menu, now enabled; notes there open read-only)*
+- [x] Restore returns it to its original folder (or "Notes" if that folder is gone) *("Recover" in the note right-click menu in Recently Deleted)*
+- [x] "Delete Permanently" with confirmation *(right-click menu, or Delete while in Recently Deleted; Cancel is the default button)*
+- [x] Auto-purge items older than 30 days: on startup and once per day *(`TrashPurger`, started by `AppContext::openDatabase()`; exactly 30 days old still stays)*
+- [x] List shows "N days remaining" *(in place of the time, rounded up)*
 
 **Tests**
 - `TC-STO-029` (U) Trash → restore → note back in original folder.

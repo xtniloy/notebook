@@ -61,6 +61,12 @@ private:
     void openNote(qint64 noteId);
     // Saves what's pending, then shows the empty state.
     void clearEditor();
+    // Delete action: to Recently Deleted, or, there, permanently (task 2.10).
+    void deleteCurrentNote();
+    void recoverNote(qint64 noteId);
+    // After a confirmation; cannot be undone.
+    void deletePermanently(qint64 noteId);
+    void showNoteMenu(const QPoint& position);
     void setSidebarVisible(bool visible);
     // Sets exact pane widths; the editor gets the remaining space. QSplitter's
     // own setSizes() spreads any difference proportionally across all panes.

@@ -194,6 +194,20 @@ QFuture<DbStatus> NoteService::purge(qint64 id)
         });
 }
 
+QFuture<DbResult<QList<qint64>>> NoteService::purgeExpired()
+{
+    const app::IClock* clock = &m_clock;
+    return m_db.post([clock](Database& db) { return NoteRepository(db, *clock).purgeExpired(); })
+        .then(this, [this](DbResult<QList<qint64>> purged) {
+            if (purged) {
+                for (const qint64 id : purged.value()) {
+                    emit notePurged(id);
+                }
+            }
+            return purged;
+        });
+}
+
 QFuture<DbResult<QList<NoteSummary>>> NoteService::list(qint64 folderId, NoteSort sort, int limit,
                                                         int offset)
 {

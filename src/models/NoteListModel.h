@@ -58,6 +58,10 @@ public:
     // midnight. Sections are otherwise fixed while the model is shown.
     void refreshDates();
 
+    // "30 days remaining" for a note trashed at `trashedAtMs`: Recently
+    // Deleted's rows show this instead of a time (task 2.10).
+    [[nodiscard]] static QString daysRemainingText(qint64 trashedAtMs, qint64 nowMs);
+
     [[nodiscard]] int rowCount(const QModelIndex& parent = {}) const override;
     [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
     [[nodiscard]] Qt::ItemFlags flags(const QModelIndex& index) const override;
@@ -97,6 +101,8 @@ private:
 
     [[nodiscard]] QString sectionOf(const NoteSummary& note) const;
     [[nodiscard]] qint64 timestampOf(const NoteSummary& note) const;
+    // The row's time; in Recently Deleted, the days until it is purged.
+    [[nodiscard]] QString timeTextOf(const NoteSummary& note) const;
 
     services::NoteService& m_service;
     const app::IClock& m_clock;

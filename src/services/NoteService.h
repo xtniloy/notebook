@@ -55,6 +55,9 @@ public:
     QFuture<storage::DbStatus> trash(qint64 id);
     QFuture<storage::DbStatus> restore(qint64 id);
     QFuture<storage::DbStatus> purge(qint64 id);
+    // Purges notes trashed more than 30 days ago (task 2.10); notePurged() for
+    // each. Returns their ids.
+    QFuture<storage::DbResult<QList<qint64>>> purgeExpired();
 
     // The notes `folderId` lists in the sidebar: a folder, All Notes, or
     // Recently Deleted (which ignores `sort`: most recently deleted first).

@@ -9,6 +9,7 @@
 #include <QLoggingCategory>
 
 #include <algorithm>
+#include <chrono>
 
 namespace notes::models {
 
@@ -191,10 +192,8 @@ QList<NoteListModel::Row> NoteListModel::buildRows(const QList<NoteSummary>& not
             current = section;
             first = false;
         }
-        rows.append(Row{.isHeader = false,
-                        .section = section,
-                        .timeText = DateGrouping::rowTimeText(timestampOf(note), m_now),
-                        .note = note});
+        rows.append(
+            Row{.isHeader = false, .section = section, .timeText = timeTextOf(note), .note = note});
     }
     return rows;
 }
@@ -302,6 +301,23 @@ QString NoteListModel::sectionOf(const NoteSummary& note) const
         return tr("Notes");
     }
     return DateGrouping::title(DateGrouping::sectionFor(timestampOf(note), m_now));
+}
+
+QString NoteListModel::timeTextOf(const NoteSummary& note) const
+{
+    if (m_folderId != kRecentlyDeletedFolderId) {
+        return DateGrouping::rowTimeText(timestampOf(note), m_now);
+    }
+    return daysRemainingText(note.trashedAt.value_or(m_now), m_now);
+}
+
+QString NoteListModel::daysRemainingText(qint64 trashedAtMs, qint64 nowMs)
+{
+    // Rounded up: a note purged in 2.5 days shows "3 days", like macOS Notes.
+    constexpr qint64 kDayMs = std::chrono::milliseconds(std::chrono::days(1)).count();
+    const qint64 left = trashedAtMs + storage::NoteRepository::kTrashRetention.count() - nowMs;
+    const qint64 days = std::max<qint64>(0, (left + kDayMs - 1) / kDayMs);
+    return days == 1 ? tr("1 day remaining") : tr("%1 days remaining").arg(days);
 }
 
 qint64 NoteListModel::timestampOf(const NoteSummary& note) const

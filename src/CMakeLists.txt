@@ -37,6 +37,8 @@ add_library(notesapp_core STATIC
     services/NoteService.h
     services/NoteText.cpp
     services/NoteText.h
+    services/TrashPurger.cpp
+    services/TrashPurger.h
     storage/Database.cpp
     storage/Database.h
     storage/DbResult.h

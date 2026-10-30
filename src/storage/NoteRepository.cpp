@@ -335,6 +335,38 @@ DbStatus NoteRepository::purge(qint64 id)
     return tx.value().commit();
 }
 
+DbResult<QList<qint64>> NoteRepository::purgeExpired()
+{
+    DbResult<ScopedStatement> select = m_db.prepare(
+        QStringLiteral("SELECT id FROM notes WHERE trashed_at IS NOT NULL AND deleted_at IS NULL"
+                       " AND trashed_at < ? ORDER BY id"));
+    if (!select) {
+        return select.error();
+    }
+    select.value()->bind(1, m_clock.nowMs() - kTrashRetention.count());
+    QList<qint64> expired;
+    while (true) {
+        DbResult<bool> row = select.value()->step();
+        if (!row) {
+            return row.error();
+        }
+        if (!row.value()) {
+            break;
+        }
+        expired.append(select.value()->column<qint64>(0));
+    }
+    select.value()->reset();
+    // One transaction per note: a failure leaves the others purged.
+    QList<qint64> purged;
+    for (const qint64 id : std::as_const(expired)) {
+        if (const DbStatus status = purge(id); !status) {
+            return status.error();
+        }
+        purged.append(id);
+    }
+    return purged;
+}
+
 DbResult<QList<NoteSummary>> NoteRepository::list(QLatin1StringView where,
                                                   QLatin1StringView orderBy,
                                                   std::optional<qint64> folderId, int limit,

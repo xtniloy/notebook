@@ -8,6 +8,7 @@
 #include <QList>
 #include <QString>
 
+#include <chrono>
 #include <cstdint>
 #include <optional>
 
@@ -72,6 +73,12 @@ public:
     // Deletes the note for good: its attachments go, and the row becomes a
     // tombstone without content, so sync can pass the deletion on.
     DbStatus purge(qint64 id);
+
+    // How long notes stay in Recently Deleted (Plan §3.3).
+    static constexpr std::chrono::milliseconds kTrashRetention = std::chrono::days(30);
+    // Purges every note trashed more than kTrashRetention ago (exactly 30 days
+    // ago still stays). Returns the purged ids.
+    [[nodiscard]] DbResult<QList<qint64>> purgeExpired();
 
     // Pinned notes first, then by `sort`. Never loads bodies (TC-STO-014).
     // `limit` < 0 means no limit; `offset` skips rows (paging, task 2.8).

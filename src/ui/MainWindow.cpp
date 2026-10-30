@@ -6,6 +6,8 @@
 #include "models/FolderTreeModel.h"
 #include "models/Note.h"
 #include "models/NoteListModel.h"
+#include "models/NoteListRoles.h"
+#include "models/SidebarRoles.h"
 #include "services/Autosave.h"
 #include "services/NoteService.h"
 #include "ui/ActionRegistry.h"
@@ -26,8 +28,11 @@
 #include <QDateTime>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QPainter>
+#include <QPushButton>
 #include <QSettings>
 #include <QSizePolicy>
 #include <QSplitter>
@@ -135,6 +140,10 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
             [this](qint64 folderId) { m_noteListModel->setFolder(folderId); });
     connect(m_noteList, &NoteListView::noteSelected, this, &MainWindow::openNote);
     connect(m_noteList, &NoteListView::currentNoteCleared, this, &MainWindow::clearEditor);
+    m_noteList->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_noteList, &QWidget::customContextMenuRequested, this, &MainWindow::showNoteMenu);
+    connect(m_actions->action(ActionId::DeleteNote), &QAction::triggered, this,
+            &MainWindow::deleteCurrentNote);
     connect(m_editor->textEdit(), &QTextEdit::textChanged, m_autosave,
             &services::Autosave::markChanged);
     m_sidebar->setModel(m_sidebarModel);
@@ -343,11 +352,73 @@ void MainWindow::openNote(qint64 noteId)
             return;
         }
         m_editor->showNote(note.value().bodyText, modified);
+        if (note.value().isTrashed()) {
+            // Read-only in Recently Deleted, as in macOS Notes: recover it to edit.
+            m_editor->textEdit()->setReadOnly(true);
+            return;
+        }
         const NoteTextEdit* edit = m_editor->textEdit();
         m_autosave->track(noteId, [edit] {
             return services::Autosave::Content{.html = edit->toHtml(), .text = edit->toPlainText()};
         });
     });
+}
+
+void MainWindow::deleteCurrentNote()
+{
+    const std::optional<qint64> note = m_noteList->currentNote();
+    if (!note) {
+        return;
+    }
+    if (m_noteListModel->folderId() == models::kRecentlyDeletedFolderId) {
+        deletePermanently(*note);
+        return;
+    }
+    m_autosave->flush(); // the last keystrokes go with it
+    (void)m_context.notes().trash(*note);
+}
+
+void MainWindow::recoverNote(qint64 noteId)
+{
+    (void)m_context.notes().restore(noteId);
+}
+
+void MainWindow::deletePermanently(qint64 noteId)
+{
+    QMessageBox confirm(QMessageBox::Warning, tr("Delete Permanently"),
+                        tr("Delete this note permanently?"), QMessageBox::NoButton, this);
+    confirm.setObjectName(QStringLiteral("deletePermanentlyDialog"));
+    confirm.setInformativeText(tr("You can't undo this action."));
+    const QPushButton* remove = confirm.addButton(tr("Delete"), QMessageBox::DestructiveRole);
+    confirm.addButton(QMessageBox::Cancel);
+    confirm.setDefaultButton(QMessageBox::Cancel);
+    confirm.exec();
+    if (confirm.clickedButton() == remove) {
+        (void)m_context.notes().purge(noteId);
+    }
+}
+
+void MainWindow::showNoteMenu(const QPoint& position)
+{
+    const QModelIndex index = m_noteList->indexAt(position);
+    const QVariant id = index.data(models::kNoteIdRole);
+    if (!id.isValid()) {
+        return; // a header or empty space
+    }
+    const qint64 noteId = id.toLongLong();
+    QMenu menu(this);
+    menu.setObjectName(QStringLiteral("noteMenu"));
+    if (m_noteListModel->folderId() == models::kRecentlyDeletedFolderId) {
+        menu.addAction(tr("&Recover"), this, [this, noteId] { recoverNote(noteId); })
+            ->setObjectName(QStringLiteral("recoverNoteAction"));
+        menu.addAction(tr("&Delete Permanently…"), this,
+                       [this, noteId] { deletePermanently(noteId); })
+            ->setObjectName(QStringLiteral("deletePermanentlyAction"));
+    } else {
+        // Pin, Move to and Duplicate join with task 2.11.
+        menu.addAction(m_actions->action(ActionId::DeleteNote));
+    }
+    menu.exec(m_noteList->viewport()->mapToGlobal(position));
 }
 
 void MainWindow::clearEditor()

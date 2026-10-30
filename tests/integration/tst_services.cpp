@@ -70,6 +70,7 @@ private slots:
     void listUnderstandsVirtualFolders();
     void signalsArriveOnServiceThread();
     void folderSignals();
+    void purgeExpiredSignalsEachNote();
 
 private:
     std::unique_ptr<notes::test::TempDb> m_dir;
@@ -290,6 +291,24 @@ void tst_Services::folderSignals()
     const DbResult<QList<notes::storage::FolderTreeEntry>> tree = await(m_folders->listTree());
     QVERIFY(tree);
     QCOMPARE(tree.value().size(), 1); // only "Notes" left: Home went with Work
+}
+
+// Task 2.10: the list and sidebar drop auto-purged notes like manual ones.
+void tst_Services::purgeExpiredSignalsEachNote()
+{
+    const Note a = await(m_notes->create(m_work, {}, QStringLiteral("a"))).value();
+    const Note b = await(m_notes->create(m_work, {}, QStringLiteral("b"))).value();
+    QVERIFY(await(m_notes->trash(a.id)));
+    QVERIFY(await(m_notes->trash(b.id)));
+    m_clock.advance(std::chrono::days(31));
+
+    QSignalSpy purged(m_notes.get(), &NoteService::notePurged);
+    const DbResult<QList<qint64>> result = await(m_notes->purgeExpired());
+    QVERIFY(result);
+    QCOMPARE(result.value(), (QList<qint64>{a.id, b.id}));
+    QCOMPARE(purged.count(), 2);
+    QCOMPARE(purged.at(0).at(0).toLongLong(), a.id);
+    QCOMPARE(purged.at(1).at(0).toLongLong(), b.id);
 }
 
 QTEST_GUILESS_MAIN(tst_Services)
