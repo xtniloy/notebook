@@ -9,7 +9,6 @@
 #include <QObject>
 
 #include <optional>
-#include <vector>
 
 namespace notes::app {
 class IClock;
@@ -39,7 +38,8 @@ public:
 
     // The default "Notes" folder, created on first run.
     [[nodiscard]] QFuture<storage::DbResult<models::Folder>> ensureDefaultFolder();
-    [[nodiscard]] QFuture<storage::DbResult<std::vector<storage::FolderNode>>> listTree();
+    // Display order, each folder followed by its subfolders (FolderTreeEntry).
+    [[nodiscard]] QFuture<storage::DbResult<QList<storage::FolderTreeEntry>>> listTree();
 
     QFuture<storage::DbResult<models::Folder>> create(const QString& name,
                                                       std::optional<qint64> parentId = {});

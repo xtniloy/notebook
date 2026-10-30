@@ -47,7 +47,7 @@ inline std::unique_ptr<app::AppContext> makeTestContext(const QString& directory
 // plain QFuture::waitForFinished() there would never return. Aborts the test
 // run if the future doesn't finish in time, rather than hanging.
 template <typename T>
-T await(QFuture<T> future, int timeoutMs = 10'000)
+T await(const QFuture<T>& future, int timeoutMs = 10'000)
 {
     const QDeadlineTimer deadline(timeoutMs);
     while (!future.isFinished() && !deadline.hasExpired()) {

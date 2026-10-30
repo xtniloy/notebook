@@ -377,7 +377,7 @@ DbStatus FolderRepository::reorder(std::optional<qint64> parentId, const QList<q
     return tx.value().commit();
 }
 
-DbResult<std::vector<FolderNode>> FolderRepository::listTree()
+DbResult<QList<FolderTreeEntry>> FolderRepository::listTree()
 {
     DbResult<ScopedStatement> select =
         m_db.prepare(QStringLiteral("SELECT %1 FROM folders WHERE deleted_at IS NULL"
@@ -415,28 +415,26 @@ DbResult<std::vector<FolderNode>> FolderRepository::listTree()
         }
     }
 
-    // Built iteratively; folder trees are shallow, but recursion is avoided by policy.
+    // Pre-order walk with an explicit stack (no recursion, by policy).
     struct Pending
     {
         qsizetype index;
-        std::vector<FolderNode>* into;
+        int depth;
     };
-    std::vector<FolderNode> tree;
+    QList<FolderTreeEntry> tree;
+    tree.reserve(folders.size());
     QList<Pending> pending;
-    // Pushed in reverse so they come off the stack in sort order.
     for (const qsizetype index : roots | std::views::reverse) {
-        pending.append(Pending{.index = index, .into = &tree});
+        pending.append(Pending{.index = index, .depth = 0});
     }
-    // Reserve so pointers into the vectors stay valid while they are filled.
-    tree.reserve(static_cast<std::size_t>(roots.size()));
     while (!pending.isEmpty()) {
         const Pending next = pending.takeLast();
         const Folder& folder = folders.at(next.index);
-        FolderNode& node = next.into->emplace_back(FolderNode{.folder = folder, .children = {}});
+        tree.append(FolderTreeEntry{.folder = folder, .depth = next.depth});
+        // Pushed in reverse so they come off the stack in sort order.
         const QList<qsizetype> kids = children.value(folder.id);
-        node.children.reserve(static_cast<std::size_t>(kids.size()));
         for (const qsizetype index : kids | std::views::reverse) {
-            pending.append(Pending{.index = index, .into = &node.children});
+            pending.append(Pending{.index = index, .depth = next.depth + 1});
         }
     }
     return tree;

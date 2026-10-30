@@ -287,9 +287,9 @@ void tst_Services::folderSignals()
     QCOMPARE(deleted.at(0).at(0).toLongLong(), m_work);
     QCOMPARE(titles(await(m_notes->list(notes::models::kRecentlyDeletedFolderId, NoteSort::Title))),
              QStringList{note.title});
-    const DbResult<std::vector<notes::storage::FolderNode>> tree = await(m_folders->listTree());
+    const DbResult<QList<notes::storage::FolderTreeEntry>> tree = await(m_folders->listTree());
     QVERIFY(tree);
-    QCOMPARE(tree.value().size(), std::size_t{1}); // only "Notes" left
+    QCOMPARE(tree.value().size(), 1); // only "Notes" left: Home went with Work
 }
 
 QTEST_GUILESS_MAIN(tst_Services)

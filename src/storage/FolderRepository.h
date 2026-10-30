@@ -7,7 +7,6 @@
 #include <QString>
 
 #include <optional>
-#include <vector>
 
 namespace notes::app {
 class IClock;
@@ -17,11 +16,15 @@ namespace notes::storage {
 
 class Database;
 
-// A folder with its subfolders, as listTree() returns them.
-struct FolderNode
+// One folder in listTree()'s result: the tree flattened in display order, each
+// folder directly before its subfolders. (A flat list, not a recursive node
+// type: trees travel through QFuture results, which copy them.)
+struct FolderTreeEntry
 {
     models::Folder folder;
-    std::vector<FolderNode> children;
+    int depth = 0; // 0 for top-level folders
+
+    bool operator==(const FolderTreeEntry&) const = default;
 };
 
 // Folders in the `folders` table (task 2.5). Runs on the DB thread (ADR 0003);
@@ -66,8 +69,9 @@ public:
     // them exactly once.
     DbStatus reorder(std::optional<qint64> parentId, const QList<qint64>& orderedIds);
 
-    // Every folder that isn't deleted, as a tree. Siblings are in sort order.
-    [[nodiscard]] DbResult<std::vector<FolderNode>> listTree();
+    // Every folder that isn't deleted, in display order: each folder followed by
+    // its subfolders (one level deeper), siblings in sort order.
+    [[nodiscard]] DbResult<QList<FolderTreeEntry>> listTree();
 
 private:
     [[nodiscard]] DbResult<models::Folder> getLive(qint64 id);

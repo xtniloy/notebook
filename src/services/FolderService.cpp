@@ -11,8 +11,8 @@ using models::Folder;
 using storage::Database;
 using storage::DbResult;
 using storage::DbStatus;
-using storage::FolderNode;
 using storage::FolderRepository;
+using storage::FolderTreeEntry;
 
 FolderService::FolderService(storage::DbThread& db, const app::IClock& clock, QObject* parent)
     : QObject(parent)
@@ -29,7 +29,7 @@ QFuture<DbResult<Folder>> FolderService::ensureDefaultFolder()
         [clock](Database& db) { return FolderRepository(db, *clock).ensureDefaultFolder(); });
 }
 
-QFuture<DbResult<std::vector<FolderNode>>> FolderService::listTree()
+QFuture<DbResult<QList<FolderTreeEntry>>> FolderService::listTree()
 {
     const app::IClock* clock = &m_clock;
     return m_db.post([clock](Database& db) { return FolderRepository(db, *clock).listTree(); });

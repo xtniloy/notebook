@@ -20,23 +20,32 @@ using notes::storage::Database;
 using notes::storage::DbError;
 using notes::storage::DbResult;
 using notes::storage::DbStatus;
-using notes::storage::FolderNode;
 using notes::storage::FolderRepository;
+using notes::storage::FolderTreeEntry;
 using Kind = DbError::Kind;
 
 namespace {
 
-// "Work [Projects [Archive]], Personal" style outline of a tree, for comparisons.
-// Recursive for readability; test trees are at most 3 levels deep.
-QString outline(const std::vector<FolderNode>& nodes) // NOLINT(misc-no-recursion)
+// "Work [Projects [Archive]], Personal" style outline of listTree()'s flat,
+// depth-annotated result, for comparisons.
+QString outline(const QList<FolderTreeEntry>& entries)
 {
-    QStringList parts;
-    for (const FolderNode& node : nodes) {
-        parts.append(node.children.empty()
-                         ? node.folder.name
-                         : QStringLiteral("%1 [%2]").arg(node.folder.name, outline(node.children)));
+    QString text;
+    int depth = 0;
+    for (qsizetype i = 0; i < entries.size(); ++i) {
+        const FolderTreeEntry& entry = entries.at(i);
+        if (i > 0) {
+            if (entry.depth > depth) {
+                text += QStringLiteral(" [");
+            } else {
+                text += QString(QStringLiteral("]")).repeated(depth - entry.depth) +
+                        QStringLiteral(", ");
+            }
+        }
+        text += entry.folder.name;
+        depth = entry.depth;
     }
-    return parts.join(QStringLiteral(", "));
+    return text + QString(QStringLiteral("]")).repeated(depth);
 }
 
 } // namespace
@@ -127,8 +136,8 @@ void tst_FolderRepository::markSynced()
 
 QString tst_FolderRepository::tree()
 {
-    DbResult<std::vector<FolderNode>> nodes = m_repo->listTree();
-    return nodes ? outline(nodes.value()) : QStringLiteral("ERROR: ") + nodes.error().message;
+    const DbResult<QList<FolderTreeEntry>> entries = m_repo->listTree();
+    return entries ? outline(entries.value()) : QStringLiteral("ERROR: ") + entries.error().message;
 }
 
 // TC-STO-007
@@ -142,10 +151,18 @@ void tst_FolderRepository::nestedFoldersFormATree()
 
     QCOMPARE(tree(), QStringLiteral("Work [Projects [Archive], Meetings], Personal"));
 
-    const std::vector<FolderNode> nodes = m_repo->listTree().value();
-    QCOMPARE(nodes.at(0).children.at(0).children.at(0).folder.id, archive.id);
-    QCOMPARE(nodes.at(0).children.at(0).children.at(0).folder.parentId, projects.id);
-    QVERIFY(!nodes.at(0).folder.parentId.has_value());
+    // Display order: each folder directly before its subfolders, one level deeper.
+    const QList<FolderTreeEntry> entries = m_repo->listTree().value();
+    QCOMPARE(entries.size(), 5);
+    QCOMPARE(entries.at(0).depth, 0);
+    QVERIFY(!entries.at(0).folder.parentId.has_value());
+    QCOMPARE(entries.at(1).folder.id, projects.id);
+    QCOMPARE(entries.at(1).depth, 1);
+    QCOMPARE(entries.at(2).folder.id, archive.id);
+    QCOMPARE(entries.at(2).depth, 2);
+    QCOMPARE(entries.at(2).folder.parentId, projects.id);
+    QCOMPARE(entries.at(3).depth, 1); // Meetings
+    QCOMPARE(entries.at(4).depth, 0); // Personal
 
     // New folders: fresh UUID, the clock's time, version 1, dirty.
     QVERIFY(notes::models::parseUuid(archive.uuid).has_value());
