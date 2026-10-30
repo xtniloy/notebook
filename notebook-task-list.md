@@ -387,9 +387,9 @@ Record each in `docs/adr/`:
 
 ### 2.6 Note repository `M`
 
-- [ ] `NoteRepository`: `create`, `get`, `updateBody`, `listForFolder(sort)` (title + snippet only, **no body**), `listAll`, `setPinned`, `moveToFolder`, `trash`, `restore`, `purge`
-- [ ] Sort modes: date edited, date created, title (case-insensitive, locale-aware)
-- [ ] Every change bumps `version`, `updated_at`, `sync_state = 0`
+- [x] `NoteRepository`: `create`, `get`, `updateBody`, `listForFolder(sort)` (title + snippet only, **no body**), `listAll`, `setPinned`, `moveToFolder`, `trash`, `restore`, `purge` *(lists return `NoteSummary`, which has no body fields, and take `limit`/`offset` for 2.8's paging; plus `listTrashed()`. `restore` falls back to the default folder; `purge` deletes attachments and tags and leaves a content-free tombstone for sync)*
+- [x] Sort modes: date edited, date created, title (case-insensitive, locale-aware) *(a `LOCALE` collation backed by `QCollator`, registered on every connection; numbers sort by value)*
+- [x] Every change bumps `version`, `updated_at`, `sync_state = 0` *(changed: every change bumps `version` and `sync_state`, but only content changes set `updated_at`, the "date edited" the list sorts and groups by. Pinning, moving or trashing a note doesn't make it look newly edited)*
 
 **Tests**
 - `TC-STO-013` (U) Create → get returns identical fields.

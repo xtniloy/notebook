@@ -22,6 +22,7 @@ add_library(notesapp_core STATIC
     models/FakeSidebarModel.h
     models/Folder.h
     models/Note.h
+    models/NoteSummary.h
     models/NoteListRoles.h
     models/SidebarRoles.h
     models/SyncState.h
@@ -37,6 +38,8 @@ add_library(notesapp_core STATIC
     storage/FolderRepository.h
     storage/Migrator.cpp
     storage/Migrator.h
+    storage/NoteRepository.cpp
+    storage/NoteRepository.h
     storage/SqlCipher.cpp
     storage/SqlCipher.h
     storage/SqliteError.cpp

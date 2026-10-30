@@ -2,6 +2,7 @@
 
 #include "storage/SqliteError.h"
 
+#include <QCollator>
 #include <QFile>
 
 #include <sqlite3.h>
@@ -42,6 +43,26 @@ ScopedStatement::~ScopedStatement()
 }
 
 // --- Database ---
+
+namespace {
+
+int compareLocale(void* collator, int lengthA, const void* a, int lengthB, const void* b)
+{
+    return static_cast<const QCollator*>(collator)->compare(
+        QString::fromUtf8(static_cast<const char*>(a), lengthA),
+        QString::fromUtf8(static_cast<const char*>(b), lengthB));
+}
+
+int traceStatement(unsigned type, void* context, void* /*statement*/, void* sql)
+{
+    if (type == SQLITE_TRACE_STMT) {
+        const auto& hook = *static_cast<const std::function<void(const QString&)>*>(context);
+        hook(QString::fromUtf8(static_cast<const char*>(sql)));
+    }
+    return 0;
+}
+
+} // namespace
 
 Database::Database(sqlite3* db, QString path)
     : m_db(db)
@@ -93,6 +114,17 @@ DbStatus Database::configure()
                            .message = QStringLiteral("Not linked against SQLCipher")};
         }
     }
+    // Title sorting (task 2.6). SQLite's NOCASE only folds ASCII: "Élan" would
+    // sort after "Zebra".
+    m_collator = std::make_unique<QCollator>(QLocale());
+    m_collator->setCaseSensitivity(Qt::CaseInsensitive);
+    m_collator->setNumericMode(true);
+    if (const int rc = sqlite3_create_collation_v2(m_db, "LOCALE", SQLITE_UTF8, m_collator.get(),
+                                                   &compareLocale, nullptr);
+        rc != SQLITE_OK) {
+        return sqliteError(m_db, rc);
+    }
+
     // An in-memory database reports "memory" and stays that way; fine for tests.
     return exec(QStringLiteral("PRAGMA journal_mode = WAL;"
                                "PRAGMA foreign_keys = ON;"
@@ -152,6 +184,16 @@ DbResult<ScopedStatement> Database::prepare(const QString& sql)
     CacheSlot& slot = m_cache[sql];
     slot.statement = std::move(prepared).value();
     return ScopedStatement(slot.statement.get(), &slot.inUse);
+}
+
+void Database::setTraceHook(std::function<void(const QString& sql)> hook)
+{
+    m_traceHook = std::move(hook);
+    if (m_traceHook) {
+        sqlite3_trace_v2(m_db, SQLITE_TRACE_STMT, &traceStatement, &m_traceHook);
+    } else {
+        sqlite3_trace_v2(m_db, 0, nullptr, nullptr);
+    }
 }
 
 qint64 Database::lastInsertRowId() const

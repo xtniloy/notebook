@@ -6,9 +6,11 @@
 #include <QHashFunctions> // std::hash<QString>
 #include <QString>
 
+#include <functional>
 #include <memory>
 #include <unordered_map>
 
+class QCollator;
 struct sqlite3;
 
 namespace notes::storage {
@@ -46,7 +48,9 @@ class Database
 {
 public:
     // Opens or creates the database at `path` (":memory:" for an in-memory one)
-    // and configures it: WAL journal, foreign keys on, synchronous=NORMAL.
+    // and configures it: WAL journal, foreign keys on, synchronous=NORMAL, and
+    // the `LOCALE` collation (`ORDER BY title COLLATE LOCALE`): the user's
+    // locale, case-insensitive, numbers by value ("Note 2" before "Note 10").
     // Fails unless the linked library is SQLCipher.
     [[nodiscard]] static DbResult<std::unique_ptr<Database>> open(const QString& path);
 
@@ -69,6 +73,11 @@ public:
     [[nodiscard]] int changes() const;
     [[nodiscard]] bool inTransaction() const;
     [[nodiscard]] std::size_t cachedStatementCount() const { return m_cache.size(); }
+
+    // For tests: called with the SQL text of every statement as it starts
+    // running. The text has `?`/`:name` placeholders, never bound values, so no
+    // note content passes through. An empty function removes the hook.
+    void setTraceHook(std::function<void(const QString& sql)> hook);
     [[nodiscard]] const QString& path() const { return m_path; }
 
 private:
@@ -86,6 +95,10 @@ private:
     QString m_path;
     // Node-based, so a slot's address (ScopedStatement::m_inUse) never moves.
     std::unordered_map<QString, CacheSlot> m_cache;
+    // The LOCALE collation's comparer. Members outlive the destructor body, which
+    // closes the connection, so SQLite never calls into a freed collator.
+    std::unique_ptr<QCollator> m_collator;
+    std::function<void(const QString&)> m_traceHook;
 };
 
 } // namespace notes::storage
