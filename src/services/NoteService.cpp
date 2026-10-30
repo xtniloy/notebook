@@ -1,0 +1,213 @@
+#include "services/NoteService.h"
+
+#include "app/IClock.h"
+#include "models/SidebarRoles.h"
+#include "services/NoteText.h"
+#include "storage/DbThread.h"
+#include "storage/FolderRepository.h"
+
+namespace notes::services {
+
+using models::Note;
+using models::NoteSummary;
+using storage::Database;
+using storage::DbError;
+using storage::DbResult;
+using storage::DbStatus;
+using storage::FolderRepository;
+using storage::NoteContent;
+using storage::NoteRepository;
+using storage::NoteSort;
+using Kind = DbError::Kind;
+
+namespace {
+
+NoteContent contentFor(const QString& bodyHtml, const QString& bodyText)
+{
+    return {.title = NoteText::title(bodyText),
+            .snippet = NoteText::snippet(bodyText),
+            .bodyHtml = bodyHtml,
+            .bodyText = bodyText};
+}
+
+} // namespace
+
+NoteService::NoteService(storage::DbThread& db, const app::IClock& clock, QObject* parent)
+    : QObject(parent)
+    , m_db(db)
+    , m_clock(clock)
+{}
+
+NoteService::~NoteService() = default;
+
+QFuture<DbResult<Note>> NoteService::create(qint64 folderId, const QString& bodyHtml,
+                                            const QString& bodyText)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db
+        .post([clock, folderId,
+               content = contentFor(bodyHtml, bodyText)](Database& db) -> DbResult<Note> {
+            qint64 target = folderId;
+            if (folderId == models::kRecentlyDeletedFolderId) {
+                return DbError::make(Kind::InvalidArgument,
+                                     QStringLiteral("Recently Deleted can't take new notes"));
+            }
+            if (folderId == models::kAllNotesFolderId) {
+                // "All Notes" isn't a folder: new notes go to the default one.
+                DbResult<models::Folder> fallback =
+                    FolderRepository(db, *clock).ensureDefaultFolder();
+                if (!fallback) {
+                    return fallback.error();
+                }
+                target = fallback.value().id;
+            }
+            return NoteRepository(db, *clock).create(target, content);
+        })
+        .then(this, [this](DbResult<Note> result) {
+            if (result) {
+                emit noteCreated(result.value());
+            }
+            return result;
+        });
+}
+
+QFuture<DbResult<Note>> NoteService::get(qint64 id)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db.post([clock, id](Database& db) { return NoteRepository(db, *clock).get(id); });
+}
+
+QFuture<DbResult<Note>> NoteService::updateBody(qint64 id, const QString& bodyHtml,
+                                                const QString& bodyText)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db
+        .post([clock, id, content = contentFor(bodyHtml, bodyText)](Database& db) {
+            return NoteRepository(db, *clock).updateBody(id, content);
+        })
+        .then(this, [this](DbResult<Note> result) {
+            if (result) {
+                emit noteUpdated(result.value());
+            }
+            return result;
+        });
+}
+
+QFuture<DbStatus> NoteService::setPinned(qint64 id, bool pinned)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db
+        .post([clock, id, pinned](Database& db) -> DbResult<bool> {
+            NoteRepository notes(db, *clock);
+            DbResult<Note> before = notes.get(id);
+            if (!before) {
+                return before.error();
+            }
+            if (const DbStatus status = notes.setPinned(id, pinned); !status) {
+                return status.error();
+            }
+            return before.value().pinned != pinned; // changed?
+        })
+        .then(this, [this, id, pinned](DbResult<bool> changed) -> DbStatus {
+            if (!changed) {
+                return changed.error();
+            }
+            if (changed.value()) {
+                emit notePinnedChanged(id, pinned);
+            }
+            return {};
+        });
+}
+
+QFuture<DbStatus> NoteService::moveToFolder(qint64 id, qint64 folderId)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db
+        .post([clock, id, folderId](Database& db) -> DbResult<qint64> {
+            NoteRepository notes(db, *clock);
+            DbResult<Note> before = notes.get(id);
+            if (!before) {
+                return before.error();
+            }
+            if (const DbStatus status = notes.moveToFolder(id, folderId); !status) {
+                return status.error();
+            }
+            return before.value().folderId;
+        })
+        .then(this, [this, id, folderId](DbResult<qint64> from) -> DbStatus {
+            if (!from) {
+                return from.error();
+            }
+            if (from.value() != folderId) {
+                emit noteMoved(id, from.value(), folderId);
+            }
+            return {};
+        });
+}
+
+QFuture<DbStatus> NoteService::trash(qint64 id)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db.post([clock, id](Database& db) { return NoteRepository(db, *clock).trash(id); })
+        .then(this, [this, id](DbStatus status) {
+            if (status) {
+                emit noteTrashed(id);
+            }
+            return status;
+        });
+}
+
+QFuture<DbStatus> NoteService::restore(qint64 id)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db
+        .post([clock, id](Database& db) -> DbResult<qint64> {
+            NoteRepository notes(db, *clock);
+            if (const DbStatus status = notes.restore(id); !status) {
+                return status.error();
+            }
+            // Its own folder, or "Notes" if that is gone.
+            DbResult<Note> after = notes.get(id);
+            if (!after) {
+                return after.error();
+            }
+            return after.value().folderId;
+        })
+        .then(this, [this, id](DbResult<qint64> folderId) -> DbStatus {
+            if (!folderId) {
+                return folderId.error();
+            }
+            emit noteRestored(id, folderId.value());
+            return {};
+        });
+}
+
+QFuture<DbStatus> NoteService::purge(qint64 id)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db.post([clock, id](Database& db) { return NoteRepository(db, *clock).purge(id); })
+        .then(this, [this, id](DbStatus status) {
+            if (status) {
+                emit notePurged(id);
+            }
+            return status;
+        });
+}
+
+QFuture<DbResult<QList<NoteSummary>>> NoteService::list(qint64 folderId, NoteSort sort, int limit,
+                                                        int offset)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db.post([clock, folderId, sort, limit, offset](Database& db) {
+        NoteRepository notes(db, *clock);
+        if (folderId == models::kAllNotesFolderId) {
+            return notes.listAll(sort, limit, offset);
+        }
+        if (folderId == models::kRecentlyDeletedFolderId) {
+            return notes.listTrashed(limit, offset);
+        }
+        return notes.listForFolder(folderId, sort, limit, offset);
+    });
+}
+
+} // namespace notes::services

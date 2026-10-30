@@ -3,6 +3,9 @@
 #include "FakeClock.h"
 #include "app/AppContext.h"
 
+#include <QCoreApplication>
+#include <QDeadlineTimer>
+#include <QFuture>
 #include <QSettings>
 #include <QString>
 #include <QTemporaryDir>
@@ -37,6 +40,23 @@ inline std::unique_ptr<app::AppContext> makeTestContext(const QString& directory
         std::make_unique<QSettings>(directory + QStringLiteral("/settings.ini"),
                                     QSettings::IniFormat),
         std::make_unique<FakeClock>());
+}
+
+// The result of a service call, waiting with the event loop running. Services
+// finish their futures in continuations on the calling thread (ADR 0003), so a
+// plain QFuture::waitForFinished() there would never return. Aborts the test
+// run if the future doesn't finish in time, rather than hanging.
+template <typename T>
+T await(QFuture<T> future, int timeoutMs = 10'000)
+{
+    const QDeadlineTimer deadline(timeoutMs);
+    while (!future.isFinished() && !deadline.hasExpired()) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    }
+    if (!future.isFinished()) {
+        qFatal("notes::test::await: future did not finish within %d ms", timeoutMs);
+    }
+    return future.result();
 }
 
 } // namespace notes::test

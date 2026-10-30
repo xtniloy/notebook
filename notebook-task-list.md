@@ -428,10 +428,10 @@ Record each in `docs/adr/`:
 
 ### 2.7 Note and folder services `M`
 
-- [ ] `NoteService`, `FolderService` wrap repositories, run on DB thread, emit signals (`noteCreated`, `noteUpdated`, `noteMoved`, `noteTrashed`, ...)
-- [ ] **Title derivation:** first non-empty line of plain text, trimmed, max 200 chars
-- [ ] **Snippet derivation:** next non-empty line(s), max 120 chars
-- [ ] New note is created in the selected folder (or "Notes" when "All Notes" is selected)
+- [x] `NoteService`, `FolderService` wrap repositories, run on DB thread, emit signals (`noteCreated`, `noteUpdated`, `noteMoved`, `noteTrashed`, ...) *(each call posts a job to `DbThread` and returns a `QFuture`; on success the signal is emitted on the service's thread before the future finishes; failures and no-op calls emit nothing. Also `notePinnedChanged`, `noteRestored`, `notePurged`, `folderCreated/Changed/Deleted`, `foldersReordered`. `list()` understands All Notes and Recently Deleted. The UI switches from fake data in 2.8)*
+- [x] **Title derivation:** first non-empty line of plain text, trimmed, max 200 chars *(`NoteText`; also handles CRLF and Qt's paragraph separators, and never cuts an emoji in half)*
+- [x] **Snippet derivation:** next non-empty line(s), max 120 chars *(joined with spaces)*
+- [x] New note is created in the selected folder (or "Notes" when "All Notes" is selected) *(Recently Deleted refuses new notes)*
 
 **Tests**
 - `TC-STO-019` (U) Data-driven title test: `"Shopping\nMilk"` → `"Shopping"`; `"\n\n  Hi  \n"` → `"Hi"`; empty → `""` (UI shows "New Note"); 500-char line → 200 chars.
