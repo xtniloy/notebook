@@ -48,4 +48,7 @@ QString iconPath(Icon icon);
 // QIcon::Selected, the disabled text color for QIcon::Disabled).
 QIcon icon(Icon icon);
 
+// The app's logo (resources/app/logo.svg), in its own colours.
+QIcon appIcon();
+
 } // namespace notes::ui

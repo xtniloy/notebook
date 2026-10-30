@@ -23,7 +23,9 @@ std::optional<qint64> noteIdOf(const QModelIndex& index)
 NoteListView::NoteListView(QWidget* parent)
     : QListView(parent)
 {
-    setUniformItemSizes(true);
+    // Not uniform: headers are compact (UI review). Row heights come from the
+    // delegate's constant-time sizeHint(), so laying out 10,000 rows stays cheap.
+    setUniformItemSizes(false);
     setSelectionMode(QAbstractItemView::SingleSelection);
     setEditTriggers(QAbstractItemView::NoEditTriggers);
     setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);

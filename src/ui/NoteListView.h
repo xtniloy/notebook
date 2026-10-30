@@ -8,7 +8,8 @@ namespace notes::ui {
 
 // The note list (Plan §3.4): notes under date section headers, newest first.
 // Works with any model that provides the roles in models/NoteListRoles.h.
-// Rows have uniform heights so 10,000 notes scroll without laying out each one.
+// Only visible rows are painted, so 10,000 notes scroll smoothly (TC-PERF-001).
+// Section headers are shorter than note rows, so item sizes aren't uniform.
 class NoteListView : public QListView
 {
     Q_OBJECT

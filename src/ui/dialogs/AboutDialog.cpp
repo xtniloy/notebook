@@ -1,6 +1,7 @@
 #include "ui/dialogs/AboutDialog.h"
 
 #include "app/Config.h"
+#include "ui/Icons.h"
 
 #include <QApplication>
 #include <QDialogButtonBox>
@@ -53,6 +54,12 @@ AboutDialog::AboutDialog(QWidget* parent)
     const QString displayName = QString::fromLatin1(config::kDisplayName);
     setWindowTitle(tr("About %1").arg(displayName));
 
+    auto* logo = new QLabel(this);
+    logo->setObjectName(QStringLiteral("logo"));
+    constexpr int kLogoSize = 64;
+    logo->setPixmap(appIcon().pixmap(QSize(kLogoSize, kLogoSize), devicePixelRatioF()));
+    logo->setAlignment(Qt::AlignHCenter);
+
     auto* title = new QLabel(QStringLiteral("<b>%1</b> %2")
                                  .arg(displayName.toHtmlEscaped(),
                                       QString::fromLatin1(config::kAppVersion).toHtmlEscaped()),
@@ -73,6 +80,7 @@ AboutDialog::AboutDialog(QWidget* parent)
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
     auto* layout = new QVBoxLayout(this);
+    layout->addWidget(logo);
     layout->addWidget(title);
     layout->addWidget(qtNotice);
     layout->addSpacing(8);

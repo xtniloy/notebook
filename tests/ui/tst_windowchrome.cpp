@@ -351,6 +351,40 @@ void tst_WindowChrome::shadowFadesWithoutGaps()
         (kMargin + (WindowChrome::kCornerRadius * (1 - (1 / std::numbers::sqrt2)))) * scale);
     fadesOutward(QPoint(corner - 2, image.height() - corner + 1), -1, 1, "out of the corner");
 
+    // Radially out of both bottom corners' curves at several angles, as seen over
+    // a white desktop: nothing at the edge may be darker than the shadow just
+    // outside it (UI bug: the shadow was painted over the half-erased edge
+    // pixels, a dark ring ~26 levels darker than the shadow: the "thin line").
+    const qreal r = WindowChrome::kCornerRadius;
+    const auto overWhite = [&](QPoint p) {
+        const QColor c = image.pixelColor(p);
+        const qreal a = c.alphaF();
+        return (a * static_cast<qreal>(qGray(c.rgb()))) + ((1 - a) * 255);
+    };
+    const QPointF centres[] = {
+        QPointF(kMargin + r, window->height() - kMargin - r),                  // bottom-left
+        QPointF(window->width() - kMargin - r, window->height() - kMargin - r) // bottom-right
+    };
+    for (const QPointF centre : centres) {
+        const qreal sideX = centre.x() < window->width() / 2.0 ? -1 : 1;
+        for (const int degrees : {0, 30, 45, 60, 90}) {
+            const qreal angle = degrees * std::numbers::pi / 180;
+            const QPointF dir(sideX * std::cos(angle), std::sin(angle));
+            const auto at = [&](qreal d) { return ((centre + (dir * d)) * scale).toPoint(); };
+            const qreal shadow = overWhite(at(r + 3));
+            // From 2 px inside the edge to 1 px outside, in half-device-pixel steps.
+            const int steps = static_cast<int>(std::ceil(3 * 2 * scale));
+            for (int step = 0; step <= steps; ++step) {
+                const qreal d = r - 2 + (step * 0.5 / scale);
+                QVERIFY2(overWhite(at(d)) >= shadow - 8,
+                         qPrintable(QStringLiteral("dark ring at the corner (%1°): %2 vs shadow %3")
+                                        .arg(degrees)
+                                        .arg(overWhite(at(d)))
+                                        .arg(shadow)));
+            }
+        }
+    }
+
     // The last (partial) device row of the content blends with the outside.
     const qreal bottom = (window->height() - kMargin) * scale;
     if (bottom != std::floor(bottom)) {

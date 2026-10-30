@@ -45,6 +45,7 @@ private slots:
     void iconRenders();
     void pathsAreUnique();
     void everyBundledIconIsReferenced();
+    void appLogoRenders();
 };
 
 void tst_Icons::iconRenders_data()
@@ -94,6 +95,19 @@ void tst_Icons::everyBundledIconIsReferenced()
 
     QVERIFY(!bundled.isEmpty());
     QCOMPARE(bundled - referenced, QSet<QString>());
+}
+
+// The logo keeps its own colours (it isn't tinted like the Lucide icons).
+void tst_Icons::appLogoRenders()
+{
+    const QIcon logo = notes::ui::appIcon();
+    QVERIFY(!logo.isNull());
+    const QImage image = logo.pixmap(64, 64).toImage();
+    QVERIFY(hasVisiblePixels(image));
+    // The amber header (#F3BE33): below the ring holes, left of the first one.
+    const QColor header = image.pixelColor(12, 17);
+    QVERIFY2(header.red() > 220 && header.green() > 160 && header.blue() < 120,
+             qPrintable(header.name()));
 }
 
 QTEST_MAIN(tst_Icons)

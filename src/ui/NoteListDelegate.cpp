@@ -17,7 +17,9 @@ constexpr int kIconGap = 4;
 constexpr qreal kHighlightRadius = 6.0;
 constexpr qreal kThumbnailRadius = 4.0;
 constexpr qreal kHeaderScale = 1.1;
-constexpr int kHeaderBottomPadding = 6;
+// Section headers ("Pinned", "Today", ...): gentle space above, a little below.
+constexpr int kHeaderTopPadding = 12;
+constexpr int kHeaderBottomPadding = 4;
 constexpr int kHighlightInset = 6;
 
 QFont boldFont(const QFont& base, qreal scale = 1.0)
@@ -143,10 +145,14 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
                       option.fontMetrics.elidedText(preview, Qt::ElideRight, detailLine.width()));
 }
 
-QSize NoteListDelegate::sizeHint(const QStyleOptionViewItem& option,
-                                 const QModelIndex& /*index*/) const
+QSize NoteListDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
-    // The same for every row, header or note (uniform item sizes).
+    // Every note row has the same height; headers are compact (UI review: full
+    // note-height headers left a large gap above "Today", "Yesterday", ...).
+    if (index.data(models::kIsSectionHeaderRole).toBool()) {
+        return {0, QFontMetrics(boldFont(option.font, kHeaderScale)).height() + kHeaderTopPadding +
+                       kHeaderBottomPadding};
+    }
     const int height = QFontMetrics(boldFont(option.font)).height() + kLineGap +
                        option.fontMetrics.height() + (2 * kVerticalPadding);
     return {0, height};

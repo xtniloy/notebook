@@ -270,7 +270,7 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 - [x] `NoteListView` (`QListView`, `setUniformItemSizes(true)`) *(works with any model that provides the roles in `models/NoteListRoles.h`)*
 - [x] `NoteListDelegate`: bold title, time + first line of preview, thumbnail slot, pin icon, lock icon *(the slot is a placeholder until attachments; locked notes show "Locked" and their model never holds a preview)*
-- [x] Section headers: Pinned, Today, Yesterday, Previous 7 Days, Previous 30 Days, month names, years *(headers are disabled rows of the same height as notes, so uniform item sizes still hold; clicks and arrow keys skip them. Previous 7 Days = 2–7 calendar days ago, Previous 30 Days = 8–30; months only for the current year)*
+- [x] Section headers: Pinned, Today, Yesterday, Previous 7 Days, Previous 30 Days, month names, years *(headers are disabled rows that clicks and arrow keys skip; since the 1.9 UI review they are compact rather than note-height, so item sizes aren't uniform (the delegate's sizeHint() is constant-time and TC-PERF-001 still passes). Previous 7 Days = 2–7 calendar days ago, Previous 30 Days = 8–30; months only for the current year)*
 - [x] Fake model that can generate **10,000** items, to prove virtualization early *(the app shows 10,000; generating them takes ~11 ms)*
 
 **Tests**
@@ -294,7 +294,7 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 ### 1.8 Themes (light/dark) `M`
 
-- [x] `resources/themes/light.qss` and `dark.qss` using shared color tokens (accent color from Plan §3.6) *(one shared `theme.qss` with `${token}` placeholders, filled from each theme's `ThemeColors`, so the two themes can't drift apart; the same tokens build the `QPalette` that custom-painted delegates use. Accent: amber `#F2A900`, dark text on it. Icons are tinted with the palette at paint time, so they stay visible in dark mode)*
+- [x] `resources/themes/light.qss` and `dark.qss` using shared color tokens (accent color from Plan §3.6) *(one shared `theme.qss` with `${token}` placeholders, filled from each theme's `ThemeColors`, so the two themes can't drift apart; the same tokens build the `QPalette` that custom-painted delegates use. Accent: amber `#F3BE33` (was `#F2A900`; lightened in the 1.9 UI review), dark text on it. Icons are tinted with the palette at paint time, so they stay visible in dark mode)*
 - [x] `ThemeManager` follows the system setting and reacts live to changes (`QStyleHints::colorSchemeChanged`, or D-Bus fallback per ADR 0001) *(no D-Bus fallback needed: ADR 0001 requires Qt 6.8)*
 - [x] Manual override in settings: System / Light / Dark *(View → Appearance; saved as `appearance/theme`)*
 - [x] 150 ms fade limit for any animation *(`ThemeManager::kMaxAnimationMs`; theme switches cross-fade in 150 ms; Qt's own menu/combo/tooltip animations are turned off)*
@@ -316,6 +316,7 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 - [x] Rounded window corners (12 px, as GNOME) *(an overlay above the content erases the corners outside the curve and draws the border along it; square when maximised)*
 - [x] Spacing per UI review: padding around the header row and toolbar, window buttons centred on the menu titles, search box as tall as the button groups, lighter shadow
 - [x] Second UI review: gap between the menu row and the toolbar buttons equal to the gap below them; window buttons at GNOME size (22 px, 14 px icons); roomier note list rows (more padding and line spacing, as macOS Notes)
+- [x] Third UI review: lighter accent `#F3BE33`; compact section headers in the note list; equal toolbar insets at both ends (QToolBar ignores its own side margins, so fixed spacers at each end); app logo (`resources/app/logo.svg`) as window icon and in About; a dark ring along the window's curved corners removed (the shadow was painted over the half-erased edge pixels instead of behind them)
 - [x] Bug fix (seen at 125 % display scale): thin light line under the window and at the corners, and a shadow that looked heavy. The shadow is now nested translucent rounded shapes (no seams, no unshaded strip under the window, lighter); the window edge is a faint translucent line instead of light grey; content widgets overhang the rounded edge by 1 px and the overlay trims them, so no background strip shows at fractional scales
 - [x] Toolbar buttons in joined, rounded groups as in macOS Notes: sidebar · list/gallery · delete/new note · format/checklist/table/attachment/lock · share; editing tools centred
 - [x] Search placeholder (magnifier + "Search") centred until the box is focused or has text

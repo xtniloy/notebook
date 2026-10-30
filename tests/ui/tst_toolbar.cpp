@@ -36,6 +36,7 @@ private slots:
     void searchPlaceholderCentredUntilUsed();
     void searchFieldMatchesGroupHeight();
     void layoutSameAfterThemeChange();
+    void toolbarInsetsAreSymmetric();
     void buttonsShowToolTipWithShortcut();
     void shortcutTriggersAction_data();
     void shortcutTriggersAction();
@@ -249,6 +250,23 @@ void tst_Toolbar::layoutSameAfterThemeChange()
     window->themes().setPreference(notes::ui::ThemePreference::Dark);
     window->themes().setPreference(notes::ui::ThemePreference::Light);
     QTRY_COMPARE(snapshot(), before);
+}
+
+// UI review: the sidebar button sat 4 px from the left edge, the search box
+// 20 px from the right one; both ends now have the same inset.
+void tst_Toolbar::toolbarInsetsAreSymmetric()
+{
+    const auto window = showActiveWindow();
+    QVERIFY(window);
+    const QToolBar* toolBar = toolBarOf(*window);
+    const QToolButton* first = buttonFor(*toolBar, QStringLiteral("toggleSidebarAction"));
+    const auto* search = window->findChild<QLineEdit*>(QStringLiteral("searchField"));
+    QVERIFY(first && search);
+    const int left = first->mapTo(toolBar, QPoint(0, 0)).x();
+    const int right = toolBar->width() - (search->geometry().right() + 1);
+    QVERIFY2(qAbs(left - right) <= 1,
+             qPrintable(QStringLiteral("left %1 px, right %2 px").arg(left).arg(right)));
+    QVERIFY(left >= 10);
 }
 
 void tst_Toolbar::buttonsShowToolTipWithShortcut()

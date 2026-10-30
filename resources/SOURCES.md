@@ -37,3 +37,10 @@ Other weights fall back to the nearest bundled one.
 
 `tst_icons` fails if an icon file is missing or if an SVG in `icons/` isn't referenced
 in `Icons.cpp`, so unused icons don't bloat the binary.
+
+## App logo (`app/logo.svg`)
+
+The project's own artwork, supplied by the project owner on 2026-10-30 (a notepad with an
+amber `#F3BE33` header and a pencil). Used as the window icon and in the About dialog;
+packaging installs it as the desktop icon (Phase 11).
+

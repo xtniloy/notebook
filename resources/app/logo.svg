@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E6E8EB"/>
+    </linearGradient>
+    <linearGradient id="header" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F3BE33"/>
+      <stop offset="1" stop-color="#EDB52A"/>
+    </linearGradient>
+    <linearGradient id="barrel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C9CBCF"/>
+      <stop offset="0.35" stop-color="#F4F5F6"/>
+      <stop offset="1" stop-color="#C2C5CA"/>
+    </linearGradient>
+    <clipPath id="pad">
+      <rect x="128" y="128" width="768" height="768" rx="150"/>
+    </clipPath>
+  </defs>
+
+  <!-- Pad -->
+  <g clip-path="url(#pad)">
+    <rect x="128" y="128" width="768" height="768" fill="url(#paper)"/>
+    <rect x="128" y="128" width="768" height="178" fill="url(#header)"/>
+  </g>
+
+  <!-- Ring holes -->
+  <g fill="#D29A14">
+    <circle cx="325" cy="200" r="37"/>
+    <circle cx="512" cy="200" r="37"/>
+    <circle cx="698" cy="200" r="37"/>
+  </g>
+  <!-- Rings (trimmed flat at the pad's top edge, y=128) -->
+  <g fill="#F7EDCC">
+    <path d="M302 128 H348 V197 A23 23 0 0 1 302 197 Z"/>
+    <path d="M489 128 H535 V197 A23 23 0 0 1 489 197 Z"/>
+    <path d="M675 128 H721 V197 A23 23 0 0 1 675 197 Z"/>
+  </g>
+
+  <!-- Lines -->
+  <g stroke="#C8CBD0" stroke-width="12" stroke-linecap="round">
+    <line x1="210" y1="466" x2="814" y2="466"/>
+    <line x1="210" y1="607" x2="814" y2="607"/>
+    <line x1="210" y1="748" x2="814" y2="748"/>
+  </g>
+
+  <!-- Pencil -->
+  <g transform="translate(524 598) rotate(-45)" stroke="#9A9DA3" stroke-width="8" stroke-linejoin="round">
+    <!-- cone -->
+    <path d="M -196 -40 L -292 -8 Q -303 0 -292 8 L -196 40 Z" fill="#FFFFFF"/>
+    <!-- graphite -->
+    <path d="M -262 -18 L -292 -8 Q -303 0 -292 8 L -262 18 Z" fill="#B9BCC1"/>
+    <!-- barrel -->
+    <rect x="-196" y="-40" width="428" height="80" fill="url(#barrel)"/>
+    <!-- eraser cap -->
+    <path d="M 232 -40 L 264 -40 A 40 40 0 0 1 264 40 L 232 40 Z" fill="#F4F4F5"/>
+  </g>
+</svg>

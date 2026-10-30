@@ -209,10 +209,18 @@ void WindowChrome::paintCorners(QPainter& painter) const
     // Erase what the content widgets painted outside the rounded shape...
     painter.setCompositionMode(QPainter::CompositionMode_DestinationOut);
     painter.fillPath(outside, Qt::black);
-    // ...put the shadow back there...
-    painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    // ...put the shadow back *behind* what is left: fully erased pixels get the
+    // whole shadow, half-erased edge pixels exactly their missing share. (A clip
+    // path instead isn't anti-aliased, which left a stepped light seam along the
+    // curve.) Limited to the corners and the overhang strip around the content;
+    // elsewhere the content is opaque anyway.
+    const QRect inner = content.toRect();
+    const int r = kCornerRadius;
     painter.save();
-    painter.setClipPath(outside);
+    painter.setClipRegion(
+        QRegion(content.adjusted(-kOverhang, -kOverhang, kOverhang, kOverhang).toAlignedRect()) -
+        QRegion(inner.adjusted(r, 0, -r, 0)) - QRegion(inner.adjusted(0, r, 0, -r)));
+    painter.setCompositionMode(QPainter::CompositionMode_DestinationOver);
     paintShadow(painter, content.translated(0, kShadowOffsetY), kCornerRadius, kShadowSize);
     painter.restore();
     // ...and outline the shape, just outside the content.

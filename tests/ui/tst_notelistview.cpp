@@ -1,4 +1,4 @@
-// NoteListView (task 1.6): TC-UI-015 note selection signal, uniform rows, header
+// NoteListView (task 1.6): TC-UI-015 note selection signal, row heights, header
 // rows that can't be selected. Runs under QT_QPA_PLATFORM=offscreen.
 
 #include "FakeClock.h"
@@ -27,7 +27,7 @@ private slots:
     void init();
     void cleanup();
 
-    void rowsHaveUniformHeight();
+    void rowHeights();
     void selectsFirstNoteInitially();
     void clickingNoteEmitsNoteSelected();
     void clickingHeaderKeepsSelection();
@@ -79,13 +79,19 @@ int tst_NoteListView::rowOf(const QString& header) const
     return -1;
 }
 
-void tst_NoteListView::rowsHaveUniformHeight()
+void tst_NoteListView::rowHeights()
 {
-    QVERIFY(m_view->uniformItemSizes());
-    const int height = m_view->visualRect(m_model->index(0)).height(); // "Pinned" header
-    QVERIFY(height >= 40);
-    QCOMPARE(m_view->visualRect(m_model->index(1)).height(), height);
-    QCOMPARE(m_view->visualRect(m_model->index(m_model->rowCount() - 1)).height(), height);
+    // Every note row has one height...
+    const int noteHeight = m_view->visualRect(m_model->index(1)).height();
+    QVERIFY(noteHeight >= 40);
+    QCOMPARE(m_view->visualRect(m_model->index(2)).height(), noteHeight);
+    QCOMPARE(m_view->visualRect(m_model->index(m_model->rowCount() - 1)).height(), noteHeight);
+    // ...and section headers are compact (UI review: no big gap above "Today").
+    const int headerHeight = m_view->visualRect(m_model->index(0)).height(); // "Pinned"
+    QVERIFY(headerHeight >= m_view->fontMetrics().height());
+    QVERIFY2(
+        headerHeight <= noteHeight * 2 / 3,
+        qPrintable(QStringLiteral("header %1 px, note %2 px").arg(headerHeight).arg(noteHeight)));
     // Rows span the full width, so the whole row is clickable.
     QCOMPARE(m_view->visualRect(m_model->index(1)).width(), m_view->viewport()->width());
 }

@@ -6,10 +6,10 @@ namespace notes::ui {
 
 // Paints note list rows (Plan §3.4): bold title, then the time and first line of
 // the preview; a thumbnail slot on the right; pin and lock icons. Locked notes
-// show "Locked" instead of a preview. Section headers are bold captions sitting
-// at the bottom of their row, so the space above separates the groups.
+// show "Locked" instead of a preview. Section headers are bold captions with
+// a little space above, separating the groups.
 //
-// Every row has the same height, which lets the view skip per-row layout.
+// Note rows share one height; section headers are shorter.
 class NoteListDelegate : public QStyledItemDelegate
 {
     Q_OBJECT

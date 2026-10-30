@@ -5,6 +5,7 @@
 #include "app/Config.h"
 #include "app/SingleInstance.h"
 #include "ui/Fonts.h"
+#include "ui/Icons.h"
 #include "ui/MainWindow.h"
 
 #include <QLoggingCategory>
@@ -38,6 +39,9 @@ Application::Application(int& argc, char** argv)
     applyAppIdentity();
     setApplicationDisplayName(QString::fromLatin1(config::kDisplayName));
     setDesktopFileName(QString::fromLatin1(config::kAppId));
+    // Window icon. GNOME's dock takes its icon from the installed .desktop file
+    // (kAppId) instead, which packaging adds in Phase 11.
+    setWindowIcon(ui::appIcon());
 }
 
 Application::~Application() = default;

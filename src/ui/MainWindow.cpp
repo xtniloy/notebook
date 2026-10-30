@@ -45,7 +45,8 @@ constexpr QSize kDefaultWindowSize(1100, 720);
 // Restored widths beyond this are treated as corrupt settings.
 constexpr int kMaxRestoredPaneWidth = 2000;
 constexpr int kSearchFieldWidth = 240;
-constexpr int kToolBarSideInset = 8;
+// With the toolbar's 4 px padding and 8 px spacing: 14 px from each window edge.
+constexpr int kToolBarEdgeSpacer = 2;
 constexpr int kToolBarBottomInset = 10;
 // Enough to show that the list is virtualized (Plan §10, TC-PERF-001).
 constexpr int kFakeNoteCount = 10'000;
@@ -185,6 +186,17 @@ void MainWindow::createToolBar()
         toolBar->addWidget(spacer);
     };
 
+    // Fixed spacers at both ends: QToolBar's layout ignores the toolbar's own
+    // left/right margins, so the first group sat 4 px from the edge while the
+    // search box ended 20 px from it.
+    const auto addEdgeSpacer = [&] {
+        auto* spacer = new QWidget(toolBar);
+        spacer->setFixedWidth(kToolBarEdgeSpacer);
+        spacer->setAttribute(Qt::WA_TransparentForMouseEvents);
+        toolBar->addWidget(spacer);
+    };
+
+    addEdgeSpacer();
     addGroup({ActionId::ToggleSidebar});
     addGroup({ActionId::ListView, ActionId::GalleryView});
     addGroup({ActionId::DeleteNote, ActionId::NewNote});
@@ -205,6 +217,7 @@ void MainWindow::createToolBar()
         m_searchField->setFixedHeight(group->sizeHint().height());
     }
     toolBar->addWidget(m_searchField);
+    addEdgeSpacer();
 
     m_chrome->addDragArea(toolBar);
 
@@ -219,7 +232,7 @@ void MainWindow::createToolBar()
     // On top of the style sheet's uniform padding (QToolBar can't take uneven
     // padding from it). The menu row above ends ~10 px below its text, so the
     // bottom gets that much extra: the gaps above and below the buttons match.
-    toolBar->setContentsMargins(kToolBarSideInset, 0, kToolBarSideInset, kToolBarBottomInset);
+    toolBar->setContentsMargins(0, 0, 0, kToolBarBottomInset);
 }
 
 void MainWindow::createMenus()

@@ -131,6 +131,13 @@ qt_add_resources(notesapp_ui "themes"
     BASE "${resource_dir}/themes"
     FILES "${resource_dir}/themes/theme.qss")
 
+# App logo (window icon, About dialog). Packaging installs it as the desktop
+# icon in Phase 11.
+qt_add_resources(notesapp_ui "app"
+    PREFIX "/app"
+    BASE "${resource_dir}/app"
+    FILES "${resource_dir}/app/logo.svg")
+
 file(GLOB license_files CONFIGURE_DEPENDS "${resource_dir}/licenses/*.txt")
 qt_add_resources(notesapp_ui "licenses"
     PREFIX "/licenses"

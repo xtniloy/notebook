@@ -190,4 +190,9 @@ QIcon icon(Icon icon)
     return cache.at(index);
 }
 
+QIcon appIcon()
+{
+    return QIcon(QStringLiteral(":/app/logo.svg"));
+}
+
 } // namespace notes::ui
