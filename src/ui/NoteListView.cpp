@@ -5,6 +5,8 @@
 
 #include <QItemSelectionModel>
 
+#include <algorithm>
+
 namespace notes::ui {
 
 namespace {
@@ -101,6 +103,10 @@ bool NoteListView::selectNote(qint64 noteId)
 void NoteListView::rowsAboutToBeRemoved(const QModelIndex& parent, int start, int end)
 {
     m_removingRows = true;
+    if (const int current = currentIndex().row();
+        !parent.isValid() && current >= start && current <= end) {
+        m_removedAt = start; // the rows after the block move up to here
+    }
     QListView::rowsAboutToBeRemoved(parent, start, end);
 }
 
@@ -151,18 +157,29 @@ void NoteListView::checkCurrentNote()
         return;
     }
     if (m_currentNote && indexForNote(*m_currentNote).isValid()) {
+        m_removedAt = -1;
         restoreSelection(); // back after a move
         return;
     }
     const bool hadNote = m_currentNote.has_value();
     m_currentNote.reset();
-    for (int row = 0; row < model()->rowCount(); ++row) {
-        if (const std::optional<qint64> id = noteIdOf(model()->index(row, 0))) {
-            m_currentNote = id;
-            restoreSelection();
-            emit noteSelected(*id);
-            return;
-        }
+    const int rows = model()->rowCount();
+    // The note after the removed one, else the one before; the first note if
+    // nothing was removed (e.g. the first page arrived).
+    const int from = m_removedAt < 0 ? 0 : std::min(m_removedAt, rows - 1);
+    m_removedAt = -1;
+    std::optional<qint64> next;
+    for (int row = from; row < rows && !next; ++row) {
+        next = noteIdOf(model()->index(row, 0));
+    }
+    for (int row = from - 1; row >= 0 && !next; --row) {
+        next = noteIdOf(model()->index(row, 0));
+    }
+    if (next) {
+        m_currentNote = next;
+        restoreSelection();
+        emit noteSelected(*next);
+        return;
     }
     if (hadNote) {
         emit currentNoteCleared();

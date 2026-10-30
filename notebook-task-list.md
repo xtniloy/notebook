@@ -382,7 +382,7 @@ Record each in `docs/adr/`:
 - [x] `migrations/001_initial.sql` = schema from **Plan §7** *(`src/storage/migrations/`. Without `notes_fts`: task 5.1 adds it together with the sync triggers an external-content FTS table needs. `note_tags` also gets foreign keys with `ON DELETE CASCADE`)*
 - [x] `Migrator`: reads `meta.schema_version`, applies newer numbered scripts in order, each in a transaction *(the version update is in the same transaction; foreign keys are off while migrating and `PRAGMA foreign_key_check` runs before each commit; files must be `NNN_name.sql` with no gaps)*
 - [x] Migration scripts embedded via `.qrc` *(`qt_add_resources()` on `notesapp_core`, as in 1.2)*
-- [ ] If the DB's version is **newer** than the app knows: refuse to open and show a clear error (prevents an old app version from damaging data) *(`Migrator` side done: returns `TooNew` and writes nothing. The error dialog needs the app's startup path that opens the database, which no task lists yet; it belongs with 2.11's wiring)*
+- [x] If the DB's version is **newer** than the app knows: refuse to open and show a clear error (prevents an old app version from damaging data) *(`Migrator` returns `TooNew` and writes nothing; since 2.11 the startup job skips everything else too, and `Application` shows the error instead of the window and exits)*
 
 **Tests**
 - `TC-MIG-001` (U) Empty DB → after migrate, `schema_version` = latest and all tables/indexes from Plan §7 exist.
@@ -398,7 +398,7 @@ Record each in `docs/adr/`:
 - [x] `FolderRepository`: `create`, `rename`, `move(newParent)`, `softDelete`, `listTree`, `reorder` *(names are trimmed; `softDelete` tombstones the whole subtree and moves its notes to Recently Deleted, keeping their `folder_id` for restore. Errors carry a `DbError::Kind`: NotFound, InvalidArgument, Cycle, Protected)*
 - [x] Every change bumps `version`, sets `updated_at`, and sets `sync_state = 0` *(times from `IClock`; `reorder` only touches rows whose position changes)*
 - [x] Prevent cycles (moving a folder into its own descendant)
-- [x] Create default **Notes** folder on first run *(`ensureDefaultFolder()`, with the fixed UUID `d5cf1c5f-0bc7-419e-b2f2-096709ed4f5b` from ADR 0005; it can't be deleted, moved or renamed, as in macOS Notes. Calling it at startup comes with the 2.11 wiring)*
+- [x] Create default **Notes** folder on first run *(`ensureDefaultFolder()`, with the fixed UUID `d5cf1c5f-0bc7-419e-b2f2-096709ed4f5b` from ADR 0005; it can't be deleted, moved or renamed, as in macOS Notes. Called at startup by `AppContext::openDatabase()` since 2.8)*
 
 **Tests**
 - `TC-STO-007` (U) Create nested folders 3 levels deep → `listTree` returns the correct hierarchy.
@@ -491,10 +491,10 @@ Record each in `docs/adr/`:
 
 ### 2.11 Wire UI to real data `M`
 
-- [ ] Sidebar, note list, and editor use the real models and services
-- [ ] New Note (`Ctrl+N`), Delete (`Delete` key), Pin from context menu
-- [ ] Right-click menus: note (Pin, Move to, Duplicate, Delete), folder (Rename, Delete, New Subfolder)
-- [ ] Sort options menu, saved in `QSettings`
+- [x] Sidebar, note list, and editor use the real models and services *(since 2.8)*
+- [x] New Note (`Ctrl+N`), Delete (`Delete` key), Pin from context menu *(a new note goes into the selected folder, "Notes" from All Notes; from Recently Deleted the sidebar switches to "Notes". Deleting selects the next note, or the previous one at the end)*
+- [x] Right-click menus: note (Pin, Move to, Duplicate, Delete), folder (Rename, Delete, New Subfolder) *(names via a small dialog; deleting a folder asks first. "Notes" can't be renamed or deleted, so those are greyed out. The sidebar's New Folder button and File › New Folder (`Ctrl+Shift+N`) work too)*
+- [x] Sort options menu, saved in `QSettings` *(View › Sort Notes By: Date Edited / Date Created / Title, key `noteList/sort`)*
 
 **Tests**
 - `TC-UI-021` (UI) `Ctrl+N` creates a note in the selected folder and focuses the editor.

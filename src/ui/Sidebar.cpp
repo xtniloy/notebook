@@ -94,13 +94,22 @@ Sidebar::Sidebar(QWidget* parent)
     connect(m_tree, &QTreeView::collapsed, this,
             [this](const QModelIndex& index) { onExpandedChanged(index, false); });
 
-    // Folder creation arrives with the FolderService (task 2.7).
+    m_tree->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_tree, &QWidget::customContextMenuRequested, this, [this](const QPoint& position) {
+        const QModelIndex index = m_tree->indexAt(position);
+        const std::optional<qint64> id = folderIdOf(index);
+        if (id && index.data(models::kKindRole).toInt() ==
+                      static_cast<int>(models::SidebarItemKind::Folder)) {
+            emit folderMenuRequested(*id, m_tree->viewport()->mapToGlobal(position));
+        }
+    });
+
     m_newFolderButton->setObjectName(QStringLiteral("newFolderButton"));
     m_newFolderButton->setIcon(icon(Icon::NewFolder));
     m_newFolderButton->setText(tr("New Folder"));
     m_newFolderButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     m_newFolderButton->setAutoRaise(true);
-    m_newFolderButton->setEnabled(false);
+    connect(m_newFolderButton, &QToolButton::clicked, this, &Sidebar::newFolderRequested);
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 4);
@@ -168,6 +177,7 @@ bool Sidebar::selectFolder(qint64 folderId)
     if (!index.isValid() || !(index.flags() & Qt::ItemIsSelectable)) {
         return false;
     }
+    m_tree->scrollTo(index); // expands its parents
     m_tree->setCurrentIndex(index);
     return true;
 }

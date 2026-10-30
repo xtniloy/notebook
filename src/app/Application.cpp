@@ -64,7 +64,15 @@ int Application::run()
     // After the single-instance check, so a second launch doesn't pay for it.
     loadFonts();
     m_context = AppContext::createDefault();
-    m_context->openDatabase(AppContext::defaultDatabasePath());
+    // Waits for the migration job only: at startup, before any window, and
+    // needed to decide whether the window may open at all.
+    QFuture<storage::DbResult<storage::Migrator::Result>> ready =
+        m_context->openDatabase(AppContext::defaultDatabasePath());
+    ready.waitForFinished();
+    if (const std::optional<QString> failure = AppContext::openFailureMessage(ready.result())) {
+        QMessageBox::critical(nullptr, applicationDisplayName(), *failure);
+        return EXIT_FAILURE;
+    }
     m_window = std::make_unique<ui::MainWindow>(*m_context);
     connect(instance, &SingleInstance::activationRequested, this, &Application::activateMainWindow);
     m_window->show();

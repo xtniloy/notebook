@@ -23,7 +23,8 @@ public:
     // selected note across model resets. Rows may arrive later (the real model
     // loads asynchronously): then the first note is selected and announced with
     // noteSelected(), and if the selected note goes away for good, the first
-    // remaining one is, or currentNoteCleared() says the list is empty.
+    // following one is (the previous one at the end; TC-UI-022), or
+    // currentNoteCleared() says the list is empty.
     void setModel(QAbstractItemModel* model) override;
 
     [[nodiscard]] std::optional<qint64> currentNote() const { return m_currentNote; }
@@ -53,6 +54,9 @@ private:
     bool m_restoring = false;
     bool m_checkPending = false;
     bool m_removingRows = false;
+    // Where the current note's row was removed, to pick its successor; -1 if
+    // the current note wasn't among the removed rows.
+    int m_removedAt = -1;
 };
 
 } // namespace notes::ui

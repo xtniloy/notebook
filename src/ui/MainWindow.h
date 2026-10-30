@@ -1,6 +1,10 @@
 #pragma once
 
+#include "storage/NoteRepository.h"
+
 #include <QMainWindow>
+
+#include <optional>
 
 class QAction;
 class QSplitter;
@@ -67,6 +71,22 @@ private:
     // After a confirmation; cannot be undone.
     void deletePermanently(qint64 noteId);
     void showNoteMenu(const QPoint& position);
+
+    // Task 2.11.
+    void newNote();
+    void duplicateNote(qint64 noteId);
+    void showFolderMenu(qint64 folderId, const QPoint& globalPosition);
+    void newFolder(std::optional<qint64> parentId);
+    void renameFolder(qint64 folderId);
+    void deleteFolder(qint64 folderId);
+    // Asks for a folder name; nullopt if cancelled or blank.
+    [[nodiscard]] std::optional<QString> askFolderName(const QString& title,
+                                                       const QString& initial);
+    void showError(const QString& text, const QString& details);
+    // Selects m_pendingNote / m_pendingFolder once their rows have arrived.
+    void selectPendingNote();
+    void selectPendingFolder();
+    void setNoteSort(storage::NoteSort sort);
     void setSidebarVisible(bool visible);
     // Sets exact pane widths; the editor gets the remaining space. QSplitter's
     // own setSizes() spreads any difference proportionally across all panes.
@@ -93,6 +113,12 @@ private:
     services::Autosave* m_autosave;
     // The note openNote() last asked for; older answers are dropped.
     qint64 m_openingNote = 0;
+    // Made by the user and to be selected once listed (new, duplicated).
+    std::optional<qint64> m_pendingNote;
+    std::optional<qint64> m_pendingFolder;
+    // A new note: the editor takes focus once it is shown (TC-UI-021).
+    qint64 m_focusEditorFor = 0;
+    storage::NoteSort m_sort = storage::NoteSort::DateEdited;
     SearchField* m_searchField = nullptr;
 
     // Kept while the sidebar is hidden, so it comes back at the same width.

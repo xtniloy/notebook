@@ -62,14 +62,16 @@ private:
     {
         SidebarItemKind kind = SidebarItemKind::SectionHeader;
         QString name;
-        qint64 folderId = 0;   // 0: selects nothing (headers)
-        qsizetype parent = -1; // -1: top level
-        int row = 0;           // among its parent's children
+        qint64 folderId = 0;    // 0: selects nothing (headers)
+        bool isDefault = false; // the "Notes" folder
+        qsizetype parent = -1;  // -1: top level
+        int row = 0;            // among its parent's children
         QList<qsizetype> children;
     };
 
     void rebuild(const QList<storage::FolderTreeEntry>& folders);
-    qsizetype addNode(SidebarItemKind kind, const QString& name, qint64 folderId, qsizetype parent);
+    qsizetype addNode(SidebarItemKind kind, const QString& name, qint64 folderId, qsizetype parent,
+                      bool isDefault = false);
     void applyCounts(const QHash<qint64, int>& counts);
     [[nodiscard]] const QList<qsizetype>& childrenOf(const QModelIndex& parent) const;
     [[nodiscard]] QModelIndex indexOf(qsizetype node) const;

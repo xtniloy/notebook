@@ -367,6 +367,8 @@ QVariant NoteListModel::data(const QModelIndex& index, int role) const
         return false; // attachments arrive in Phase 3
     case kSectionRole:
         return row.section;
+    case kNoteFolderIdRole:
+        return note.folderId;
     default:
         return {};
     }

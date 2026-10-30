@@ -46,6 +46,9 @@ public:
     // can't take new notes.
     QFuture<storage::DbResult<models::Note>> create(qint64 folderId, const QString& bodyHtml,
                                                     const QString& bodyText);
+    // A new note in the same folder with the same body, titled "<title> copy"
+    // (TC-UI-023); noteCreated(). Not for trashed or locked notes.
+    QFuture<storage::DbResult<models::Note>> duplicate(qint64 id);
     [[nodiscard]] QFuture<storage::DbResult<models::Note>> get(qint64 id);
     // Saves the editor's content; the title and snippet follow from the text.
     QFuture<storage::DbResult<models::Note>> updateBody(qint64 id, const QString& bodyHtml,

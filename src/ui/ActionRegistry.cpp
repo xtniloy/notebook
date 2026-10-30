@@ -61,7 +61,8 @@ ActionSpec specFor(ActionId id)
         return {.objectName = "newNoteAction",
                 .text = ActionRegistry::tr("&New Note"),
                 .icon = Icon::NewNote,
-                .shortcut = QKeySequence(Qt::CTRL | Qt::Key_N)};
+                .shortcut = QKeySequence(Qt::CTRL | Qt::Key_N),
+                .enabled = true}; // task 2.11
     case ActionId::Format:
         return {.objectName = "formatAction",
                 .text = ActionRegistry::tr("&Text Style"),

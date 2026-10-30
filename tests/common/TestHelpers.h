@@ -40,7 +40,7 @@ inline std::unique_ptr<app::AppContext> makeTestContext(const QString& directory
         std::make_unique<QSettings>(directory + QStringLiteral("/settings.ini"),
                                     QSettings::IniFormat),
         std::make_unique<FakeClock>());
-    context->openDatabase(directory + QStringLiteral("/notes.db"));
+    (void)context->openDatabase(directory + QStringLiteral("/notes.db"));
     return context;
 }
 

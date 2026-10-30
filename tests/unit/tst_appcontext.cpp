@@ -5,6 +5,9 @@
 #include "app/AppContext.h"
 #include "app/AppIdentity.h"
 #include "app/Config.h"
+#include "services/NoteService.h"
+#include "storage/Database.h"
+#include "storage/Migrator.h"
 
 #include <QSettings>
 #include <QTest>
@@ -19,6 +22,8 @@ private slots:
     void settingsUseAppIdentity();
     void defaultContextUsesAppSettingsFile();
     void contextUsesInjectedSettings();
+    void newerDatabaseIsRefused();
+    void openFailureMessages();
 };
 
 void tst_AppContext::initTestCase()
@@ -66,6 +71,54 @@ void tst_AppContext::contextUsesInjectedSettings()
     }
     const QSettings reopened(dir.dirPath() + QStringLiteral("/settings.ini"), QSettings::IniFormat);
     QCOMPARE(reopened.value(QStringLiteral("probe")).toInt(), 42);
+}
+
+// TC-MIG-004 end to end: a database from a newer version is reported, and the
+// startup job writes nothing to it (no default folder, no purge).
+void tst_AppContext::newerDatabaseIsRefused()
+{
+    using notes::storage::Migrator;
+    const notes::test::TempDb dir;
+    const QString path = dir.dirPath() + QStringLiteral("/notes.db");
+    const int latest = Migrator().latestVersion().value();
+    {
+        auto db = notes::storage::Database::open(path);
+        QVERIFY(db);
+        QVERIFY(
+            db.value()->exec(QStringLiteral("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);"
+                                            "INSERT INTO meta VALUES ('schema_version', '%1');")
+                                 .arg(latest + 1)));
+    }
+    auto fresh = std::make_unique<notes::app::AppContext>(
+        std::make_unique<QSettings>(dir.dirPath() + QStringLiteral("/settings.ini"),
+                                    QSettings::IniFormat),
+        std::make_unique<notes::test::FakeClock>());
+    const auto result = notes::test::await(fresh->openDatabase(path));
+    QVERIFY(result);
+    QCOMPARE(result.value().outcome, Migrator::Outcome::TooNew);
+    const std::optional<QString> message = notes::app::AppContext::openFailureMessage(result);
+    QVERIFY2(message.value_or(QString()).contains(QStringLiteral("newer version")),
+             qPrintable(message.value_or(QStringLiteral("(none)"))));
+    fresh = nullptr;
+
+    auto db = notes::storage::Database::open(path);
+    QVERIFY(db);
+    auto tables = db.value()->prepare(QStringLiteral("SELECT count(*) FROM sqlite_master"
+                                                     " WHERE name = 'folders'"));
+    QVERIFY(tables && tables.value()->step().valueOr(false));
+    QCOMPARE(tables.value()->column<int>(0), 0); // nothing created
+}
+
+void tst_AppContext::openFailureMessages()
+{
+    using notes::storage::Migrator;
+    const notes::storage::DbResult<Migrator::Result> ok(
+        Migrator::Result{.outcome = Migrator::Outcome::Migrated, .fromVersion = 0, .toVersion = 1});
+    QVERIFY(!notes::app::AppContext::openFailureMessage(ok));
+    const notes::storage::DbResult<Migrator::Result> failed(notes::storage::DbError::make(
+        notes::storage::DbError::Kind::Sqlite, QStringLiteral("disk I/O error")));
+    const std::optional<QString> message = notes::app::AppContext::openFailureMessage(failed);
+    QVERIFY(message && message->contains(QStringLiteral("disk I/O error")));
 }
 
 QTEST_GUILESS_MAIN(tst_AppContext)

@@ -25,6 +25,9 @@ inline constexpr int kKindRole = Qt::UserRole + 1;
 inline constexpr int kFolderIdRole = Qt::UserRole + 2;
 // int note count; an invalid QVariant means no badge.
 inline constexpr int kCountRole = Qt::UserRole + 3;
+// bool, folders only: the default "Notes" folder, which can't be renamed,
+// moved or deleted (FolderRepository).
+inline constexpr int kIsDefaultFolderRole = Qt::UserRole + 4;
 
 // Folder ids are SQLite rowids (always positive), so negative ids are free for
 // the two entries that select notes without being a folder.

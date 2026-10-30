@@ -213,10 +213,13 @@ void tst_Sidebar::stateSurvivesModelSwap()
 
 void tst_Sidebar::newFolderButtonAtBottom()
 {
-    const auto* button = m_sidebar->findChild<QToolButton*>(QStringLiteral("newFolderButton"));
+    auto* button = m_sidebar->findChild<QToolButton*>(QStringLiteral("newFolderButton"));
     QVERIFY(button);
     QVERIFY(button->isVisible());
-    QVERIFY(!button->isEnabled()); // enabled by the FolderService in task 2.7
+    QVERIFY(button->isEnabled());
+    const QSignalSpy requested(m_sidebar.get(), &Sidebar::newFolderRequested);
+    button->click();
+    QCOMPARE(requested.count(), 1);
     QVERIFY(button->geometry().top() >= m_tree->geometry().bottom());
     QVERIFY(!button->icon().isNull());
 }

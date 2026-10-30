@@ -1,8 +1,13 @@
 #pragma once
 
+#include "storage/DbResult.h"
+#include "storage/Migrator.h"
+
+#include <QFuture>
 #include <QString>
 
 #include <memory>
+#include <optional>
 
 class QSettings;
 
@@ -45,11 +50,18 @@ public:
     // The current time for all app code (ADR 0004).
     [[nodiscard]] const IClock& clock() const { return *m_clock; }
 
-    // Starts the DB thread on `path` (created if missing), queues the schema
-    // migration, the default "Notes" folder and emptying Recently Deleted of
-    // notes older than 30 days (then daily), and creates the services. Jobs run
-    // in order, so anything posted afterwards sees a migrated database. Call once.
-    void openDatabase(const QString& path);
+    // Starts the DB thread on `path` (created if missing) and creates the
+    // services. The first job migrates the schema and makes sure the default
+    // "Notes" folder exists; jobs run in order, so anything posted afterwards
+    // sees a migrated database. The returned future has that job's result:
+    // a database from a newer app version (Outcome::TooNew) is left untouched,
+    // and the app must not use it (openFailureMessage()). Once it succeeded,
+    // Recently Deleted is emptied of notes older than 30 days, then daily.
+    // Call once.
+    QFuture<storage::DbResult<storage::Migrator::Result>> openDatabase(const QString& path);
+    // What to tell the user when openDatabase() failed, or nullopt if it worked.
+    [[nodiscard]] static std::optional<QString>
+    openFailureMessage(const storage::DbResult<storage::Migrator::Result>& result);
     // The user's database: notes.db in the app's data directory (made 0700).
     [[nodiscard]] static QString defaultDatabasePath();
     [[nodiscard]] bool hasDatabase() const { return m_db != nullptr; }

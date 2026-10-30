@@ -87,8 +87,9 @@ void FolderTreeModel::rebuild(const QList<FolderTreeEntry>& folders)
         if (depth >= lastAtDepth.size()) {
             continue; // a skipped level can't happen; don't guess a parent
         }
-        const qsizetype node =
-            addNode(Folder, entry.folder.name, entry.folder.id, lastAtDepth.at(depth));
+        const qsizetype node = addNode(
+            Folder, entry.folder.name, entry.folder.id, lastAtDepth.at(depth),
+            entry.folder.uuid == QLatin1StringView(storage::FolderRepository::kDefaultFolderUuid));
         lastAtDepth.resize(depth + 1);
         lastAtDepth.append(node);
     }
@@ -96,13 +97,14 @@ void FolderTreeModel::rebuild(const QList<FolderTreeEntry>& folders)
 }
 
 qsizetype FolderTreeModel::addNode(SidebarItemKind kind, const QString& name, qint64 folderId,
-                                   qsizetype parent)
+                                   qsizetype parent, bool isDefault)
 {
     const qsizetype node = m_nodes.size();
     QList<qsizetype>& siblings = parent < 0 ? m_topLevel : m_nodes[parent].children;
     m_nodes.append(Node{.kind = kind,
                         .name = name,
                         .folderId = folderId,
+                        .isDefault = isDefault,
                         .parent = parent,
                         .row = static_cast<int>(siblings.size()),
                         .children = {}});
@@ -181,6 +183,8 @@ QVariant FolderTreeModel::data(const QModelIndex& index, int role) const
         return node.folderId == 0 ? QVariant() : QVariant(node.folderId);
     case kCountRole:
         return node.folderId == 0 ? QVariant() : QVariant(m_counts.value(node.folderId));
+    case kIsDefaultFolderRole:
+        return node.kind == SidebarItemKind::Folder ? QVariant(node.isDefault) : QVariant();
     default:
         return {};
     }

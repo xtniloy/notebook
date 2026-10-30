@@ -10,3 +10,5 @@ notes_add_test(NAME tst_windowchrome SOURCES tst_windowchrome.cpp LABELS ui LIBS
 notes_add_test(NAME tst_autosave SOURCES tst_autosave.cpp LABELS ui integration LIBS notesapp_ui)
 # Task 2.10: Recently Deleted in the window.
 notes_add_test(NAME tst_recentlydeleted SOURCES tst_recentlydeleted.cpp LABELS ui LIBS notesapp_ui)
+# TC-UI-021 .. TC-UI-024: the window on real data (task 2.11).
+notes_add_test(NAME tst_wiring SOURCES tst_wiring.cpp LABELS ui integration LIBS notesapp_ui)

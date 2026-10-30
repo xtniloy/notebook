@@ -3,12 +3,14 @@
 #include "app/AppContext.h"
 #include "app/Config.h"
 #include "app/IClock.h"
+#include "models/Folder.h"
 #include "models/FolderTreeModel.h"
 #include "models/Note.h"
 #include "models/NoteListModel.h"
 #include "models/NoteListRoles.h"
 #include "models/SidebarRoles.h"
 #include "services/Autosave.h"
+#include "services/FolderService.h"
 #include "services/NoteService.h"
 #include "ui/ActionRegistry.h"
 #include "ui/EditorView.h"
@@ -28,6 +30,7 @@
 #include <QDateTime>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -40,6 +43,7 @@
 #include <QToolButton>
 
 #include <algorithm>
+#include <array>
 #include <initializer_list>
 #include <optional>
 
@@ -50,6 +54,34 @@ namespace {
 constexpr QLatin1StringView kGeometryKey("mainWindow/geometry");
 constexpr QLatin1StringView kPaneWidthsKey("mainWindow/paneWidths");
 constexpr QLatin1StringView kSidebarVisibleKey("mainWindow/sidebarVisible");
+constexpr QLatin1StringView kSortKey("noteList/sort");
+
+// Settings values for the note sort; unknown values mean the default.
+constexpr std::array kSortNames{
+    std::pair{storage::NoteSort::DateEdited, QLatin1StringView("dateEdited")},
+    std::pair{storage::NoteSort::DateCreated, QLatin1StringView("dateCreated")},
+    std::pair{storage::NoteSort::Title, QLatin1StringView("title")},
+};
+
+storage::NoteSort sortFromSettings(const QString& value)
+{
+    for (const auto& [sort, name] : kSortNames) {
+        if (value == name) {
+            return sort;
+        }
+    }
+    return storage::NoteSort::DateEdited;
+}
+
+QLatin1StringView settingsNameOf(storage::NoteSort sort)
+{
+    for (const auto& [candidate, name] : kSortNames) {
+        if (candidate == sort) {
+            return name;
+        }
+    }
+    return kSortNames.front().second;
+}
 
 constexpr QSize kDefaultWindowSize(1100, 720);
 // Restored widths beyond this are treated as corrupt settings.
@@ -120,6 +152,7 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     , m_sidebarModel(new models::FolderTreeModel(context.folders(), context.notes(), this))
     , m_noteListModel(new models::NoteListModel(context.notes(), context.clock(), this))
     , m_autosave(new services::Autosave(context.notes(), this))
+    , m_sort(sortFromSettings(context.settings().value(kSortKey).toString()))
 {
     setWindowTitle(QString::fromLatin1(config::kDisplayName));
 
@@ -137,7 +170,14 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     // Both models fill in asynchronously; the views pick the first folder and
     // note as rows arrive, and say so with their signals.
     connect(m_sidebar, &Sidebar::folderSelected, this,
-            [this](qint64 folderId) { m_noteListModel->setFolder(folderId); });
+            [this](qint64 folderId) { m_noteListModel->setFolder(folderId, m_sort); });
+    connect(m_sidebar, &Sidebar::folderMenuRequested, this, &MainWindow::showFolderMenu);
+    connect(m_sidebar, &Sidebar::newFolderRequested, this, [this] { newFolder(std::nullopt); });
+    connect(m_sidebarModel, &models::FolderTreeModel::loaded, this,
+            &MainWindow::selectPendingFolder);
+    connect(m_noteListModel, &QAbstractItemModel::rowsInserted, this,
+            &MainWindow::selectPendingNote);
+    connect(m_actions->action(ActionId::NewNote), &QAction::triggered, this, &MainWindow::newNote);
     connect(m_noteList, &NoteListView::noteSelected, this, &MainWindow::openNote);
     connect(m_noteList, &NoteListView::currentNoteCleared, this, &MainWindow::clearEditor);
     m_noteList->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -150,7 +190,7 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     m_noteList->setModel(m_noteListModel);
     // Selected during setModel() without a signal, if the rows were there already.
     if (const std::optional<qint64> folder = m_sidebar->currentFolder()) {
-        m_noteListModel->setFolder(*folder);
+        m_noteListModel->setFolder(*folder, m_sort);
     }
 
     m_toggleSidebar->setChecked(true);
@@ -277,6 +317,10 @@ void MainWindow::createMenus()
 
     QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
     add(fileMenu, {ActionId::NewNote});
+    QAction* newFolderAction =
+        fileMenu->addAction(tr("New &Folder"), this, [this] { newFolder(std::nullopt); });
+    newFolderAction->setObjectName(QStringLiteral("newFolderAction"));
+    newFolderAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
     fileMenu->addSeparator();
     add(fileMenu, {ActionId::LockNote, ActionId::ShareExport});
 
@@ -292,6 +336,24 @@ void MainWindow::createMenus()
     add(viewMenu, {ActionId::ListView, ActionId::GalleryView});
     viewMenu->addSeparator();
     add(viewMenu, {ActionId::ToggleSidebar});
+    viewMenu->addSeparator();
+
+    // Sort Notes By (task 2.11), saved in QSettings. Recently Deleted always
+    // lists by deletion date.
+    QMenu* sortMenu = viewMenu->addMenu(tr("&Sort Notes By"));
+    sortMenu->setObjectName(QStringLiteral("sortMenu"));
+    auto* sortGroup = new QActionGroup(sortMenu);
+    const auto addSort = [&](const QString& text, storage::NoteSort sort) {
+        QAction* action = sortMenu->addAction(text);
+        action->setObjectName(QStringLiteral("sort_%1").arg(settingsNameOf(sort)));
+        action->setCheckable(true);
+        action->setChecked(m_sort == sort);
+        sortGroup->addAction(action);
+        connect(action, &QAction::triggered, this, [this, sort] { setNoteSort(sort); });
+    };
+    addSort(tr("Date &Edited"), storage::NoteSort::DateEdited);
+    addSort(tr("Date &Created"), storage::NoteSort::DateCreated);
+    addSort(tr("&Title"), storage::NoteSort::Title);
     viewMenu->addSeparator();
 
     // Appearance: System / Light / Dark (task 1.8), saved by the ThemeManager.
@@ -352,6 +414,10 @@ void MainWindow::openNote(qint64 noteId)
             return;
         }
         m_editor->showNote(note.value().bodyText, modified);
+        if (noteId == m_focusEditorFor) {
+            m_focusEditorFor = 0;
+            m_editor->textEdit()->setFocus(Qt::OtherFocusReason);
+        }
         if (note.value().isTrashed()) {
             // Read-only in Recently Deleted, as in macOS Notes: recover it to edit.
             m_editor->textEdit()->setReadOnly(true);
@@ -415,10 +481,224 @@ void MainWindow::showNoteMenu(const QPoint& position)
                        [this, noteId] { deletePermanently(noteId); })
             ->setObjectName(QStringLiteral("deletePermanentlyAction"));
     } else {
-        // Pin, Move to and Duplicate join with task 2.11.
+        const bool pinned = index.data(models::kPinnedRole).toBool();
+        menu.addAction(
+                pinned ? tr("Un&pin Note") : tr("&Pin Note"), this,
+                [this, noteId, pinned] { (void)m_context.notes().setPinned(noteId, !pinned); })
+            ->setObjectName(QStringLiteral("pinNoteAction"));
+
+        // Move To: every folder, indented under its parent; not its own.
+        QMenu* moveMenu = menu.addMenu(tr("&Move To"));
+        moveMenu->setObjectName(QStringLiteral("moveNoteMenu"));
+        const qint64 from = index.data(models::kNoteFolderIdRole).toLongLong();
+        QList<std::pair<QModelIndex, int>> pending{{QModelIndex(), -1}};
+        while (!pending.isEmpty()) {
+            const auto [parent, depth] = pending.takeFirst();
+            QList<std::pair<QModelIndex, int>> children;
+            for (int row = 0; row < m_sidebarModel->rowCount(parent); ++row) {
+                const QModelIndex child = m_sidebarModel->index(row, 0, parent);
+                const bool isFolder = child.data(models::kKindRole).toInt() ==
+                                      static_cast<int>(models::SidebarItemKind::Folder);
+                if (isFolder) {
+                    const qint64 folder = child.data(models::kFolderIdRole).toLongLong();
+                    QAction* target = moveMenu->addAction(
+                        QString(qsizetype{depth} * 4, QLatin1Char(' ')) + child.data().toString(),
+                        this, [this, noteId, folder] {
+                            (void)m_context.notes().moveToFolder(noteId, folder);
+                        });
+                    target->setObjectName(QStringLiteral("moveTo_%1").arg(folder));
+                    target->setEnabled(folder != from);
+                }
+                // Folders' subfolders come right after them.
+                children.append({child, isFolder ? depth + 1 : depth});
+            }
+            for (qsizetype i = 0; i < children.size(); ++i) {
+                pending.insert(i, children.at(i));
+            }
+        }
+
+        menu.addAction(tr("D&uplicate"), this, [this, noteId] { duplicateNote(noteId); })
+            ->setObjectName(QStringLiteral("duplicateNoteAction"));
+        menu.addSeparator();
         menu.addAction(m_actions->action(ActionId::DeleteNote));
     }
     menu.exec(m_noteList->viewport()->mapToGlobal(position));
+}
+
+void MainWindow::newNote()
+{
+    m_autosave->flush();
+    const qint64 folder = m_noteListModel->folderId();
+    // Recently Deleted (or nothing yet) can't take notes: they go to "Notes",
+    // which the sidebar then shows.
+    const bool elsewhere = folder == models::kRecentlyDeletedFolderId || folder == 0;
+    m_context.notes()
+        .create(elsewhere ? models::kAllNotesFolderId : folder, {}, {})
+        .then(this, [this, elsewhere](const storage::DbResult<models::Note>& note) {
+            if (!note) {
+                showError(tr("The note could not be created."), note.error().message);
+                return;
+            }
+            m_pendingNote = note.value().id;
+            m_focusEditorFor = note.value().id;
+            if (elsewhere) {
+                m_sidebar->selectFolder(note.value().folderId);
+            }
+            selectPendingNote();
+        });
+}
+
+void MainWindow::duplicateNote(qint64 noteId)
+{
+    m_autosave->flush(); // the copy has the latest text
+    m_context.notes().duplicate(noteId).then(
+        this, [this](const storage::DbResult<models::Note>& copy) {
+            if (!copy) {
+                showError(tr("The note could not be duplicated."), copy.error().message);
+                return;
+            }
+            m_pendingNote = copy.value().id;
+            selectPendingNote();
+        });
+}
+
+void MainWindow::selectPendingNote()
+{
+    if (m_pendingNote && m_noteList->selectNote(*m_pendingNote)) {
+        m_pendingNote.reset();
+    }
+}
+
+void MainWindow::selectPendingFolder()
+{
+    if (m_pendingFolder && m_sidebar->selectFolder(*m_pendingFolder)) {
+        m_pendingFolder.reset();
+    }
+}
+
+void MainWindow::setNoteSort(storage::NoteSort sort)
+{
+    if (sort == m_sort) {
+        return;
+    }
+    m_sort = sort;
+    m_context.settings().setValue(kSortKey, QString(settingsNameOf(sort)));
+    if (const std::optional<qint64> folder = m_sidebar->currentFolder()) {
+        m_autosave->flush();
+        const std::optional<qint64> note = m_noteList->currentNote();
+        m_noteListModel->setFolder(*folder, sort);
+        m_pendingNote = note; // keep it selected in the new order
+    }
+}
+
+void MainWindow::showFolderMenu(qint64 folderId, const QPoint& globalPosition)
+{
+    const QModelIndex index = m_sidebarModel
+                                  ->match(m_sidebarModel->index(0, 0), models::kFolderIdRole,
+                                          folderId, 1, Qt::MatchExactly | Qt::MatchRecursive)
+                                  .value(0);
+    // "Notes" can't be renamed or deleted (FolderRepository refuses too).
+    const bool isDefault = index.data(models::kIsDefaultFolderRole).toBool();
+    QMenu menu(this);
+    menu.setObjectName(QStringLiteral("folderMenu"));
+    menu.addAction(tr("New &Subfolder…"), this, [this, folderId] { newFolder(folderId); })
+        ->setObjectName(QStringLiteral("newSubfolderAction"));
+    QAction* rename =
+        menu.addAction(tr("&Rename Folder…"), this, [this, folderId] { renameFolder(folderId); });
+    rename->setObjectName(QStringLiteral("renameFolderAction"));
+    rename->setEnabled(!isDefault);
+    menu.addSeparator();
+    QAction* remove =
+        menu.addAction(tr("&Delete Folder…"), this, [this, folderId] { deleteFolder(folderId); });
+    remove->setObjectName(QStringLiteral("deleteFolderAction"));
+    remove->setEnabled(!isDefault);
+    menu.exec(globalPosition);
+}
+
+std::optional<QString> MainWindow::askFolderName(const QString& title, const QString& initial)
+{
+    QInputDialog dialog(this);
+    dialog.setObjectName(QStringLiteral("folderNameDialog"));
+    dialog.setWindowTitle(title);
+    dialog.setLabelText(tr("Name:"));
+    dialog.setTextValue(initial);
+    if (dialog.exec() != QDialog::Accepted) {
+        return std::nullopt;
+    }
+    const QString name = dialog.textValue().trimmed();
+    return name.isEmpty() ? std::nullopt : std::optional<QString>(name);
+}
+
+void MainWindow::newFolder(std::optional<qint64> parentId)
+{
+    const std::optional<QString> name =
+        askFolderName(parentId ? tr("New Subfolder") : tr("New Folder"), tr("New Folder"));
+    if (!name) {
+        return;
+    }
+    m_context.folders()
+        .create(*name, parentId)
+        .then(this, [this](const storage::DbResult<models::Folder>& folder) {
+            if (!folder) {
+                showError(tr("The folder could not be created."), folder.error().message);
+                return;
+            }
+            m_pendingFolder = folder.value().id; // selected once the tree reloads
+        });
+}
+
+void MainWindow::renameFolder(qint64 folderId)
+{
+    const QModelIndex index = m_sidebarModel
+                                  ->match(m_sidebarModel->index(0, 0), models::kFolderIdRole,
+                                          folderId, 1, Qt::MatchExactly | Qt::MatchRecursive)
+                                  .value(0);
+    const std::optional<QString> name = askFolderName(tr("Rename Folder"), index.data().toString());
+    if (!name) {
+        return;
+    }
+    m_context.folders()
+        .rename(folderId, *name)
+        .then(this, [this](const storage::DbResult<models::Folder>& folder) {
+            if (!folder) {
+                showError(tr("The folder could not be renamed."), folder.error().message);
+            }
+        });
+}
+
+void MainWindow::deleteFolder(qint64 folderId)
+{
+    const QModelIndex index = m_sidebarModel
+                                  ->match(m_sidebarModel->index(0, 0), models::kFolderIdRole,
+                                          folderId, 1, Qt::MatchExactly | Qt::MatchRecursive)
+                                  .value(0);
+    QMessageBox confirm(QMessageBox::Warning, tr("Delete Folder"),
+                        tr("Delete the folder \u201c%1\u201d?").arg(index.data().toString()),
+                        QMessageBox::NoButton, this);
+    confirm.setObjectName(QStringLiteral("deleteFolderDialog"));
+    confirm.setInformativeText(
+        tr("Its subfolders are deleted too, and all their notes move to Recently Deleted."));
+    const QPushButton* remove = confirm.addButton(tr("Delete"), QMessageBox::DestructiveRole);
+    confirm.addButton(QMessageBox::Cancel);
+    confirm.setDefaultButton(QMessageBox::Cancel);
+    confirm.exec();
+    if (confirm.clickedButton() != remove) {
+        return;
+    }
+    m_autosave->flush();
+    m_context.folders().remove(folderId).then(this, [this](const storage::DbStatus& status) {
+        if (!status) {
+            showError(tr("The folder could not be deleted."), status.error().message);
+        }
+    });
+}
+
+void MainWindow::showError(const QString& text, const QString& details)
+{
+    QMessageBox box(QMessageBox::Warning, windowTitle(), text, QMessageBox::Ok, this);
+    box.setObjectName(QStringLiteral("errorDialog"));
+    box.setInformativeText(details);
+    box.exec();
 }
 
 void MainWindow::clearEditor()

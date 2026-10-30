@@ -29,5 +29,7 @@ inline constexpr int kHasThumbnailRole = Qt::UserRole + 8;
 // QString, notes only: the title of the section the note is in ("Pinned",
 // "Today", "March", ...), so views can group without header rows.
 inline constexpr int kSectionRole = Qt::UserRole + 9;
+// qint64, notes only: the folder the note is in (or was in, when trashed).
+inline constexpr int kNoteFolderIdRole = Qt::UserRole + 10;
 
 } // namespace notes::models

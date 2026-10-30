@@ -78,7 +78,7 @@ void tst_ActionRegistry::onlyImplementedActionsAreEnabled()
 {
     const ActionRegistry registry;
     const QSet<ActionId> implemented{ActionId::ToggleSidebar, ActionId::SearchAllNotes,
-                                     ActionId::DeleteNote};
+                                     ActionId::DeleteNote, ActionId::NewNote};
     for (int i = 0; i < static_cast<int>(ActionId::Count); ++i) {
         const auto id = static_cast<ActionId>(i);
         const QAction* action = registry.action(id);

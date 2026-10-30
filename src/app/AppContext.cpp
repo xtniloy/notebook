@@ -1,13 +1,16 @@
 #include "app/AppContext.h"
 
+#include "app/Config.h"
 #include "app/IClock.h"
 #include "app/SystemClock.h"
 #include "services/FolderService.h"
 #include "services/NoteService.h"
 #include "services/TrashPurger.h"
 #include "storage/DbThread.h"
+#include "storage/FolderRepository.h"
 #include "storage/Migrator.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QLoggingCategory>
@@ -34,27 +37,57 @@ AppContext::AppContext(std::unique_ptr<QSettings> settings, std::unique_ptr<IClo
 
 AppContext::~AppContext() = default;
 
-void AppContext::openDatabase(const QString& path)
+QFuture<storage::DbResult<storage::Migrator::Result>> AppContext::openDatabase(const QString& path)
 {
+    using storage::Migrator;
     Q_ASSERT(!m_db);
     m_db = std::make_unique<storage::DbThread>(path);
-    // Queued first, so every later job sees the current schema. Telling the user
-    // about a failure (e.g. a database from a newer version) is task 2.11.
-    m_db->post([](storage::Database& db) { return storage::Migrator().migrate(db); })
-        .then([](const storage::DbResult<storage::Migrator::Result>& result) {
-            if (!result) {
-                qCCritical(lcContext) << "Database migration failed:" << result.error().code
-                                      << result.error().message;
-            } else if (result.value().outcome == storage::Migrator::Outcome::TooNew) {
-                qCCritical(lcContext) << "The database was written by a newer version, schema"
-                                      << result.value().fromVersion;
-            }
-        });
     m_notes = std::make_unique<services::NoteService>(*m_db, *m_clock);
     m_folders = std::make_unique<services::FolderService>(*m_db, *m_clock);
-    (void)m_folders->ensureDefaultFolder();
     m_trashPurger = std::make_unique<services::TrashPurger>(*m_notes);
-    m_trashPurger->start();
+
+    const IClock* clock = m_clock.get();
+    QFuture<storage::DbResult<Migrator::Result>> ready =
+        m_db->post([clock](storage::Database& db) -> storage::DbResult<Migrator::Result> {
+            storage::DbResult<Migrator::Result> migrated = Migrator().migrate(db);
+            if (!migrated || migrated.value().outcome == Migrator::Outcome::TooNew) {
+                return migrated; // written nothing (TC-MIG-004)
+            }
+            if (const auto notes = storage::FolderRepository(db, *clock).ensureDefaultFolder();
+                !notes) {
+                return notes.error();
+            }
+            return migrated;
+        });
+    services::TrashPurger* purger = m_trashPurger.get();
+    ready.then(purger, [purger](const storage::DbResult<Migrator::Result>& result) {
+        if (const std::optional<QString> failure = openFailureMessage(result)) {
+            // Shown to the user by Application; logged without the details.
+            qCCritical(lcContext) << "Database not usable:" << (result ? -1 : result.error().code);
+            return;
+        }
+        purger->start();
+    });
+    return ready;
+}
+
+std::optional<QString>
+AppContext::openFailureMessage(const storage::DbResult<storage::Migrator::Result>& result)
+{
+    if (!result) {
+        return QCoreApplication::translate("AppContext", "Your notes could not be opened.\n\n%1")
+            .arg(result.error().message);
+    }
+    if (result.value().outcome == storage::Migrator::Outcome::TooNew) {
+        //: %1 is the app's name.
+        return QCoreApplication::translate(
+                   "AppContext",
+                   "Your notes were saved by a newer version of %1, so this version can't "
+                   "open them safely.\n\nInstall the latest version of %1. Your notes "
+                   "have not been changed.")
+            .arg(QString::fromLatin1(config::kDisplayName));
+    }
+    return std::nullopt;
 }
 
 QString AppContext::defaultDatabasePath()

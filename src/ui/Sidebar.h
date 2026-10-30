@@ -40,6 +40,11 @@ public:
 signals:
     // A folder, All Notes or Recently Deleted was selected (ids in SidebarRoles.h).
     void folderSelected(qint64 folderId);
+    // Right-click on a folder row (not All Notes or Recently Deleted), at
+    // `globalPosition`, for its menu.
+    void folderMenuRequested(qint64 folderId, const QPoint& globalPosition);
+    // The "New Folder" button.
+    void newFolderRequested();
 
 private:
     void onSelectionChanged(const QItemSelection& selected);

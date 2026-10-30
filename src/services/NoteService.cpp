@@ -71,6 +71,39 @@ QFuture<DbResult<Note>> NoteService::create(qint64 folderId, const QString& body
         });
 }
 
+QFuture<DbResult<Note>> NoteService::duplicate(qint64 id)
+{
+    const app::IClock* clock = &m_clock;
+    //: The title of a duplicated note; %1 is the original's title.
+    const QString titleFormat = tr("%1 copy");
+    return m_db
+        .post([clock, id, titleFormat](Database& db) -> DbResult<Note> {
+            NoteRepository notes(db, *clock);
+            DbResult<Note> original = notes.get(id);
+            if (!original) {
+                return original.error();
+            }
+            const Note& note = original.value();
+            if (note.isTrashed() || note.deletedAt || note.locked) {
+                return DbError::make(Kind::InvalidArgument,
+                                     QStringLiteral("Only live, unlocked notes can be duplicated"));
+            }
+            // Explicit title: the body (and so the derived title) is identical.
+            const NoteContent copy{.title = note.title.isEmpty() ? QString()
+                                                                 : titleFormat.arg(note.title),
+                                   .snippet = note.snippet,
+                                   .bodyHtml = note.bodyHtml,
+                                   .bodyText = note.bodyText};
+            return notes.create(note.folderId, copy);
+        })
+        .then(this, [this](DbResult<Note> result) {
+            if (result) {
+                emit noteCreated(result.value());
+            }
+            return result;
+        });
+}
+
 QFuture<DbResult<Note>> NoteService::get(qint64 id)
 {
     const app::IClock* clock = &m_clock;
