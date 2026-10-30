@@ -15,12 +15,12 @@
 QMenuBar#headerBar {
     background: ${window};
     color: ${text};
-    padding: 4px 10px 2px 10px; /* clear of the rounded corners */
+    padding: 6px 10px 0 10px; /* clear of the rounded corners */
 }
 
 QMenuBar#headerBar::item {
     background: transparent;
-    padding: 7px 8px; /* as tall as the window buttons */
+    padding: 4px 8px;
     border-radius: 6px;
 }
 
@@ -29,10 +29,11 @@ QMenuBar#headerBar::item:pressed {
     background: ${hover};
 }
 
+/* GNOME-sized: 22 px circles, 14 px icons (sizes set in WindowChrome). */
 #windowButtons QToolButton {
     border: none;
-    border-radius: 12px;
-    padding: 4px;
+    border-radius: 11px;
+    padding: 0;
     background: ${hover};
 }
 
@@ -45,7 +46,9 @@ QToolBar#mainToolBar {
     background: ${window};
     border: none;
     border-bottom: 1px solid ${separator};
-    padding: 8px 12px 10px 12px;
+    /* Qt applies one uniform margin here; MainWindow adds the uneven rest so the
+       gaps above and below the buttons match. */
+    padding: 4px;
     spacing: 8px; /* between groups */
 }
 

@@ -9,15 +9,16 @@ namespace notes::ui {
 
 namespace {
 
-constexpr int kHorizontalPadding = 12;
-constexpr int kVerticalPadding = 9;
-constexpr int kLineGap = 3;
+constexpr int kHorizontalPadding = 16;
+constexpr int kVerticalPadding = 13; // roomy rows, as macOS Notes
+constexpr int kLineGap = 5;
 constexpr int kIconSize = 14;
 constexpr int kIconGap = 4;
 constexpr qreal kHighlightRadius = 6.0;
 constexpr qreal kThumbnailRadius = 4.0;
 constexpr qreal kHeaderScale = 1.1;
-constexpr int kHeaderBottomPadding = 5;
+constexpr int kHeaderBottomPadding = 6;
+constexpr int kHighlightInset = 6;
 
 QFont boldFont(const QFont& base, qreal scale = 1.0)
 {
@@ -73,8 +74,8 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
     if (selected) {
         painter->setPen(Qt::NoPen);
         painter->setBrush(palette.highlight());
-        painter->drawRoundedRect(option.rect.adjusted(4, 1, -4, -1), kHighlightRadius,
-                                 kHighlightRadius);
+        painter->drawRoundedRect(option.rect.adjusted(kHighlightInset, 1, -kHighlightInset, -1),
+                                 kHighlightRadius, kHighlightRadius);
     } else {
         // Hairline between notes, but not above the next section's header.
         const QModelIndex next = index.siblingAtRow(index.row() + 1);

@@ -18,7 +18,9 @@ namespace {
 
 constexpr int kShadowOffsetY = 3; // light comes from slightly above
 constexpr int kShadowAlpha = 38;  // soft: a hint of depth, not a dark halo
-constexpr int kButtonSpacing = 6;
+constexpr int kButtonSpacing = 8;
+constexpr int kButtonSize = 22; // GNOME header bar buttons
+constexpr int kButtonIconSize = 14;
 
 QCursor cursorFor(Qt::Edges edges)
 {
@@ -84,6 +86,8 @@ QToolButton* windowButton(QWidget* parent, const char* name, Icon iconId, const 
     button->setAccessibleName(toolTip); // icon-only: screen readers need a name
     button->setAutoRaise(true);
     button->setFocusPolicy(Qt::NoFocus);
+    button->setFixedSize(kButtonSize, kButtonSize);
+    button->setIconSize(QSize(kButtonIconSize, kButtonIconSize));
     return button;
 }
 
@@ -233,7 +237,7 @@ QWidget* WindowChrome::createWindowButtons(QWidget* parent)
     auto* layout = new QHBoxLayout(buttons);
     // Clear of the rounded top-right corner; vertical room comes from the
     // header's padding, so the buttons centre on the menu titles.
-    layout->setContentsMargins(kButtonSpacing, 0, 2 * kButtonSpacing, 0);
+    layout->setContentsMargins(kButtonSpacing, 0, kButtonSpacing + 4, 0);
     layout->setSpacing(kButtonSpacing);
 
     // Order and side follow GNOME's default (":minimize,maximize,close").

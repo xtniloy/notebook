@@ -45,6 +45,8 @@ constexpr QSize kDefaultWindowSize(1100, 720);
 // Restored widths beyond this are treated as corrupt settings.
 constexpr int kMaxRestoredPaneWidth = 2000;
 constexpr int kSearchFieldWidth = 240;
+constexpr int kToolBarSideInset = 8;
+constexpr int kToolBarBottomInset = 10;
 // Enough to show that the list is virtualized (Plan §10, TC-PERF-001).
 constexpr int kFakeNoteCount = 10'000;
 // The style sheet draws a 1 px line in the middle; the rest is grab area.
@@ -213,6 +215,11 @@ void MainWindow::createToolBar()
     toolBar->ensurePolished();
     QEvent styleChange(QEvent::StyleChange);
     QCoreApplication::sendEvent(toolBar, &styleChange);
+
+    // On top of the style sheet's uniform padding (QToolBar can't take uneven
+    // padding from it). The menu row above ends ~10 px below its text, so the
+    // bottom gets that much extra: the gaps above and below the buttons match.
+    toolBar->setContentsMargins(kToolBarSideInset, 0, kToolBarSideInset, kToolBarBottomInset);
 }
 
 void MainWindow::createMenus()

@@ -8,6 +8,7 @@
 #include "ui/WindowChrome.h"
 
 #include <QApplication>
+#include <QFrame>
 #include <QMenuBar>
 #include <QTest>
 #include <QToolBar>
@@ -40,6 +41,7 @@ private slots:
     void edgesAt();
     void paintsShadowOutsideBorder();
     void cornersAreRounded();
+    void headerAndToolbarSpacingIsBalanced();
 
 private:
     std::unique_ptr<MainWindow> showWindow();
@@ -258,6 +260,37 @@ void tst_WindowChrome::cornersAreRounded()
     window->showMaximized();
     QTRY_VERIFY(window->isMaximized());
     QTRY_COMPARE(qAlpha(window->grab().toImage().pixel(0, 0)), 255);
+}
+
+// UI review: the gap between the menu row and the toolbar buttons matches the
+// gap below the buttons, and the window buttons are a regular size, clear of
+// the top edge.
+void tst_WindowChrome::headerAndToolbarSpacingIsBalanced()
+{
+    const auto window = showWindow();
+    QVERIFY(window);
+    const auto* header = window->findChild<QMenuBar*>(QStringLiteral("headerBar"));
+    const auto* toolBar = window->findChild<QToolBar*>(QStringLiteral("mainToolBar"));
+    const auto* group = toolBar->findChild<QFrame*>(QStringLiteral("toolGroup"));
+    QVERIFY(header && toolBar && group);
+
+    // From the bottom of the menu titles' text to the top of the buttons...
+    const QRect item = header->actionGeometry(header->actions().constFirst());
+    const int textBottom =
+        header->mapTo(window.get(), item.center()).y() + (header->fontMetrics().height() / 2);
+    const QRect groupRect(group->mapTo(window.get(), QPoint(0, 0)), group->size());
+    const int above = groupRect.top() - textBottom;
+    // ...and from the bottom of the buttons to the toolbar's bottom line.
+    const int below = toolBar->geometry().bottom() - groupRect.bottom();
+    QVERIFY2(qAbs(above - below) <= 3,
+             qPrintable(QStringLiteral("above %1 px, below %2 px").arg(above).arg(below)));
+    QVERIFY(below >= 6);
+
+    for (const char* name : {"windowMinimizeButton", "windowMaximizeButton", "windowCloseButton"}) {
+        const QToolButton* windowButton = button(*window, name);
+        QCOMPARE(windowButton->size(), QSize(22, 22));
+        QVERIFY2(windowButton->mapTo(window.get(), QPoint(0, 0)).y() - kMargin >= 6, name);
+    }
 }
 
 QTEST_MAIN(tst_WindowChrome)
