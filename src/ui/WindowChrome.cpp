@@ -7,6 +7,7 @@
 #include <QMenuBar>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QRadialGradient>
 #include <QToolButton>
 #include <QWindow>
@@ -15,8 +16,8 @@ namespace notes::ui {
 
 namespace {
 
-constexpr int kShadowOffsetY = 2; // light comes from slightly above
-constexpr int kShadowAlpha = 70;
+constexpr int kShadowOffsetY = 3; // light comes from slightly above
+constexpr int kShadowAlpha = 38;  // soft: a hint of depth, not a dark halo
 constexpr int kButtonSpacing = 6;
 
 QCursor cursorFor(Qt::Edges edges)
@@ -31,25 +32,30 @@ QCursor cursorFor(Qt::Edges edges)
     return horizontal ? Qt::SizeHorCursor : Qt::SizeVerCursor;
 }
 
-// A soft shadow around `rect`: radial gradients at the corners, linear along
-// the sides (a nine-patch made of gradients; no blur pass needed).
-void paintShadow(QPainter& painter, const QRect& rect, int size)
+// A soft shadow around the rounded rectangle `rect`: radial gradients at the
+// corners, linear along the sides (a nine-patch of gradients; no blur pass).
+void paintShadow(QPainter& painter, const QRectF& rect, qreal radius, qreal size)
 {
     const QColor dark(0, 0, 0, kShadowAlpha);
     const QColor clear(0, 0, 0, 0);
-    const QRectF r = rect;
+    const qreal r = radius;
     const qreal s = size;
+    const qreal reach = r + s;
 
     const auto corner = [&](QPointF center, QRectF area) {
-        QRadialGradient gradient(center, s);
+        QRadialGradient gradient(center, reach);
         gradient.setColorAt(0, dark);
+        gradient.setColorAt(r / reach, dark);
         gradient.setColorAt(1, clear);
         painter.fillRect(area, gradient);
     };
-    corner(r.topLeft(), QRectF(r.left() - s, r.top() - s, s, s));
-    corner(r.topRight(), QRectF(r.right(), r.top() - s, s, s));
-    corner(r.bottomLeft(), QRectF(r.left() - s, r.bottom(), s, s));
-    corner(r.bottomRight(), QRectF(r.right(), r.bottom(), s, s));
+    corner(rect.topLeft() + QPointF(r, r), QRectF(rect.left() - s, rect.top() - s, reach, reach));
+    corner(rect.topRight() + QPointF(-r, r),
+           QRectF(rect.right() - r, rect.top() - s, reach, reach));
+    corner(rect.bottomLeft() + QPointF(r, -r),
+           QRectF(rect.left() - s, rect.bottom() - r, reach, reach));
+    corner(rect.bottomRight() + QPointF(-r, -r),
+           QRectF(rect.right() - r, rect.bottom() - r, reach, reach));
 
     const auto side = [&](QPointF from, QPointF to, QRectF area) {
         QLinearGradient gradient(from, to);
@@ -57,11 +63,16 @@ void paintShadow(QPainter& painter, const QRect& rect, int size)
         gradient.setColorAt(1, clear);
         painter.fillRect(area, gradient);
     };
-    side(r.topLeft(), r.topLeft() - QPointF(0, s), QRectF(r.left(), r.top() - s, r.width(), s));
-    side(r.bottomLeft(), r.bottomLeft() + QPointF(0, s),
-         QRectF(r.left(), r.bottom(), r.width(), s));
-    side(r.topLeft(), r.topLeft() - QPointF(s, 0), QRectF(r.left() - s, r.top(), s, r.height()));
-    side(r.topRight(), r.topRight() + QPointF(s, 0), QRectF(r.right(), r.top(), s, r.height()));
+    const qreal innerWidth = rect.width() - (2 * r);
+    const qreal innerHeight = rect.height() - (2 * r);
+    side(QPointF(0, rect.top()), QPointF(0, rect.top() - s),
+         QRectF(rect.left() + r, rect.top() - s, innerWidth, s));
+    side(QPointF(0, rect.bottom()), QPointF(0, rect.bottom() + s),
+         QRectF(rect.left() + r, rect.bottom(), innerWidth, s));
+    side(QPointF(rect.left(), 0), QPointF(rect.left() - s, 0),
+         QRectF(rect.left() - s, rect.top() + r, s, innerHeight));
+    side(QPointF(rect.right(), 0), QPointF(rect.right() + s, 0),
+         QRectF(rect.right(), rect.top() + r, s, innerHeight));
 }
 
 QToolButton* windowButton(QWidget* parent, const char* name, Icon iconId, const QString& toolTip)
@@ -78,9 +89,35 @@ QToolButton* windowButton(QWidget* parent, const char* name, Icon iconId, const 
 
 } // namespace
 
+// Sits above all content and paints WindowChrome::paintCorners(). Mouse events
+// pass through to the widgets below.
+class CornerOverlay : public QWidget
+{
+public:
+    CornerOverlay(const WindowChrome& chrome, QWidget* window)
+        : QWidget(window)
+        , m_chrome(chrome)
+    {
+        setObjectName(QStringLiteral("windowCornerOverlay"));
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setFocusPolicy(Qt::NoFocus);
+    }
+
+protected:
+    void paintEvent(QPaintEvent* /*event*/) override
+    {
+        QPainter painter(this);
+        m_chrome.paintCorners(painter);
+    }
+
+private:
+    const WindowChrome& m_chrome;
+};
+
 WindowChrome::WindowChrome(QMainWindow* window)
     : QObject(window)
     , m_window(window)
+    , m_overlay(new CornerOverlay(*this, window))
 {
     m_window->setWindowFlag(Qt::FramelessWindowHint);
     m_window->setAttribute(Qt::WA_TranslucentBackground);
@@ -120,25 +157,64 @@ Qt::Edges WindowChrome::edgesAt(const QPoint& pos, const QSize& size, int margin
     return edges;
 }
 
+QRect WindowChrome::contentRect() const
+{
+    return m_window->rect().marginsRemoved(frameMargins());
+}
+
 void WindowChrome::paint(QPainter& painter) const
 {
-    const QMargins margins = frameMargins();
-    const QRect content = m_window->rect().marginsRemoved(margins);
-    const QPalette& palette = m_window->palette();
+    const QColor background = m_window->palette().color(QPalette::Window);
+    if (frameMargins().isNull()) {
+        painter.fillRect(m_window->rect(), background);
+        return;
+    }
+    const QRectF content = contentRect();
+    painter.setCompositionMode(QPainter::CompositionMode_Source);
+    painter.fillRect(m_window->rect(), Qt::transparent);
+    painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    painter.setRenderHint(QPainter::Antialiasing);
+    paintShadow(painter, content.translated(0, kShadowOffsetY), kCornerRadius, kShadowSize);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(background);
+    painter.drawRoundedRect(content, kCornerRadius, kCornerRadius);
+}
 
-    if (!margins.isNull()) {
-        painter.setCompositionMode(QPainter::CompositionMode_Source);
-        painter.fillRect(m_window->rect(), Qt::transparent);
-        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-        paintShadow(painter, content.translated(0, kShadowOffsetY), kShadowSize);
+void WindowChrome::paintCorners(QPainter& painter) const
+{
+    if (frameMargins().isNull()) {
+        return; // maximised: square, edge to edge
     }
-    painter.fillRect(content, palette.color(QPalette::Window));
-    if (!margins.isNull()) {
-        painter.setPen(palette.color(QPalette::Mid));
-        painter.setBrush(Qt::NoBrush);
-        // The border sits in the last pixel of the margin, just outside the content.
-        painter.drawRect(content.adjusted(-kBorderWidth, -kBorderWidth, 0, 0));
-    }
+    const QRectF content = contentRect();
+    QPainterPath square;
+    square.addRect(content);
+    QPainterPath rounded;
+    rounded.addRoundedRect(content, kCornerRadius, kCornerRadius);
+    const QPainterPath corners = square.subtracted(rounded);
+
+    painter.setRenderHint(QPainter::Antialiasing);
+    // Erase what the content widgets painted outside the rounded shape...
+    painter.setCompositionMode(QPainter::CompositionMode_DestinationOut);
+    painter.fillPath(corners, Qt::black);
+    // ...put the shadow back there...
+    painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    painter.save();
+    painter.setClipPath(corners);
+    paintShadow(painter, content.translated(0, kShadowOffsetY), kCornerRadius, kShadowSize);
+    painter.restore();
+    // ...and outline the shape, just outside the content.
+    painter.setPen(QPen(m_window->palette().color(QPalette::Mid), kBorderWidth));
+    painter.setBrush(Qt::NoBrush);
+    const qreal half = kBorderWidth / 2.0;
+    painter.drawRoundedRect(content.adjusted(-half, -half, half, half), kCornerRadius + half,
+                            kCornerRadius + half);
+}
+
+void WindowChrome::placeOverlay()
+{
+    m_overlay->setGeometry(m_window->rect());
+    m_overlay->raise(); // above everything added since
+    m_overlay->update();
 }
 
 void WindowChrome::toggleMaximized()
@@ -155,7 +231,9 @@ QWidget* WindowChrome::createWindowButtons(QWidget* parent)
     auto* buttons = new QWidget(parent);
     buttons->setObjectName(QStringLiteral("windowButtons"));
     auto* layout = new QHBoxLayout(buttons);
-    layout->setContentsMargins(kButtonSpacing, 0, kButtonSpacing, 0);
+    // Clear of the rounded top-right corner; vertical room comes from the
+    // header's padding, so the buttons centre on the menu titles.
+    layout->setContentsMargins(kButtonSpacing, 0, 2 * kButtonSpacing, 0);
     layout->setSpacing(kButtonSpacing);
 
     // Order and side follow GNOME's default (":minimize,maximize,close").
@@ -184,6 +262,9 @@ void WindowChrome::addDragArea(QWidget* area)
 void WindowChrome::updateFrame()
 {
     m_window->setContentsMargins(frameMargins());
+    if (m_overlay != nullptr) {
+        m_overlay->update();
+    }
     if (m_maximizeButton != nullptr) {
         const bool maximized = m_window->isMaximized();
         m_maximizeButton->setIcon(icon(maximized ? Icon::WindowRestore : Icon::WindowMaximize));
@@ -220,6 +301,10 @@ bool WindowChrome::handleWindowEvent(QEvent* event)
     switch (event->type()) {
     case QEvent::WindowStateChange:
         updateFrame();
+        return false;
+    case QEvent::Show:
+    case QEvent::Resize:
+        placeOverlay();
         return false;
     case QEvent::ChildAdded: {
         // Watch the window's direct children (menu bar, toolbar, central widget)

@@ -16,18 +16,24 @@ namespace notes::ui {
 // ignores the app theme and draws no shadow, so the window disappeared against
 // light backgrounds.
 //
-// The window is frameless and translucent. Around the content it paints a soft
-// drop shadow and a 1 px border; that margin is also the resize border. Both
-// go away while the window is maximised or full screen. (Qt can't tell when
-// GNOME snaps a window to half the screen, so snapped windows keep the margin.)
+// The window is frameless and translucent, with rounded corners. Around the
+// content it paints a soft drop shadow and a 1 px border; that margin is also
+// the resize border. Shadow, border and rounding go away while the window is
+// maximised or full screen. (Qt can't tell when GNOME snaps a window to half
+// the screen, so snapped windows keep them.)
+//
+// The content widgets (menu bar, panes) are opaque rectangles, so the rounding
+// is done by an overlay above them that erases the four corners outside the
+// rounded shape and draws the border along it.
 class WindowChrome : public QObject
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(WindowChrome)
 
 public:
-    static constexpr int kShadowSize = 16;
+    static constexpr int kShadowSize = 20;
     static constexpr int kBorderWidth = 1;
+    static constexpr int kCornerRadius = 12; // as GNOME (libadwaita) windows
 
     // Must run before the window is first shown (translucency can't be added later).
     explicit WindowChrome(QMainWindow* window);
@@ -43,8 +49,8 @@ public:
     // The shadow and border around the content; zero when maximised.
     [[nodiscard]] QMargins frameMargins() const;
 
-    // Paints the shadow, the border and the content background. Call from the
-    // window's paintEvent().
+    // Paints the shadow and the rounded content background. Call from the
+    // window's paintEvent(); the corner overlay paints the rest.
     void paint(QPainter& painter) const;
 
     void toggleMaximized();
@@ -57,11 +63,20 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
+    friend class CornerOverlay;
+
+    // The window's content area: inside the shadow margin.
+    [[nodiscard]] QRect contentRect() const;
+    // Erases the corners outside the rounded shape, redraws the shadow there,
+    // and draws the border. Called by the overlay above all content.
+    void paintCorners(QPainter& painter) const;
+    void placeOverlay();
     bool handleWindowEvent(QEvent* event);
     bool handleDragAreaEvent(QWidget* area, QEvent* event);
     void updateFrame();
 
     QMainWindow* m_window;
+    QWidget* m_overlay = nullptr;
     QToolButton* m_maximizeButton = nullptr;
     // Only compared, never dereferenced, so stale pointers are harmless.
     QSet<const QObject*> m_dragAreas;

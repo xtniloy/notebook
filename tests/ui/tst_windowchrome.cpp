@@ -39,6 +39,7 @@ private slots:
     void edgesAt_data();
     void edgesAt();
     void paintsShadowOutsideBorder();
+    void cornersAreRounded();
 
 private:
     std::unique_ptr<MainWindow> showWindow();
@@ -231,6 +232,32 @@ void tst_WindowChrome::paintsShadowOutsideBorder()
     window->showMaximized();
     QTRY_VERIFY(window->isMaximized());
     QTRY_COMPARE(qAlpha(window->grab().toImage().pixel(0, midY)), 255);
+}
+
+// TC-UI-040: rounded corners; square again when maximised.
+void tst_WindowChrome::cornersAreRounded()
+{
+    const auto window = showWindow();
+    QVERIFY(window);
+    const QImage image = window->grab().toImage();
+    const int radius = WindowChrome::kCornerRadius;
+    // The content's own corner pixel lies outside the curve: erased (only a faint
+    // shadow remains). On the curve's diagonal well inside, the window is opaque.
+    for (const QPoint corner :
+         {QPoint(kMargin, kMargin), QPoint(image.width() - kMargin - 1, kMargin),
+          QPoint(kMargin, image.height() - kMargin - 1),
+          QPoint(image.width() - kMargin - 1, image.height() - kMargin - 1)}) {
+        QVERIFY2(qAlpha(image.pixel(corner)) < 128,
+                 qPrintable(QStringLiteral("corner %1,%2 alpha %3")
+                                .arg(corner.x())
+                                .arg(corner.y())
+                                .arg(qAlpha(image.pixel(corner)))));
+    }
+    QCOMPARE(qAlpha(image.pixel(kMargin + radius, kMargin + radius)), 255);
+
+    window->showMaximized();
+    QTRY_VERIFY(window->isMaximized());
+    QTRY_COMPARE(qAlpha(window->grab().toImage().pixel(0, 0)), 255);
 }
 
 QTEST_MAIN(tst_WindowChrome)

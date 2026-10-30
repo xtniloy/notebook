@@ -17,10 +17,10 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QFrame>
 #include <QHBoxLayout>
-#include <QLayout>
 #include <QMenuBar>
 #include <QPainter>
 #include <QSettings>
@@ -44,10 +44,9 @@ constexpr QLatin1StringView kSidebarVisibleKey("mainWindow/sidebarVisible");
 constexpr QSize kDefaultWindowSize(1100, 720);
 // Restored widths beyond this are treated as corrupt settings.
 constexpr int kMaxRestoredPaneWidth = 2000;
-constexpr int kSearchFieldWidth = 220;
+constexpr int kSearchFieldWidth = 240;
 // Enough to show that the list is virtualized (Plan §10, TC-PERF-001).
 constexpr int kFakeNoteCount = 10'000;
-constexpr int kToolGroupSpacing = 8;
 // The style sheet draws a 1 px line in the middle; the rest is grab area.
 constexpr int kSplitterHandleWidth = 5;
 
@@ -153,9 +152,6 @@ void MainWindow::createToolBar()
     // No "hide toolbar" context menu: there would be no way to bring it back.
     toolBar->setContextMenuPolicy(Qt::PreventContextMenu);
     toolBar->toggleViewAction()->setVisible(false);
-    // In code, not the style sheet: QToolBar reads `spacing` only when re-polished,
-    // so the first theme's value was ignored.
-    toolBar->layout()->setSpacing(kToolGroupSpacing);
 
     // macOS-style groups of joined buttons (Plan §3.1): layout, view mode and
     // note actions on the left, editing tools in the middle, share and search on
@@ -200,9 +196,23 @@ void MainWindow::createToolBar()
     m_searchField->setObjectName(QStringLiteral("searchField"));
     m_searchField->setToolTip(m_actions->action(ActionId::SearchAllNotes)->toolTip());
     m_searchField->setFixedWidth(kSearchFieldWidth);
+    // As tall as the button groups beside it (macOS Notes). Polished first, so
+    // the group's size includes the style sheet's padding and border.
+    if (auto* group = toolBar->findChild<QFrame*>(QStringLiteral("toolGroup"))) {
+        group->ensurePolished();
+        m_searchField->setFixedHeight(group->sizeHint().height());
+    }
     toolBar->addWidget(m_searchField);
 
     m_chrome->addDragArea(toolBar);
+
+    // QToolBar takes its padding and spacing from the style when constructed,
+    // before the style sheet applies to it, and re-reads them only on a style
+    // change (as a theme switch sends). Send one, so the first theme looks the
+    // same as any later one.
+    toolBar->ensurePolished();
+    QEvent styleChange(QEvent::StyleChange);
+    QCoreApplication::sendEvent(toolBar, &styleChange);
 }
 
 void MainWindow::createMenus()

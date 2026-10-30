@@ -5,6 +5,7 @@
 #include "ui/ActionRegistry.h"
 #include "ui/MainWindow.h"
 #include "ui/SearchField.h"
+#include "ui/ThemeManager.h"
 
 #include <QAction>
 #include <QApplication>
@@ -33,6 +34,8 @@ private slots:
     void buttonsAreGrouped();
     void searchFieldIsOnTheRight();
     void searchPlaceholderCentredUntilUsed();
+    void searchFieldMatchesGroupHeight();
+    void layoutSameAfterThemeChange();
     void buttonsShowToolTipWithShortcut();
     void shortcutTriggersAction_data();
     void shortcutTriggersAction();
@@ -213,6 +216,39 @@ void tst_Toolbar::searchPlaceholderCentredUntilUsed()
     QVERIFY(!search->isPlaceholderCentred()); // text stays left-aligned
     search->clear();
     QVERIFY(search->isPlaceholderCentred());
+}
+
+// TC-UI-043: the search box lines up with the button groups.
+void tst_Toolbar::searchFieldMatchesGroupHeight()
+{
+    const auto window = showActiveWindow();
+    QVERIFY(window);
+    const QToolBar* toolBar = toolBarOf(*window);
+    const auto* group = toolBar->findChild<QFrame*>(QStringLiteral("toolGroup"));
+    const auto* search = window->findChild<QLineEdit*>(QStringLiteral("searchField"));
+    QVERIFY(group && search);
+    QCOMPARE(search->height(), group->height());
+    QCOMPARE(search->geometry().center().y(), group->geometry().center().y());
+}
+
+// The first theme lays the toolbar out exactly as a later theme switch does
+// (QToolBar re-reads padding and spacing only on a style change).
+void tst_Toolbar::layoutSameAfterThemeChange()
+{
+    const auto window = showActiveWindow();
+    QVERIFY(window);
+    const QToolBar* toolBar = toolBarOf(*window);
+    const auto snapshot = [&] {
+        QList<QRect> rects{toolBar->geometry()};
+        for (const QToolButton* button : actionButtons(*toolBar)) {
+            rects.append(QRect(button->mapTo(toolBar, QPoint(0, 0)), button->size()));
+        }
+        return rects;
+    };
+    const QList<QRect> before = snapshot();
+    window->themes().setPreference(notes::ui::ThemePreference::Dark);
+    window->themes().setPreference(notes::ui::ThemePreference::Light);
+    QTRY_COMPARE(snapshot(), before);
 }
 
 void tst_Toolbar::buttonsShowToolTipWithShortcut()
