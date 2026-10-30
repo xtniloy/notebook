@@ -21,3 +21,6 @@ notes_add_test(NAME tst_notetext SOURCES tst_notetext.cpp LABELS unit)
 # Qt6::Gui for QAbstractItemModelTester, as above.
 notes_add_test(NAME tst_notelistmodel SOURCES tst_notelistmodel.cpp LABELS unit LIBS Qt6::Gui)
 notes_add_test(NAME tst_foldertreemodel SOURCES tst_foldertreemodel.cpp LABELS unit LIBS Qt6::Gui)
+
+# Task 2.9: autosave on its own (the window's TC-STO-025..028 are in tests/ui).
+notes_add_test(NAME tst_autosave_unit SOURCES tst_autosave_unit.cpp LABELS unit)

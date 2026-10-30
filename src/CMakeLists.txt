@@ -29,6 +29,8 @@ add_library(notesapp_core STATIC
     models/Tag.h
     models/Uuid.cpp
     models/Uuid.h
+    services/Autosave.cpp
+    services/Autosave.h
     services/FolderService.cpp
     services/FolderService.h
     services/NoteService.cpp

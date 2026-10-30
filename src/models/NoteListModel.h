@@ -38,7 +38,8 @@ class NoteListModel : public QAbstractListModel
 public:
     static constexpr int kPageSize = 200;
 
-    // Both must outlive the model. Starts on All Notes, sorted by date edited.
+    // Both must outlive the model. Empty until setFolder(): the window waits for
+    // the sidebar's first choice, so the list doesn't load twice at startup.
     NoteListModel(services::NoteService& notes, const app::IClock& clock,
                   QObject* parent = nullptr);
     ~NoteListModel() override;
@@ -101,7 +102,7 @@ private:
     const app::IClock& m_clock;
     QCollator m_collator; // the LOCALE collation's rules (Database), for Title order
 
-    qint64 m_folderId = kAllNotesFolderId;
+    qint64 m_folderId = 0; // 0: none yet
     storage::NoteSort m_sort = storage::NoteSort::DateEdited;
     qint64 m_now = 0; // for sections and times; see refreshDates()
 

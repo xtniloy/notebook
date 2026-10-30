@@ -69,8 +69,6 @@ NoteListModel::NoteListModel(services::NoteService& notes, const app::IClock& cl
     connect(&m_service, &NoteService::noteTrashed, this, [this](qint64 id) { refreshNote(id); });
     connect(&m_service, &NoteService::noteRestored, this, [this](qint64 id) { refreshNote(id); });
     connect(&m_service, &NoteService::notePurged, this, [this](qint64 id) { remove(id); });
-
-    setFolder(kAllNotesFolderId);
 }
 
 NoteListModel::~NoteListModel() = default;
@@ -99,7 +97,7 @@ void NoteListModel::refreshDates()
 
 bool NoteListModel::canFetchMore(const QModelIndex& parent) const
 {
-    return !parent.isValid() && !m_exhausted && !m_loading;
+    return !parent.isValid() && m_folderId != 0 && !m_exhausted && !m_loading;
 }
 
 void NoteListModel::fetchMore(const QModelIndex& parent)
@@ -245,6 +243,9 @@ qsizetype NoteListModel::indexOf(qint64 noteId) const
 
 void NoteListModel::upsert(const NoteSummary& note)
 {
+    if (m_folderId == 0) {
+        return; // nothing shown yet
+    }
     QList<NoteSummary> notes = m_notes;
     if (const qsizetype old = indexOf(note.id); old >= 0) {
         notes.remove(old);

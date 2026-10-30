@@ -9,6 +9,10 @@ namespace notes::app {
 class AppContext;
 }
 
+namespace notes::services {
+class Autosave;
+}
+
 namespace notes::models {
 class FolderTreeModel;
 class NoteListModel;
@@ -46,6 +50,7 @@ public:
     [[nodiscard]] ThemeManager& themes() const { return *m_themes; }
 
 protected:
+    void closeEvent(QCloseEvent* event) override;
     void showEvent(QShowEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
 
@@ -54,6 +59,8 @@ private:
     void createMenus();
     void focusSearch();
     void openNote(qint64 noteId);
+    // Saves what's pending, then shows the empty state.
+    void clearEditor();
     void setSidebarVisible(bool visible);
     // Sets exact pane widths; the editor gets the remaining space. QSplitter's
     // own setSizes() spreads any difference proportionally across all panes.
@@ -76,6 +83,8 @@ private:
     QAction* m_toggleSidebar;
     models::FolderTreeModel* m_sidebarModel;
     models::NoteListModel* m_noteListModel;
+    // Saves the note in the editor (task 2.9).
+    services::Autosave* m_autosave;
     // The note openNote() last asked for; older answers are dropped.
     qint64 m_openingNote = 0;
     SearchField* m_searchField = nullptr;

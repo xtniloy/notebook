@@ -6,11 +6,13 @@
 #include "models/FolderTreeModel.h"
 #include "models/Note.h"
 #include "models/NoteListModel.h"
+#include "services/Autosave.h"
 #include "services/NoteService.h"
 #include "ui/ActionRegistry.h"
 #include "ui/EditorView.h"
 #include "ui/Icons.h"
 #include "ui/NoteListView.h"
+#include "ui/NoteTextEdit.h"
 #include "ui/SearchField.h"
 #include "ui/Sidebar.h"
 #include "ui/ThemeManager.h"
@@ -19,6 +21,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QCloseEvent>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QFrame>
@@ -108,6 +111,7 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     , m_toggleSidebar(m_actions->action(ActionId::ToggleSidebar))
     , m_sidebarModel(new models::FolderTreeModel(context.folders(), context.notes(), this))
     , m_noteListModel(new models::NoteListModel(context.notes(), context.clock(), this))
+    , m_autosave(new services::Autosave(context.notes(), this))
 {
     setWindowTitle(QString::fromLatin1(config::kDisplayName));
 
@@ -127,7 +131,9 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     connect(m_sidebar, &Sidebar::folderSelected, this,
             [this](qint64 folderId) { m_noteListModel->setFolder(folderId); });
     connect(m_noteList, &NoteListView::noteSelected, this, &MainWindow::openNote);
-    connect(m_noteList, &NoteListView::currentNoteCleared, m_editor, &EditorView::clear);
+    connect(m_noteList, &NoteListView::currentNoteCleared, this, &MainWindow::clearEditor);
+    connect(m_editor->textEdit(), &QTextEdit::textChanged, m_autosave,
+            &services::Autosave::markChanged);
     m_sidebar->setModel(m_sidebarModel);
     m_noteList->setModel(m_noteListModel);
     // Selected during setModel() without a signal, if the rows were there already.
@@ -147,7 +153,16 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+    // Before the editor goes: the autosave reads it. The save itself finishes on
+    // the DB thread, which drains its queue when the AppContext closes it.
+    m_autosave->untrack();
     saveLayout();
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    m_autosave->flush();
+    QMainWindow::closeEvent(event);
 }
 
 void MainWindow::createToolBar()
@@ -303,23 +318,39 @@ void MainWindow::focusSearch()
 
 void MainWindow::openNote(qint64 noteId)
 {
+    // Save the note being left now, before its replacement is even loaded. The
+    // load below is queued behind the save, so reopening it shows the saved text.
+    m_autosave->flush();
     m_openingNote = noteId;
-    m_context.notes().get(noteId).then(
-        this, [this, noteId](const storage::DbResult<models::Note>& note) {
-            if (noteId != m_openingNote) {
-                return; // another note was selected meanwhile
-            }
-            if (!note) {
-                m_editor->clear();
-                return;
-            }
-            const QDateTime modified = QDateTime::fromMSecsSinceEpoch(note.value().updatedAt);
-            if (note.value().locked) {
-                m_editor->showLockedNote(modified);
-            } else {
-                m_editor->showNote(note.value().bodyText, modified);
-            }
+    m_context.notes().get(noteId).then(this, [this,
+                                              noteId](const storage::DbResult<models::Note>& note) {
+        if (noteId != m_openingNote) {
+            return; // another note was selected meanwhile
+        }
+        // Anything typed into the old note while this one loaded.
+        m_autosave->untrack();
+        if (!note) {
+            m_editor->clear();
+            return;
+        }
+        const QDateTime modified = QDateTime::fromMSecsSinceEpoch(note.value().updatedAt);
+        if (note.value().locked) {
+            m_editor->showLockedNote(modified);
+            return;
+        }
+        m_editor->showNote(note.value().bodyText, modified);
+        const NoteTextEdit* edit = m_editor->textEdit();
+        m_autosave->track(noteId, [edit] {
+            return services::Autosave::Content{.html = edit->toHtml(), .text = edit->toPlainText()};
         });
+    });
+}
+
+void MainWindow::clearEditor()
+{
+    m_openingNote = 0;
+    m_autosave->untrack();
+    m_editor->clear();
 }
 
 void MainWindow::paintEvent(QPaintEvent* /*event*/)

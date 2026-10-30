@@ -458,10 +458,10 @@ Record each in `docs/adr/`:
 
 ### 2.9 Autosave `M`
 
-- [ ] Debounce: save 500 ms after the last keystroke (`QTimer` restart on each change)
-- [ ] Flush immediately on: switching notes, closing the window, app quit
-- [ ] Saves run on the DB thread; UI never waits
-- [ ] Skip saving when content is unchanged (compare hash)
+- [x] Debounce: save 500 ms after the last keystroke (`QTimer` restart on each change) *(`services::Autosave`, owned by `MainWindow`)*
+- [x] Flush immediately on: switching notes, closing the window, app quit *(the save is queued before the next note's load, so going back shows the saved text; on quit the DB thread finishes queued saves before it closes)*
+- [x] Saves run on the DB thread; UI never waits *(`NoteService::updateBody()`; failures are logged by error code, never content)*
+- [x] Skip saving when content is unchanged (compare hash) *(SHA-256 of HTML + text against what was last loaded or saved, so typing and undoing saves nothing)*
 
 **Tests**
 - `TC-STO-025` (UI) Type 10 characters within 400 ms → exactly 1 save after 500 ms.
@@ -470,6 +470,8 @@ Record each in `docs/adr/`:
 - `TC-STO-028` (UI) Select a note without editing → no save happens, `version` unchanged.
 
 **Done when:** no "Save" button needed and no lost keystrokes.
+
+*Also: the note list stays empty until the sidebar picks its first folder, instead of loading All Notes and then "Notes"; that double load could clear the editor while you typed at startup.*
 
 ### 2.10 Recently Deleted `M`
 
