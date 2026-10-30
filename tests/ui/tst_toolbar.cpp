@@ -230,6 +230,14 @@ void tst_Toolbar::searchFieldMatchesGroupHeight()
     QVERIFY(group && search);
     QCOMPARE(search->height(), group->height());
     QCOMPARE(search->geometry().center().y(), group->geometry().center().y());
+
+    // Standard-size icons, not the style's 24 px default; the groups and the
+    // search field are sized from them.
+    for (const auto* toolGroup : toolBar->findChildren<QFrame*>(QStringLiteral("toolGroup"))) {
+        for (const auto* button : toolGroup->findChildren<QToolButton*>()) {
+            QCOMPARE(button->iconSize(), QSize(18, 18));
+        }
+    }
 }
 
 // The first theme lays the toolbar out exactly as a later theme switch does

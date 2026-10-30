@@ -24,11 +24,15 @@ Other weights fall back to the nearest bundled one.
 
 ## Icons (`icons/`, ISC; some derived from Feather, MIT)
 
-[Lucide 1.57.0](https://github.com/lucide-icons/lucide/releases/tag/1.57.0) (`lucide-icons-1.57.0.zip`), copied unmodified.
+[Lucide 1.57.0](https://github.com/lucide-icons/lucide/releases/tag/1.57.0) (`lucide-icons-1.57.0.zip`), copied unmodified except as noted below.
 
 `minus.svg`, `square.svg` and `copy.svg` (window buttons, task 1.9) came from the npm package
 [`lucide-static@1.57.0`](https://unpkg.com/lucide-static@1.57.0/icons/) instead; its files add a
 `<!-- @license -->` comment and a `class` attribute, which were removed so they match the zip's.
+
+`a-large-small.svg` is modified: its letters fill only the middle of the 24×24 box, so they looked
+smaller than the other toolbar icons. Its `viewBox` is cropped to `1 0.2 22 22` (about 9% larger,
+centred on the letters) and `stroke-width` lowered to 1.83, which keeps the line weight of the rest.
 
 **Adding an icon:**
 

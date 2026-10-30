@@ -49,7 +49,10 @@ constexpr QLatin1StringView kSidebarVisibleKey("mainWindow/sidebarVisible");
 constexpr QSize kDefaultWindowSize(1100, 720);
 // Restored widths beyond this are treated as corrupt settings.
 constexpr int kMaxRestoredPaneWidth = 2000;
-constexpr int kSearchFieldWidth = 240;
+constexpr int kSearchFieldWidth = 200;
+// Standard toolbar icon size; the style's default (24 px in Fusion) made the
+// buttons, and the search field that matches their height, look oversized.
+constexpr int kToolBarIconSize = 18;
 // With the toolbar's 4 px padding and 8 px spacing: 14 px from each window edge.
 constexpr int kToolBarEdgeSpacer = 2;
 constexpr int kToolBarBottomInset = 10;
@@ -174,6 +177,7 @@ void MainWindow::createToolBar()
     // No "hide toolbar" context menu: there would be no way to bring it back.
     toolBar->setContextMenuPolicy(Qt::PreventContextMenu);
     toolBar->toggleViewAction()->setVisible(false);
+    toolBar->setIconSize(QSize(kToolBarIconSize, kToolBarIconSize));
 
     // macOS-style groups of joined buttons (Plan §3.1): layout, view mode and
     // note actions on the left, editing tools in the middle, share and search on
