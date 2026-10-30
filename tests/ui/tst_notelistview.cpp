@@ -28,6 +28,7 @@ private slots:
     void cleanup();
 
     void rowHeights();
+    void notesIndentedFromHeaders();
     void selectsFirstNoteInitially();
     void clickingNoteEmitsNoteSelected();
     void clickingHeaderKeepsSelection();
@@ -94,6 +95,35 @@ void tst_NoteListView::rowHeights()
         qPrintable(QStringLiteral("header %1 px, note %2 px").arg(headerHeight).arg(noteHeight)));
     // Rows span the full width, so the whole row is clickable.
     QCOMPARE(m_view->visualRect(m_model->index(1)).width(), m_view->viewport()->width());
+}
+
+// UI review (as macOS Notes): notes start further right than the section
+// header above them, so the headers stand out; the header stays where it was.
+void tst_NoteListView::notesIndentedFromHeaders()
+{
+    m_view->clearSelection(); // keep the highlight out of the measurement
+    const QImage image = m_view->viewport()->grab().toImage();
+    const QColor background = m_view->palette().color(QPalette::Base);
+    // Left-most pixel in `rect` that differs clearly from the background (text or icon).
+    const auto inkStart = [&](const QRect& rect) {
+        for (int x = rect.left(); x <= rect.right(); ++x) {
+            for (int y = rect.top(); y <= rect.bottom(); ++y) {
+                const QColor c = image.pixelColor(x, y);
+                if (qAbs(c.lightness() - background.lightness()) > 60) {
+                    return x;
+                }
+            }
+        }
+        return -1;
+    };
+    const int today = rowOf(QStringLiteral("Today"));
+    const int header = inkStart(m_view->visualRect(m_model->index(today)));
+    const int note = inkStart(m_view->visualRect(m_model->index(today + 1)));
+    QVERIFY(header > 0 && note > 0);
+    // Unchanged: the 16 px padding (plus up to 2 px of glyph side bearing).
+    QVERIFY2(header >= 16 && header <= 18, qPrintable(QString::number(header)));
+    QVERIFY2(note - header >= 12,
+             qPrintable(QStringLiteral("header at %1 px, note at %2 px").arg(header).arg(note)));
 }
 
 void tst_NoteListView::selectsFirstNoteInitially()

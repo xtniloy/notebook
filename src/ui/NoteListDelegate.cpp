@@ -10,6 +10,10 @@ namespace notes::ui {
 namespace {
 
 constexpr int kHorizontalPadding = 16;
+// Notes start further right than their section header, as in macOS Notes, so
+// headers stand out. Headers and the hairlines between notes stay at
+// kHorizontalPadding.
+constexpr int kNoteIndent = 14;
 constexpr int kVerticalPadding = 13; // roomy rows, as macOS Notes
 constexpr int kLineGap = 5;
 constexpr int kIconSize = 14;
@@ -91,8 +95,8 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
         }
     }
 
-    QRect content = option.rect.adjusted(kHorizontalPadding, kVerticalPadding, -kHorizontalPadding,
-                                         -kVerticalPadding);
+    QRect content = option.rect.adjusted(kHorizontalPadding + kNoteIndent, kVerticalPadding,
+                                         -kHorizontalPadding, -kVerticalPadding);
 
     // Thumbnail slot; the image itself arrives with attachments (task 3.x).
     if (index.data(models::kHasThumbnailRole).toBool()) {
