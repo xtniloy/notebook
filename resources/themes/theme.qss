@@ -6,34 +6,83 @@
  * can't reach.
  */
 
-QMainWindow {
+/*
+ * No QMainWindow background: the window is translucent around its content for
+ * the drop shadow, and WindowChrome paints the content background (task 1.9).
+ */
+
+/* Header row (task 1.9): menus on the left, window buttons on the right. */
+QMenuBar#headerBar {
     background: ${window};
+    color: ${text};
+    padding: 2px 4px 0 4px;
 }
 
-/* Toolbar: flat, with a hairline under it. */
+QMenuBar#headerBar::item {
+    background: transparent;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+QMenuBar#headerBar::item:selected,
+QMenuBar#headerBar::item:pressed {
+    background: ${hover};
+}
+
+#windowButtons QToolButton {
+    border: none;
+    border-radius: 12px;
+    padding: 4px;
+    background: ${hover};
+}
+
+#windowButtons QToolButton:hover {
+    background: ${separator};
+}
+
+/* Toolbar: macOS-style groups of joined buttons, a hairline under it. */
 QToolBar#mainToolBar {
     background: ${window};
     border: none;
     border-bottom: 1px solid ${separator};
-    padding: 4px 8px;
-    spacing: 2px;
+    padding: 4px 8px 6px 8px; /* group spacing is set in MainWindow */
 }
 
-QToolBar#mainToolBar QToolButton {
+QFrame#toolGroup {
+    background: ${base};
+    border: 1px solid ${separator};
+    border-radius: 7px;
+}
+
+QFrame#toolGroup QToolButton {
     border: none;
-    border-radius: 6px;
-    padding: 4px;
+    border-radius: 0;
+    padding: 3px 8px;
+    background: transparent;
 }
 
-QToolBar#mainToolBar QToolButton:hover,
-QToolBar#mainToolBar QToolButton:checked {
+QFrame#toolGroup QToolButton[position="first"],
+QFrame#toolGroup QToolButton[position="middle"] {
+    border-right: 1px solid ${separator};
+}
+
+QFrame#toolGroup QToolButton:hover,
+QFrame#toolGroup QToolButton:checked {
     background: ${hover};
 }
 
-QToolBar#mainToolBar::separator {
-    width: 1px;
-    margin: 6px 6px;
-    background: ${separator};
+QFrame#toolGroup QToolButton[position="first"] {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+
+QFrame#toolGroup QToolButton[position="last"] {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+QFrame#toolGroup QToolButton[position="only"] {
+    border-radius: 6px;
 }
 
 QLineEdit#searchField {

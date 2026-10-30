@@ -9,19 +9,25 @@
 #include "ui/EditorView.h"
 #include "ui/Icons.h"
 #include "ui/NoteListView.h"
+#include "ui/SearchField.h"
 #include "ui/Sidebar.h"
 #include "ui/ThemeManager.h"
+#include "ui/WindowChrome.h"
 #include "ui/dialogs/AboutDialog.h"
 
 #include <QAction>
 #include <QActionGroup>
 #include <QDateTime>
-#include <QLineEdit>
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QLayout>
 #include <QMenuBar>
+#include <QPainter>
 #include <QSettings>
 #include <QSizePolicy>
 #include <QSplitter>
 #include <QToolBar>
+#include <QToolButton>
 
 #include <algorithm>
 #include <initializer_list>
@@ -41,6 +47,7 @@ constexpr int kMaxRestoredPaneWidth = 2000;
 constexpr int kSearchFieldWidth = 220;
 // Enough to show that the list is virtualized (Plan §10, TC-PERF-001).
 constexpr int kFakeNoteCount = 10'000;
+constexpr int kToolGroupSpacing = 8;
 // The style sheet draws a 1 px line in the middle; the rest is grab area.
 constexpr int kSplitterHandleWidth = 5;
 
@@ -56,6 +63,18 @@ Pane* createPane(QLatin1StringView objectName, int minimumWidth, QWidget* parent
     pane->setObjectName(objectName);
     pane->setMinimumWidth(minimumWidth);
     return pane;
+}
+
+// A button's place in a toolbar group, for the style sheet.
+const char* groupPosition(qsizetype index, qsizetype count)
+{
+    if (count == 1) {
+        return "only";
+    }
+    if (index == 0) {
+        return "first";
+    }
+    return index == count - 1 ? "last" : "middle";
 }
 
 // A stored width, or `fallback` if missing, unparsable, or out of range.
@@ -74,6 +93,7 @@ int restoredWidth(const QVariantList& widths, int index, int minimum, int fallba
 MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     : QMainWindow(parent)
     , m_context(context)
+    , m_chrome(new WindowChrome(this))
     , m_themes(new ThemeManager(context.settings(), this))
     , m_actions(new ActionRegistry(this))
     , m_splitter(new QSplitter(Qt::Horizontal, this))
@@ -133,29 +153,56 @@ void MainWindow::createToolBar()
     // No "hide toolbar" context menu: there would be no way to bring it back.
     toolBar->setContextMenuPolicy(Qt::PreventContextMenu);
     toolBar->toggleViewAction()->setVisible(false);
+    // In code, not the style sheet: QToolBar reads `spacing` only when re-polished,
+    // so the first theme's value was ignored.
+    toolBar->layout()->setSpacing(kToolGroupSpacing);
 
-    // Groups as in Plan §3.1: layout | note | editing, then search on the right.
-    for (QAction* action : m_actions->toolbarActions()) {
-        if (action == m_actions->action(ActionId::ListView) ||
-            action == m_actions->action(ActionId::DeleteNote) ||
-            action == m_actions->action(ActionId::Format)) {
-            toolBar->addSeparator();
+    // macOS-style groups of joined buttons (Plan §3.1): layout, view mode and
+    // note actions on the left, editing tools in the middle, share and search on
+    // the right. Order within and across groups is Plan §3.2's.
+    const auto addGroup = [&](std::initializer_list<ActionId> ids) {
+        auto* group = new QFrame(toolBar);
+        group->setObjectName(QStringLiteral("toolGroup"));
+        auto* layout = new QHBoxLayout(group);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(0);
+        qsizetype index = 0;
+        for (const ActionId id : ids) {
+            auto* button = new QToolButton(group);
+            button->setDefaultAction(m_actions->action(id));
+            button->setIconSize(toolBar->iconSize());
+            // For the style sheet: rounded outer corners, dividers between buttons.
+            button->setProperty("position",
+                                groupPosition(index, static_cast<qsizetype>(ids.size())));
+            layout->addWidget(button);
+            ++index;
         }
-        toolBar->addAction(action);
-    }
+        toolBar->addWidget(group);
+    };
+    // Empty toolbar space is a drag area (WindowChrome), so spacers let clicks through.
+    const auto addSpacer = [&] {
+        auto* spacer = new QWidget(toolBar);
+        spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        spacer->setAttribute(Qt::WA_TransparentForMouseEvents);
+        toolBar->addWidget(spacer);
+    };
 
-    auto* spacer = new QWidget(toolBar);
-    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    toolBar->addWidget(spacer);
+    addGroup({ActionId::ToggleSidebar});
+    addGroup({ActionId::ListView, ActionId::GalleryView});
+    addGroup({ActionId::DeleteNote, ActionId::NewNote});
+    addSpacer();
+    addGroup({ActionId::Format, ActionId::Checklist, ActionId::InsertTable, ActionId::Attachment,
+              ActionId::LockNote});
+    addSpacer();
+    addGroup({ActionId::ShareExport});
 
-    m_searchField = new QLineEdit(toolBar);
+    m_searchField = new SearchField(toolBar);
     m_searchField->setObjectName(QStringLiteral("searchField"));
-    m_searchField->setPlaceholderText(tr("Search"));
     m_searchField->setToolTip(m_actions->action(ActionId::SearchAllNotes)->toolTip());
-    m_searchField->setClearButtonEnabled(true);
-    m_searchField->addAction(icon(Icon::Search), QLineEdit::LeadingPosition);
     m_searchField->setFixedWidth(kSearchFieldWidth);
     toolBar->addWidget(m_searchField);
+
+    m_chrome->addDragArea(toolBar);
 }
 
 void MainWindow::createMenus()
@@ -206,6 +253,12 @@ void MainWindow::createMenus()
     about->setObjectName(QStringLiteral("aboutAction"));
     about->setMenuRole(QAction::AboutRole);
     connect(about, &QAction::triggered, this, &MainWindow::showAbout);
+
+    // The menu row is the header (task 1.9): window buttons on the right, and
+    // dragging its empty part moves the window.
+    menuBar()->setObjectName(QStringLiteral("headerBar"));
+    menuBar()->setCornerWidget(m_chrome->createWindowButtons(menuBar()), Qt::TopRightCorner);
+    m_chrome->addDragArea(menuBar());
 }
 
 void MainWindow::focusSearch()
@@ -228,6 +281,12 @@ void MainWindow::openNote(qint64 noteId)
     } else {
         m_editor->showNote(note->text, modified);
     }
+}
+
+void MainWindow::paintEvent(QPaintEvent* /*event*/)
+{
+    QPainter painter(this);
+    m_chrome->paint(painter);
 }
 
 void MainWindow::showEvent(QShowEvent* event)

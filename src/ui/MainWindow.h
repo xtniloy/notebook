@@ -3,7 +3,6 @@
 #include <QMainWindow>
 
 class QAction;
-class QLineEdit;
 class QSplitter;
 
 namespace notes::app {
@@ -18,6 +17,8 @@ class FakeSidebarModel;
 namespace notes::ui {
 
 class ActionRegistry;
+class SearchField;
+class WindowChrome;
 class EditorView;
 class NoteListView;
 class Sidebar;
@@ -46,6 +47,7 @@ public:
 
 protected:
     void showEvent(QShowEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
 
 private:
     void createToolBar();
@@ -61,7 +63,9 @@ private:
     void showAbout();
 
     app::AppContext& m_context;
-    // First, so widgets are created with the theme's palette already in place.
+    // Before any child widget, so it sees them being added (task 1.9).
+    WindowChrome* m_chrome;
+    // Before the widgets too, so they are created with the theme's palette.
     ThemeManager* m_themes;
     ActionRegistry* m_actions;
     // Declaration order matters: the panes are created inside m_splitter.
@@ -73,7 +77,7 @@ private:
     // Sample data until FolderTreeModel and NoteListModel (task 2.8).
     models::FakeSidebarModel* m_sidebarModel;
     models::FakeNoteListModel* m_noteListModel;
-    QLineEdit* m_searchField = nullptr;
+    SearchField* m_searchField = nullptr;
 
     // Kept while the sidebar is hidden, so it comes back at the same width.
     int m_sidebarWidth = kSidebarDefaultWidth;

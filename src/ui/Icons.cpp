@@ -64,6 +64,12 @@ const char* iconFileName(Icon icon)
         return "chevron-right";
     case Icon::Collapse:
         return "chevron-down";
+    case Icon::WindowMinimize:
+        return "minus";
+    case Icon::WindowMaximize:
+        return "square";
+    case Icon::WindowRestore:
+        return "copy";
     case Icon::Count:
         break;
     }

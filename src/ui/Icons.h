@@ -33,6 +33,10 @@ enum class Icon : std::uint8_t {
     Cloud,
     Expand,
     Collapse,
+    // Window buttons (close uses Clear).
+    WindowMinimize,
+    WindowMaximize,
+    WindowRestore,
 
     Count // not an icon; keep last
 };

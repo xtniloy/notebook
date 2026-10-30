@@ -306,6 +306,25 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 
 **Done when:** theme follows Ubuntu's setting.
 
+### 1.9 Header bar and window chrome `M`
+
+*Added 2026-10-30 from UI feedback: on GNOME, Qt's Adwaita title bar ignores the app theme and draws no shadow, so the window blended into light backgrounds. Layout follows macOS Notes' grouped toolbar.*
+
+- [x] Replace the system title bar: the menu row (File, Edit, Format, View, Help) is the header, with minimise / maximise / close at its right end; no title text *(`WindowChrome`: frameless, translucent window; the "Notes" title still names the window for the dock and Alt+Tab)*
+- [x] Drag empty header or toolbar space to move the window; double-click to maximise / restore
+- [x] Soft drop shadow and 1 px border around the window, removed when maximised or full screen; the shadow margin is the resize border *(Qt can't tell when GNOME snaps a window to half the screen, so snapped windows keep the margin)*
+- [x] Toolbar buttons in joined, rounded groups as in macOS Notes: sidebar · list/gallery · delete/new note · format/checklist/table/attachment/lock · share; editing tools centred
+- [x] Search placeholder (magnifier + "Search") centred until the box is focused or has text
+
+**Tests**
+- `TC-UI-040` (UI) Window is frameless and translucent; header row has the five menus and the window buttons on the right.
+- `TC-UI-041` (UI) Maximise button toggles maximised state and removes the shadow margin; minimise and close buttons work.
+- `TC-UI-042` (UI) Double-click on empty header space maximises; on a menu title it doesn't.
+- `TC-UI-043` (UI) Toolbar groups and their order; search placeholder centred until used.
+- `TC-UI-044` (M) Window stays distinguishable on light and dark backgrounds in both themes; move, resize and snapping behave normally on GNOME Wayland.
+
+**Done when:** the window has one custom header row and a visible edge on any background.
+
 ---
 
 ## Phase 2: Storage MVP (Weeks 7–9)

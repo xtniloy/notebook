@@ -87,12 +87,16 @@ add_library(notesapp_ui STATIC
     ui/NoteListView.h
     ui/NoteTextEdit.cpp
     ui/NoteTextEdit.h
+    ui/SearchField.cpp
+    ui/SearchField.h
     ui/Sidebar.cpp
     ui/Sidebar.h
     ui/SidebarDelegate.cpp
     ui/SidebarDelegate.h
     ui/ThemeManager.cpp
-    ui/ThemeManager.h)
+    ui/ThemeManager.h
+    ui/WindowChrome.cpp
+    ui/WindowChrome.h)
 target_link_libraries(notesapp_ui PUBLIC notesapp_core Qt6::Widgets PRIVATE Qt6::Svg)
 
 # Bundled assets (resources/SOURCES.md). qt_add_resources() on a static library

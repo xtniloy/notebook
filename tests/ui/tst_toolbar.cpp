@@ -4,15 +4,18 @@
 #include "TestHelpers.h"
 #include "ui/ActionRegistry.h"
 #include "ui/MainWindow.h"
+#include "ui/SearchField.h"
 
 #include <QAction>
 #include <QApplication>
+#include <QFrame>
 #include <QLineEdit>
 #include <QSignalSpy>
 #include <QTest>
 #include <QToolBar>
 #include <QToolButton>
 
+#include <algorithm>
 #include <memory>
 
 using notes::ui::ActionId;
@@ -27,7 +30,9 @@ private slots:
     void cleanup();
 
     void actionOrderMatchesPlan();
+    void buttonsAreGrouped();
     void searchFieldIsOnTheRight();
+    void searchPlaceholderCentredUntilUsed();
     void buttonsShowToolTipWithShortcut();
     void shortcutTriggersAction_data();
     void shortcutTriggersAction();
@@ -39,6 +44,8 @@ private:
     std::unique_ptr<MainWindow> showActiveWindow();
     static QToolBar* toolBarOf(const MainWindow& window);
     static QAction* actionOf(const MainWindow& window, const QString& name);
+    static QList<QToolButton*> actionButtons(const QToolBar& toolBar);
+    static QToolButton* buttonFor(const QToolBar& toolBar, const QString& actionName);
 
     std::unique_ptr<notes::test::TempDb> m_dir;
     std::unique_ptr<notes::app::AppContext> m_context;
@@ -78,6 +85,32 @@ QAction* tst_Toolbar::actionOf(const MainWindow& window, const QString& name)
     return window.findChild<QAction*>(name);
 }
 
+// The toolbar's action buttons (inside the toolGroup frames), left to right.
+QList<QToolButton*> tst_Toolbar::actionButtons(const QToolBar& toolBar)
+{
+    QList<QToolButton*> buttons;
+    for (QToolButton* button : toolBar.findChildren<QToolButton*>()) {
+        if (button->defaultAction() != nullptr && button->parentWidget() != nullptr &&
+            button->parentWidget()->objectName() == u"toolGroup") {
+            buttons.append(button);
+        }
+    }
+    std::ranges::sort(buttons, {}, [&toolBar](const QToolButton* button) {
+        return button->mapTo(&toolBar, QPoint(0, 0)).x();
+    });
+    return buttons;
+}
+
+QToolButton* tst_Toolbar::buttonFor(const QToolBar& toolBar, const QString& actionName)
+{
+    for (QToolButton* button : actionButtons(toolBar)) {
+        if (button->defaultAction()->objectName() == actionName) {
+            return button;
+        }
+    }
+    return nullptr;
+}
+
 // TC-UI-008
 void tst_Toolbar::actionOrderMatchesPlan()
 {
@@ -98,20 +131,47 @@ void tst_Toolbar::actionOrderMatchesPlan()
 
     QStringList buttons;
     int previousX = -1;
-    for (QAction* action : toolBar->actions()) {
-        if (action->isSeparator() || toolBar->widgetForAction(action) == nullptr) {
-            continue;
-        }
-        const auto* button = qobject_cast<QToolButton*>(toolBar->widgetForAction(action));
-        if (button == nullptr) {
-            continue; // spacer and search field
-        }
-        QVERIFY2(button->isVisible(), qPrintable(action->objectName()));
-        QVERIFY2(button->x() > previousX, qPrintable(action->objectName()));
-        previousX = button->x();
-        buttons.append(action->objectName());
+    for (const QToolButton* button : actionButtons(*toolBar)) {
+        const QString name = button->defaultAction()->objectName();
+        QVERIFY2(button->isVisible(), qPrintable(name));
+        const int x = button->mapTo(toolBar, QPoint(0, 0)).x();
+        QVERIFY2(x > previousX, qPrintable(name));
+        previousX = x;
+        buttons.append(name);
     }
     QCOMPARE(buttons, expected);
+}
+
+// TC-UI-043: joined button groups as in macOS Notes (task 1.9).
+void tst_Toolbar::buttonsAreGrouped()
+{
+    const auto window = showActiveWindow();
+    QVERIFY(window);
+    const QToolBar* toolBar = toolBarOf(*window);
+    QStringList groups;
+    for (const QFrame* group : toolBar->findChildren<QFrame*>(QStringLiteral("toolGroup"))) {
+        QStringList names;
+        for (const QToolButton* button : group->findChildren<QToolButton*>()) {
+            names.append(button->defaultAction()->objectName().remove(QStringLiteral("Action")));
+        }
+        groups.append(names.join(QLatin1Char('|')));
+    }
+    QCOMPARE(groups,
+             (QStringList{QStringLiteral("toggleSidebar"), QStringLiteral("listView|galleryView"),
+                          QStringLiteral("deleteNote|newNote"),
+                          QStringLiteral("format|checklist|insertTable|attachment|lockNote"),
+                          QStringLiteral("shareExport")}));
+    // The style sheet rounds the outer ends and divides the inner buttons.
+    QCOMPARE(buttonFor(*toolBar, QStringLiteral("listViewAction"))->property("position").toString(),
+             QStringLiteral("first"));
+    QCOMPARE(
+        buttonFor(*toolBar, QStringLiteral("checklistAction"))->property("position").toString(),
+        QStringLiteral("middle"));
+    QCOMPARE(buttonFor(*toolBar, QStringLiteral("lockNoteAction"))->property("position").toString(),
+             QStringLiteral("last"));
+    QCOMPARE(
+        buttonFor(*toolBar, QStringLiteral("shareExportAction"))->property("position").toString(),
+        QStringLiteral("only"));
 }
 
 void tst_Toolbar::searchFieldIsOnTheRight()
@@ -124,21 +184,42 @@ void tst_Toolbar::searchFieldIsOnTheRight()
     QVERIFY(search->isVisible());
     QCOMPARE(search->parentWidget(), toolBar);
 
-    const QWidget* lastButton =
-        toolBar->widgetForAction(actionOf(*window, QStringLiteral("shareExportAction")));
+    const QToolButton* lastButton = buttonFor(*toolBar, QStringLiteral("shareExportAction"));
     QVERIFY(lastButton);
-    QVERIFY(search->geometry().left() > lastButton->geometry().right());
+    QVERIFY(search->geometry().left() >
+            lastButton->mapTo(toolBar, QPoint(lastButton->width(), 0)).x());
     // Pushed to the right edge by the spacer, not just placed after the buttons.
     QVERIFY(toolBar->contentsRect().right() - search->geometry().right() < 16);
+}
+
+// TC-UI-043: magnifier and placeholder centred until the box is used (task 1.9).
+void tst_Toolbar::searchPlaceholderCentredUntilUsed()
+{
+    const auto window = showActiveWindow();
+    QVERIFY(window);
+    auto* search = window->findChild<notes::ui::SearchField*>(QStringLiteral("searchField"));
+    QVERIFY(search);
+    search->clearFocus();
+    QVERIFY(search->isPlaceholderCentred());
+    QVERIFY(search->placeholderText().isEmpty()); // drawn centred by the field itself
+
+    search->setFocus();
+    QTRY_VERIFY(search->hasFocus());
+    QVERIFY(!search->isPlaceholderCentred());
+    QCOMPARE(search->placeholderText(), QStringLiteral("Search"));
+
+    QTest::keyClicks(search, QStringLiteral("milk"));
+    search->clearFocus();
+    QVERIFY(!search->isPlaceholderCentred()); // text stays left-aligned
+    search->clear();
+    QVERIFY(search->isPlaceholderCentred());
 }
 
 void tst_Toolbar::buttonsShowToolTipWithShortcut()
 {
     const auto window = showActiveWindow();
     QVERIFY(window);
-    const QToolBar* toolBar = toolBarOf(*window);
-    const auto* button = qobject_cast<QToolButton*>(
-        toolBar->widgetForAction(actionOf(*window, QStringLiteral("newNoteAction"))));
+    const QToolButton* button = buttonFor(*toolBarOf(*window), QStringLiteral("newNoteAction"));
     QVERIFY(button);
     QCOMPARE(button->toolTip(), QStringLiteral("New Note (Ctrl+N)"));
 }
