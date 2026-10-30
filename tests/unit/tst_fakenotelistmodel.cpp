@@ -2,8 +2,8 @@
 // data set used by TC-PERF-001.
 
 #include "FakeClock.h"
+#include "FakeNoteListModel.h"
 #include "models/DateGrouping.h"
-#include "models/FakeNoteListModel.h"
 #include "models/NoteListRoles.h"
 
 #include <QAbstractItemModelTester>

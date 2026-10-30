@@ -1,6 +1,7 @@
 #include "storage/NoteRepository.h"
 
 #include "app/IClock.h"
+#include "models/SidebarRoles.h"
 #include "models/Uuid.h"
 #include "storage/Database.h"
 #include "storage/FolderRepository.h"
@@ -381,6 +382,34 @@ DbResult<QList<NoteSummary>> NoteRepository::listTrashed(int limit, int offset)
 {
     return list(QLatin1StringView("trashed_at IS NOT NULL AND deleted_at IS NULL"),
                 QLatin1StringView("trashed_at DESC, id DESC"), std::nullopt, limit, offset);
+}
+
+DbResult<QHash<qint64, int>> NoteRepository::countsByFolder()
+{
+    DbResult<ScopedStatement> select = m_db.prepare(
+        QStringLiteral("SELECT folder_id, count(*) FROM notes"
+                       " WHERE trashed_at IS NULL AND deleted_at IS NULL GROUP BY folder_id"
+                       " UNION ALL SELECT :all, count(*) FROM notes"
+                       "  WHERE trashed_at IS NULL AND deleted_at IS NULL"
+                       " UNION ALL SELECT :trash, count(*) FROM notes"
+                       "  WHERE trashed_at IS NOT NULL AND deleted_at IS NULL"));
+    if (!select) {
+        return select.error();
+    }
+    select.value()
+        ->bind(":all", models::kAllNotesFolderId)
+        .bind(":trash", models::kRecentlyDeletedFolderId);
+    QHash<qint64, int> counts;
+    while (true) {
+        DbResult<bool> row = select.value()->step();
+        if (!row) {
+            return row.error();
+        }
+        if (!row.value()) {
+            return counts;
+        }
+        counts.insert(select.value()->column<qint64>(0), select.value()->column<int>(1));
+    }
 }
 
 } // namespace notes::storage

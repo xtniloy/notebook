@@ -16,3 +16,8 @@ notes_add_test(NAME tst_migrator SOURCES tst_migrator.cpp LABELS unit)
 notes_add_test(NAME tst_folderrepository SOURCES tst_folderrepository.cpp LABELS unit)
 notes_add_test(NAME tst_noterepository SOURCES tst_noterepository.cpp LABELS unit)
 notes_add_test(NAME tst_notetext SOURCES tst_notetext.cpp LABELS unit)
+
+# TC-STO-022, TC-STO-023, TC-STO-024: the database-backed models (task 2.8).
+# Qt6::Gui for QAbstractItemModelTester, as above.
+notes_add_test(NAME tst_notelistmodel SOURCES tst_notelistmodel.cpp LABELS unit LIBS Qt6::Gui)
+notes_add_test(NAME tst_foldertreemodel SOURCES tst_foldertreemodel.cpp LABELS unit LIBS Qt6::Gui)

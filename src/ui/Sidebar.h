@@ -28,7 +28,9 @@ public:
     ~Sidebar() override;
 
     // Not owned. Selects the first folder row ("Notes" with the default data)
-    // when nothing was selected before.
+    // when nothing was selected before. If folder rows arrive later (the real
+    // model loads asynchronously), or the selected folder is deleted, the first
+    // folder is selected then and announced with folderSelected().
     void setModel(QAbstractItemModel* model);
 
     [[nodiscard]] std::optional<qint64> currentFolder() const { return m_currentFolder; }
@@ -43,6 +45,10 @@ private:
     void onSelectionChanged(const QItemSelection& selected);
     void onExpandedChanged(const QModelIndex& index, bool expanded);
     void restoreViewState();
+    // Picks the first folder row as current; false if there is none.
+    bool pickFirstFolder();
+    // After the model changed: selects and announces the first folder if none is.
+    void adoptFirstFolder();
     [[nodiscard]] QModelIndex indexForFolder(qint64 folderId) const;
 
     QTreeView* m_tree;

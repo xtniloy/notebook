@@ -6,7 +6,7 @@
 // came into view.
 
 #include "FakeClock.h"
-#include "models/FakeNoteListModel.h"
+#include "FakeNoteListModel.h"
 #include "ui/NoteListView.h"
 
 #include <QElapsedTimer>

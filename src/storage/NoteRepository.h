@@ -4,6 +4,7 @@
 #include "models/NoteSummary.h"
 #include "storage/DbResult.h"
 
+#include <QHash>
 #include <QList>
 #include <QString>
 
@@ -81,6 +82,11 @@ public:
                                                                int offset = 0);
     // Recently Deleted, most recently trashed first.
     [[nodiscard]] DbResult<QList<models::NoteSummary>> listTrashed(int limit = -1, int offset = 0);
+
+    // Live notes per folder id, for the sidebar's badges, plus the totals for
+    // All Notes and Recently Deleted under models::kAllNotesFolderId and
+    // models::kRecentlyDeletedFolderId (task 2.8). Folders without notes are absent.
+    [[nodiscard]] DbResult<QHash<qint64, int>> countsByFolder();
 
 private:
     enum class State : std::uint8_t {

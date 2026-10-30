@@ -1,9 +1,19 @@
 set(NOTES_TEST_LABELS unit integration ui bench slow)
 
-# Header-only helpers and fakes shared by all tests (tests/common/).
+# In-memory models with sample data (the Phase 1 UI's), for view tests and the
+# scroll benchmark: they need no database and can hold 10,000 notes at once.
+add_library(notes_test_fakes STATIC
+    common/FakeNoteListModel.cpp
+    common/FakeNoteListModel.h
+    common/FakeSidebarModel.cpp
+    common/FakeSidebarModel.h)
+target_include_directories(notes_test_fakes PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/common")
+target_link_libraries(notes_test_fakes PUBLIC notesapp_core)
+
+# Helpers and fakes shared by all tests (tests/common/).
 add_library(notes_test_common INTERFACE)
 target_include_directories(notes_test_common INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/common")
-target_link_libraries(notes_test_common INTERFACE notesapp_core)
+target_link_libraries(notes_test_common INTERFACE notesapp_core notes_test_fakes)
 
 # Adds one Qt Test executable and registers it with CTest.
 #

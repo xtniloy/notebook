@@ -64,6 +64,7 @@ int Application::run()
     // After the single-instance check, so a second launch doesn't pay for it.
     loadFonts();
     m_context = AppContext::createDefault();
+    m_context->openDatabase(AppContext::defaultDatabasePath());
     m_window = std::make_unique<ui::MainWindow>(*m_context);
     connect(instance, &SingleInstance::activationRequested, this, &Application::activateMainWindow);
     m_window->show();

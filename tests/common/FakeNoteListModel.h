@@ -12,7 +12,8 @@ namespace notes::models {
 
 // Generated notes for the Phase 1 UI and the scrolling benchmark (TC-PERF-001),
 // sorted newest first under date section headers, with pinned notes on top.
-// Replaced by the database-backed NoteListModel in task 2.8.
+// The app uses the database-backed NoteListModel since task 2.8; this one stays
+// for view tests, which need many notes without a database.
 class FakeNoteListModel : public QAbstractListModel
 {
     Q_OBJECT

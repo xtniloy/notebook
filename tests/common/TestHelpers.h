@@ -32,14 +32,24 @@ private:
 };
 
 // An AppContext whose settings live in `directory`/settings.ini instead of the
-// user's ~/.config, with a FakeClock at FakeClock::kDefaultStartMs so results
-// don't depend on the real date.
+// user's ~/.config, and whose database is `directory`/notes.db, with a FakeClock
+// at FakeClock::kDefaultStartMs so results don't depend on the real date.
 inline std::unique_ptr<app::AppContext> makeTestContext(const QString& directory)
 {
-    return std::make_unique<app::AppContext>(
+    auto context = std::make_unique<app::AppContext>(
         std::make_unique<QSettings>(directory + QStringLiteral("/settings.ini"),
                                     QSettings::IniFormat),
         std::make_unique<FakeClock>());
+    context->openDatabase(directory + QStringLiteral("/notes.db"));
+    return context;
+}
+
+// The FakeClock inside a makeTestContext() context, to move time forward.
+inline FakeClock& fakeClockOf(const app::AppContext& context)
+{
+    // The context hands out its clock as const; tests own both, so this is safe.
+    return const_cast<FakeClock&>( // NOLINT(*-const-cast)
+        dynamic_cast<const FakeClock&>(context.clock()));
 }
 
 // The result of a service call, waiting with the event loop running. Services

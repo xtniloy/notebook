@@ -6,6 +6,7 @@
 #include "storage/NoteRepository.h"
 
 #include <QFuture>
+#include <QHash>
 #include <QList>
 #include <QObject>
 
@@ -59,6 +60,9 @@ public:
     // Recently Deleted (which ignores `sort`: most recently deleted first).
     [[nodiscard]] QFuture<storage::DbResult<QList<models::NoteSummary>>>
     list(qint64 folderId, storage::NoteSort sort, int limit = -1, int offset = 0);
+
+    // Note counts for the sidebar (NoteRepository::countsByFolder()).
+    [[nodiscard]] QFuture<storage::DbResult<QHash<qint64, int>>> counts();
 
 signals:
     void noteCreated(const notes::models::Note& note);

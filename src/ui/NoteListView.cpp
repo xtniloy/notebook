@@ -55,9 +55,26 @@ void NoteListView::setModel(QAbstractItemModel* model)
     }
     connect(selectionModel(), &QItemSelectionModel::selectionChanged, this,
             &NoteListView::onSelectionChanged);
-    // Connected after QListView::setModel(), so this runs after the view's own
-    // reset handling, which clears the selection.
+    // Connected after QListView::setModel(), so these run after the view's own
+    // handling, which clears the selection on reset.
     connect(model, &QAbstractItemModel::modelReset, this, &NoteListView::restoreSelection);
+    connect(model, &QAbstractItemModel::modelReset, this, &NoteListView::scheduleCheck);
+    connect(model, &QAbstractItemModel::rowsInserted, this, &NoteListView::scheduleCheck);
+    connect(model, &QAbstractItemModel::rowsRemoved, this, [this] {
+        m_removingRows = false;
+        // Undo Qt's move to a neighbour now, or it would be reported later as a
+        // selection change. A note that is gone leaves nothing selected until
+        // checkCurrentNote() picks one.
+        m_restoring = true;
+        if (const QModelIndex index = m_currentNote ? indexForNote(*m_currentNote) : QModelIndex();
+            index.isValid()) {
+            setCurrentIndex(index);
+        } else {
+            selectionModel()->clear();
+        }
+        m_restoring = false;
+        scheduleCheck();
+    });
 
     if (!m_currentNote) {
         for (int row = 0; row < model->rowCount(); ++row) {
@@ -81,9 +98,15 @@ bool NoteListView::selectNote(qint64 noteId)
     return true;
 }
 
+void NoteListView::rowsAboutToBeRemoved(const QModelIndex& parent, int start, int end)
+{
+    m_removingRows = true;
+    QListView::rowsAboutToBeRemoved(parent, start, end);
+}
+
 void NoteListView::onSelectionChanged()
 {
-    if (m_restoring) {
+    if (m_restoring || m_removingRows) {
         return;
     }
     const QModelIndexList selected = selectionModel()->selectedIndexes();
@@ -106,13 +129,44 @@ void NoteListView::restoreSelection()
         return;
     }
     m_restoring = true;
-    const QModelIndex index = indexForNote(*m_currentNote);
-    if (index.isValid()) {
+    // If the note is gone, checkCurrentNote() moves on.
+    if (const QModelIndex index = indexForNote(*m_currentNote); index.isValid()) {
         setCurrentIndex(index);
-    } else {
-        m_currentNote.reset(); // the note is gone
     }
     m_restoring = false;
+}
+
+void NoteListView::scheduleCheck()
+{
+    if (!m_checkPending) {
+        m_checkPending = true;
+        QMetaObject::invokeMethod(this, &NoteListView::checkCurrentNote, Qt::QueuedConnection);
+    }
+}
+
+void NoteListView::checkCurrentNote()
+{
+    m_checkPending = false;
+    if (model() == nullptr) {
+        return;
+    }
+    if (m_currentNote && indexForNote(*m_currentNote).isValid()) {
+        restoreSelection(); // back after a move
+        return;
+    }
+    const bool hadNote = m_currentNote.has_value();
+    m_currentNote.reset();
+    for (int row = 0; row < model()->rowCount(); ++row) {
+        if (const std::optional<qint64> id = noteIdOf(model()->index(row, 0))) {
+            m_currentNote = id;
+            restoreSelection();
+            emit noteSelected(*id);
+            return;
+        }
+    }
+    if (hadNote) {
+        emit currentNoteCleared();
+    }
 }
 
 QModelIndex NoteListView::indexForNote(qint64 noteId) const

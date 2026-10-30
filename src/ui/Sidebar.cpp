@@ -130,18 +130,36 @@ void Sidebar::setModel(QAbstractItemModel* model)
             [this](const QItemSelection& selected) { onSelectionChanged(selected); });
     // Connected after m_tree->setModel(), so this runs after the view's own reset
     // handling, which collapses everything.
-    connect(model, &QAbstractItemModel::modelReset, this, &Sidebar::restoreViewState);
+    connect(model, &QAbstractItemModel::modelReset, this, &Sidebar::adoptFirstFolder);
+    connect(model, &QAbstractItemModel::rowsInserted, this, &Sidebar::adoptFirstFolder);
 
     if (!m_currentFolder) {
-        forEachRow(*model, [this](const QModelIndex& index) {
-            if (!m_currentFolder && (index.flags() & Qt::ItemIsSelectable) &&
-                index.data(models::kKindRole).toInt() ==
-                    static_cast<int>(models::SidebarItemKind::Folder)) {
-                m_currentFolder = folderIdOf(index);
-            }
-        });
+        pickFirstFolder();
     }
     restoreViewState();
+}
+
+bool Sidebar::pickFirstFolder()
+{
+    forEachRow(*m_model, [this](const QModelIndex& index) {
+        if (!m_currentFolder && (index.flags() & Qt::ItemIsSelectable) &&
+            index.data(models::kKindRole).toInt() ==
+                static_cast<int>(models::SidebarItemKind::Folder)) {
+            m_currentFolder = folderIdOf(index);
+        }
+    });
+    return m_currentFolder.has_value();
+}
+
+void Sidebar::adoptFirstFolder()
+{
+    restoreViewState(); // drops the current folder if it is gone
+    if (m_currentFolder || !pickFirstFolder()) {
+        return;
+    }
+    const qint64 folderId = m_currentFolder.value_or(0); // set by pickFirstFolder()
+    restoreViewState();
+    emit folderSelected(folderId);
 }
 
 bool Sidebar::selectFolder(qint64 folderId)

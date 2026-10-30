@@ -8,8 +8,8 @@ namespace notes::models {
 // task 2.8), so NoteListView works with either.
 //
 // Rows are either section headers (Qt::DisplayRole is the section title) or
-// notes (Qt::DisplayRole is the note title). Headers are plain rows so the view
-// can keep uniform row heights (Plan §10: virtualized list).
+// notes (Qt::DisplayRole is the note title). Headers are plain rows, so the
+// view needs no special layout for them.
 
 // bool: the row is a section header ("Pinned", "Today", ...).
 inline constexpr int kIsSectionHeaderRole = Qt::UserRole + 1;
@@ -26,5 +26,8 @@ inline constexpr int kModifiedRole = Qt::UserRole + 5;
 inline constexpr int kPinnedRole = Qt::UserRole + 6;
 inline constexpr int kLockedRole = Qt::UserRole + 7;
 inline constexpr int kHasThumbnailRole = Qt::UserRole + 8;
+// QString, notes only: the title of the section the note is in ("Pinned",
+// "Today", "March", ...), so views can group without header rows.
+inline constexpr int kSectionRole = Qt::UserRole + 9;
 
 } // namespace notes::models

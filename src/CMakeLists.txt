@@ -16,12 +16,12 @@ add_library(notesapp_core STATIC
     models/Attachment.h
     models/DateGrouping.cpp
     models/DateGrouping.h
-    models/FakeNoteListModel.cpp
-    models/FakeNoteListModel.h
-    models/FakeSidebarModel.cpp
-    models/FakeSidebarModel.h
     models/Folder.h
+    models/FolderTreeModel.cpp
+    models/FolderTreeModel.h
     models/Note.h
+    models/NoteListModel.cpp
+    models/NoteListModel.h
     models/NoteSummary.h
     models/NoteListRoles.h
     models/SidebarRoles.h

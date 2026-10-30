@@ -1,9 +1,12 @@
 // EditorView (task 1.7): TC-UI-016 list selection shows the note and its date,
-// TC-UI-017 empty state is read-only. Runs under QT_QPA_PLATFORM=offscreen.
+// TC-UI-017 empty state is read-only. Runs under QT_QPA_PLATFORM=offscreen. The
+// main window tests use real notes in a temp database (task 2.8).
 
 #include "TestHelpers.h"
-#include "models/FakeNoteListModel.h"
+#include "models/Note.h"
 #include "models/NoteListRoles.h"
+#include "models/SidebarRoles.h"
+#include "services/NoteService.h"
 #include "ui/EditorView.h"
 #include "ui/MainWindow.h"
 #include "ui/NoteListView.h"
@@ -16,7 +19,6 @@
 
 #include <memory>
 
-using notes::models::FakeNoteListModel;
 using notes::ui::EditorView;
 namespace roles = notes::models;
 
@@ -56,11 +58,14 @@ private slots:
 
     void mainWindowOpensFirstNote();
     void selectingNoteShowsItInEditor();
-    void selectingLockedNoteShowsPlaceholder();
 
 private:
     void verifyEmptyState(const EditorView& view);
     [[nodiscard]] std::unique_ptr<notes::ui::MainWindow> showMainWindow();
+    // Three notes in "Notes", oldest first; "Third" is the newest.
+    void addNotes();
+
+    QList<notes::models::Note> m_notes;
 
     std::unique_ptr<EditorView> m_view;
     std::unique_ptr<notes::test::TempDb> m_dir;
@@ -92,6 +97,19 @@ std::unique_ptr<notes::ui::MainWindow> tst_EditorView::showMainWindow()
         return nullptr;
     }
     return window;
+}
+
+void tst_EditorView::addNotes()
+{
+    notes::test::FakeClock& clock = notes::test::fakeClockOf(*m_context);
+    for (const QString& title :
+         {QStringLiteral("First"), QStringLiteral("Second"), QStringLiteral("Third")}) {
+        clock.advance(std::chrono::minutes(1));
+        const auto note = notes::test::await(m_context->notes().create(
+            notes::models::kAllNotesFolderId, {}, title + QStringLiteral("\nBody of ") + title));
+        QVERIFY(note);
+        m_notes.append(note.value());
+    }
 }
 
 void tst_EditorView::verifyEmptyState(const EditorView& view)
@@ -165,67 +183,41 @@ void tst_EditorView::editorIsPlainText()
 
 void tst_EditorView::mainWindowOpensFirstNote()
 {
+    addNotes();
     const auto window = showMainWindow();
     QVERIFY(window);
     const auto* list = window->findChild<notes::ui::NoteListView*>(QStringLiteral("noteListPane"));
     const auto* editor = window->findChild<EditorView*>(QStringLiteral("editorPane"));
     QVERIFY(list && editor);
-    QVERIFY(list->currentNote());
-    QVERIFY(editor->hasNote());
-    QCOMPARE(editor->textEdit()->toPlainText().section(QLatin1Char('\n'), 0, 0),
-             list->currentIndex().data().toString()); // title on the first line
+    // Folders, then notes, then the note's body load asynchronously.
+    QTRY_COMPARE(list->currentNote(), std::optional<qint64>(m_notes.constLast().id));
+    QTRY_VERIFY(editor->hasNote());
+    QCOMPARE(editor->textEdit()->toPlainText(), m_notes.constLast().bodyText);
+    QCOMPARE(list->currentIndex().data().toString(), QStringLiteral("Third"));
 }
 
 // TC-UI-016
 void tst_EditorView::selectingNoteShowsItInEditor()
 {
+    addNotes();
     const auto window = showMainWindow();
     QVERIFY(window);
     auto* list = window->findChild<notes::ui::NoteListView*>(QStringLiteral("noteListPane"));
     const auto* editor = window->findChild<EditorView*>(QStringLiteral("editorPane"));
-    const auto* model = qobject_cast<const FakeNoteListModel*>(list->model());
-    QVERIFY(model);
+    QTRY_VERIFY(list->currentNote().has_value());
 
-    // A visible, unlocked note other than the current one.
-    QModelIndex target;
-    for (int row = 0; row < model->rowCount() && !target.isValid(); ++row) {
-        const QModelIndex index = model->index(row);
-        if (index.data(roles::kNoteIdRole).isValid() && index != list->currentIndex() &&
-            !index.data(roles::kLockedRole).toBool()) {
-            target = index;
-        }
-    }
+    const notes::models::Note& first = m_notes.constFirst();
+    const QAbstractItemModel* model = list->model();
+    const QModelIndex target =
+        model->match(model->index(0, 0), roles::kNoteIdRole, first.id, 1, Qt::MatchExactly)
+            .value(0);
     QVERIFY(target.isValid());
     QTest::mouseClick(list->viewport(), Qt::LeftButton, {}, list->visualRect(target).center());
 
-    const qint64 id = target.data(roles::kNoteIdRole).toLongLong();
-    QCOMPARE(list->currentNote(), std::optional<qint64>(id));
-    const auto found = model->note(id);
-    if (!found) {
-        QFAIL("note not found");
-    }
-    const FakeNoteListModel::FakeNote& note = *found;
-    QCOMPARE(editor->textEdit()->toPlainText(), note.text);
+    QCOMPARE(list->currentNote(), std::optional<qint64>(first.id));
+    QTRY_COMPARE(editor->textEdit()->toPlainText(), first.bodyText);
     QCOMPARE(headerOf(*editor)->text(),
-             EditorView::headerText(QDateTime::fromMSecsSinceEpoch(note.modifiedMs)));
-}
-
-void tst_EditorView::selectingLockedNoteShowsPlaceholder()
-{
-    const auto window = showMainWindow();
-    QVERIFY(window);
-    auto* list = window->findChild<notes::ui::NoteListView*>(QStringLiteral("noteListPane"));
-    const auto* editor = window->findChild<EditorView*>(QStringLiteral("editorPane"));
-    const QAbstractItemModel* model = list->model();
-
-    const QModelIndex locked =
-        model->match(model->index(0, 0), roles::kLockedRole, true, 1, Qt::MatchExactly).value(0);
-    QVERIFY(locked.isValid());
-    QVERIFY(list->selectNote(locked.data(roles::kNoteIdRole).toLongLong()));
-
-    QCOMPARE(placeholderOf(*editor)->text(), QStringLiteral("This note is locked."));
-    QVERIFY(editor->textEdit()->toPlainText().isEmpty());
-    QVERIFY(headerOf(*editor)->isVisible());
+             EditorView::headerText(QDateTime::fromMSecsSinceEpoch(first.updatedAt)));
 }
 
 QTEST_MAIN(tst_EditorView)

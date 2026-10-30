@@ -3,8 +3,10 @@
 #include "app/AppContext.h"
 #include "app/Config.h"
 #include "app/IClock.h"
-#include "models/FakeNoteListModel.h"
-#include "models/FakeSidebarModel.h"
+#include "models/FolderTreeModel.h"
+#include "models/Note.h"
+#include "models/NoteListModel.h"
+#include "services/NoteService.h"
 #include "ui/ActionRegistry.h"
 #include "ui/EditorView.h"
 #include "ui/Icons.h"
@@ -48,8 +50,6 @@ constexpr int kSearchFieldWidth = 240;
 // With the toolbar's 4 px padding and 8 px spacing: 14 px from each window edge.
 constexpr int kToolBarEdgeSpacer = 2;
 constexpr int kToolBarBottomInset = 10;
-// Enough to show that the list is virtualized (Plan §10, TC-PERF-001).
-constexpr int kFakeNoteCount = 10'000;
 // The style sheet draws a 1 px line in the middle; the rest is grab area.
 constexpr int kSplitterHandleWidth = 5;
 
@@ -106,9 +106,8 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     , m_editor(
           createPane<EditorView>(QLatin1StringView("editorPane"), kEditorMinimumWidth, m_splitter))
     , m_toggleSidebar(m_actions->action(ActionId::ToggleSidebar))
-    , m_sidebarModel(new models::FakeSidebarModel(this))
-    , m_noteListModel(new models::FakeNoteListModel(kFakeNoteCount, context.clock().nowMs(),
-                                                    QTimeZone::LocalTime, this))
+    , m_sidebarModel(new models::FolderTreeModel(context.folders(), context.notes(), this))
+    , m_noteListModel(new models::NoteListModel(context.notes(), context.clock(), this))
 {
     setWindowTitle(QString::fromLatin1(config::kDisplayName));
 
@@ -123,12 +122,17 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     m_splitter->setStretchFactor(kNoteListIndex, 0);
     m_splitter->setStretchFactor(kEditorIndex, 1);
     setCentralWidget(m_splitter);
+    // Both models fill in asynchronously; the views pick the first folder and
+    // note as rows arrive, and say so with their signals.
+    connect(m_sidebar, &Sidebar::folderSelected, this,
+            [this](qint64 folderId) { m_noteListModel->setFolder(folderId); });
+    connect(m_noteList, &NoteListView::noteSelected, this, &MainWindow::openNote);
+    connect(m_noteList, &NoteListView::currentNoteCleared, m_editor, &EditorView::clear);
     m_sidebar->setModel(m_sidebarModel);
     m_noteList->setModel(m_noteListModel);
-    connect(m_noteList, &NoteListView::noteSelected, this, &MainWindow::openNote);
-    // The list selects its first note without a signal, before anyone listens.
-    if (const std::optional<qint64> current = m_noteList->currentNote()) {
-        openNote(*current);
+    // Selected during setModel() without a signal, if the rows were there already.
+    if (const std::optional<qint64> folder = m_sidebar->currentFolder()) {
+        m_noteListModel->setFolder(*folder);
     }
 
     m_toggleSidebar->setChecked(true);
@@ -299,18 +303,23 @@ void MainWindow::focusSearch()
 
 void MainWindow::openNote(qint64 noteId)
 {
-    // Becomes NoteService::get(id) in task 2.7.
-    const std::optional<models::FakeNoteListModel::FakeNote> note = m_noteListModel->note(noteId);
-    if (!note) {
-        m_editor->clear();
-        return;
-    }
-    const QDateTime modified = QDateTime::fromMSecsSinceEpoch(note->modifiedMs);
-    if (note->locked) {
-        m_editor->showLockedNote(modified);
-    } else {
-        m_editor->showNote(note->text, modified);
-    }
+    m_openingNote = noteId;
+    m_context.notes().get(noteId).then(
+        this, [this, noteId](const storage::DbResult<models::Note>& note) {
+            if (noteId != m_openingNote) {
+                return; // another note was selected meanwhile
+            }
+            if (!note) {
+                m_editor->clear();
+                return;
+            }
+            const QDateTime modified = QDateTime::fromMSecsSinceEpoch(note.value().updatedAt);
+            if (note.value().locked) {
+                m_editor->showLockedNote(modified);
+            } else {
+                m_editor->showNote(note.value().bodyText, modified);
+            }
+        });
 }
 
 void MainWindow::paintEvent(QPaintEvent* /*event*/)

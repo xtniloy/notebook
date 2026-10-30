@@ -2,14 +2,18 @@
 // rows that can't be selected. Runs under QT_QPA_PLATFORM=offscreen.
 
 #include "FakeClock.h"
+#include "FakeNoteListModel.h"
 #include "TestHelpers.h"
-#include "models/FakeNoteListModel.h"
+#include "models/NoteListModel.h"
 #include "models/NoteListRoles.h"
+#include "models/SidebarRoles.h"
+#include "services/NoteService.h"
 #include "ui/MainWindow.h"
 #include "ui/NoteListView.h"
 
 #include <QScrollBar>
 #include <QSignalSpy>
+#include <QStandardItemModel>
 #include <QTest>
 
 #include <memory>
@@ -35,6 +39,7 @@ private slots:
     void keyboardSkipsHeaders();
     void selectNoteScrollsToIt();
     void selectionSurvivesModelSwap();
+    void notesArrivingLaterAreSelected();
     void mainWindowHostsNoteList();
 
 private:
@@ -207,20 +212,64 @@ void tst_NoteListView::selectionSurvivesModelSwap()
     m_view->setModel(m_model.get());
 }
 
+// Task 2.8: the real model loads asynchronously and changes row by row.
+void tst_NoteListView::notesArrivingLaterAreSelected()
+{
+    const auto noteRow = [](qint64 id) {
+        auto* item = new QStandardItem(QStringLiteral("Note %1").arg(id));
+        item->setData(id, roles::kNoteIdRole);
+        return item;
+    };
+    QStandardItemModel model;
+    NoteListView view;
+    view.setModel(&model);
+    QSignalSpy selected(&view, &NoteListView::noteSelected);
+    QSignalSpy cleared(&view, &NoteListView::currentNoteCleared);
+    QVERIFY(!view.currentNote());
+
+    // The first page arrives: its first note is selected and announced.
+    model.appendRow(noteRow(1));
+    model.appendRow(noteRow(2));
+    QTRY_COMPARE(selected.count(), 1);
+    QCOMPARE(selected.takeFirst().at(0).toLongLong(), qint64(1));
+    QCOMPARE(view.currentNote(), std::optional<qint64>(1));
+
+    // An edited note moving to the top is removed and reinserted at once: it
+    // stays selected, and the editor isn't told to switch.
+    QVERIFY(view.selectNote(2));
+    selected.clear();
+    model.removeRow(1);
+    model.insertRow(0, noteRow(2));
+    QCoreApplication::processEvents();
+    QCOMPARE(selected.count(), 0);
+    QCOMPARE(view.currentNote(), std::optional<qint64>(2));
+    QCOMPARE(view.currentIndex().row(), 0);
+
+    // Its note gone for good: the first remaining one; then nothing.
+    model.removeRow(0);
+    QTRY_COMPARE(selected.count(), 1);
+    QCOMPARE(view.currentNote(), std::optional<qint64>(1));
+    model.removeRow(0);
+    QTRY_COMPARE(cleared.count(), 1);
+    QVERIFY(!view.currentNote());
+}
+
 void tst_NoteListView::mainWindowHostsNoteList()
 {
     const notes::test::TempDb dir;
     const auto context = notes::test::makeTestContext(dir.dirPath());
+    const auto note = notes::test::await(
+        context->notes().create(roles::kAllNotesFolderId, {}, QStringLiteral("Hello")));
+    QVERIFY(note);
     const notes::ui::MainWindow window(*context);
     const auto* list = window.findChild<NoteListView*>(QStringLiteral("noteListPane"));
     QVERIFY(list);
-    QVERIFY(list->model());
-    QCOMPARE(qobject_cast<const FakeNoteListModel*>(list->model())->noteCount(), 10'000);
+    QVERIFY(qobject_cast<const notes::models::NoteListModel*>(list->model()));
+    // Loaded from the database asynchronously, then selected.
+    QTRY_COMPARE(list->currentNote(), std::optional<qint64>(note.value().id));
     // Dated from the context's clock (a FakeClock here), not the real time (ADR 0004).
-    const qint64 newest = list->model()->index(1, 0).data(roles::kModifiedRole).toLongLong();
-    QVERIFY(newest <= notes::test::FakeClock::kDefaultStartMs);
-    QVERIFY(newest > notes::test::FakeClock::kDefaultStartMs - (qint64{6} * 60 * 60 * 1000));
-    QVERIFY(list->currentNote().has_value());
+    QCOMPARE(list->currentIndex().data(roles::kModifiedRole).toLongLong(),
+             notes::test::FakeClock::kDefaultStartMs);
 }
 
 QTEST_MAIN(tst_NoteListView)

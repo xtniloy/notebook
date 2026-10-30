@@ -10,8 +10,8 @@ class AppContext;
 }
 
 namespace notes::models {
-class FakeNoteListModel;
-class FakeSidebarModel;
+class FolderTreeModel;
+class NoteListModel;
 } // namespace notes::models
 
 namespace notes::ui {
@@ -74,9 +74,10 @@ private:
     NoteListView* m_noteList;
     EditorView* m_editor;
     QAction* m_toggleSidebar;
-    // Sample data until FolderTreeModel and NoteListModel (task 2.8).
-    models::FakeSidebarModel* m_sidebarModel;
-    models::FakeNoteListModel* m_noteListModel;
+    models::FolderTreeModel* m_sidebarModel;
+    models::NoteListModel* m_noteListModel;
+    // The note openNote() last asked for; older answers are dropped.
+    qint64 m_openingNote = 0;
     SearchField* m_searchField = nullptr;
 
     // Kept while the sidebar is hidden, so it comes back at the same width.

@@ -1,4 +1,4 @@
-#include "models/FakeNoteListModel.h"
+#include "FakeNoteListModel.h"
 
 #include "models/DateGrouping.h"
 #include "models/NoteListRoles.h"

@@ -1,4 +1,4 @@
-#include "models/FakeSidebarModel.h"
+#include "FakeSidebarModel.h"
 
 #include <functional>
 #include <utility>

@@ -1,7 +1,7 @@
 // FakeSidebarModel (task 1.5): TC-UI-013 QAbstractItemModelTester, plus the
 // shape of the sample tree the sidebar relies on.
 
-#include "models/FakeSidebarModel.h"
+#include "FakeSidebarModel.h"
 
 #include <QAbstractItemModelTester>
 #include <QSet>

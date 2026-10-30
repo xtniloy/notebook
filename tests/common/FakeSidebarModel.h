@@ -10,8 +10,9 @@
 
 namespace notes::models {
 
-// In-memory sidebar tree with sample folders and tags, for the Phase 1 UI.
-// Replaced by the database-backed FolderTreeModel in task 2.8.
+// In-memory sidebar tree with sample folders and tags, from the Phase 1 UI.
+// The app uses the database-backed FolderTreeModel since task 2.8; this one
+// stays for view tests.
 class FakeSidebarModel : public QAbstractItemModel
 {
     Q_OBJECT

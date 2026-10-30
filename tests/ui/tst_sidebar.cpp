@@ -1,12 +1,14 @@
 // Sidebar (task 1.5): TC-UI-011 folder selection signal, TC-UI-012 expand/collapse
 // state kept for the session. Runs under QT_QPA_PLATFORM=offscreen.
 
+#include "FakeSidebarModel.h"
 #include "TestHelpers.h"
-#include "models/FakeSidebarModel.h"
+#include "models/SidebarRoles.h"
 #include "ui/MainWindow.h"
 #include "ui/Sidebar.h"
 
 #include <QSignalSpy>
+#include <QStandardItemModel>
 #include <QTest>
 #include <QToolButton>
 #include <QTreeView>
@@ -35,6 +37,7 @@ private slots:
     void stateSurvivesModelReset();
     void stateSurvivesModelSwap();
     void newFolderButtonAtBottom();
+    void foldersArrivingLaterAreSelected();
     void mainWindowHostsSidebar();
 
 private:
@@ -218,6 +221,37 @@ void tst_Sidebar::newFolderButtonAtBottom()
     QVERIFY(!button->icon().isNull());
 }
 
+// Task 2.8: the real model loads asynchronously and reloads with resets.
+void tst_Sidebar::foldersArrivingLaterAreSelected()
+{
+    const auto folderRow = [](const QString& name, qint64 id) {
+        auto* item = new QStandardItem(name);
+        item->setData(static_cast<int>(notes::models::SidebarItemKind::Folder),
+                      notes::models::kKindRole);
+        item->setData(id, notes::models::kFolderIdRole);
+        return item;
+    };
+    QStandardItemModel model;
+    Sidebar sidebar;
+    sidebar.setModel(&model);
+    QSignalSpy selected(&sidebar, &Sidebar::folderSelected);
+    QVERIFY(!sidebar.currentFolder());
+
+    model.appendRow(folderRow(QStringLiteral("Notes"), 1));
+    model.appendRow(folderRow(QStringLiteral("Work"), 2));
+    QCOMPARE(selected.count(), 1);
+    QCOMPARE(selected.takeFirst().at(0).toLongLong(), qint64(1));
+    QCOMPARE(sidebar.currentFolder(), std::optional<qint64>(1));
+
+    // The selected folder deleted elsewhere: the first folder takes over.
+    QVERIFY(sidebar.selectFolder(2));
+    selected.clear();
+    model.removeRow(1);
+    model.appendRow(folderRow(QStringLiteral("Personal"), 3)); // a later change
+    QCOMPARE(selected.count(), 1);
+    QCOMPARE(selected.takeFirst().at(0).toLongLong(), qint64(1));
+}
+
 void tst_Sidebar::mainWindowHostsSidebar()
 {
     const notes::test::TempDb dir;
@@ -225,10 +259,11 @@ void tst_Sidebar::mainWindowHostsSidebar()
     notes::ui::MainWindow window(*context);
     auto* sidebar = window.findChild<Sidebar*>(QStringLiteral("sidebarPane"));
     QVERIFY(sidebar);
-    QCOMPARE(sidebar->currentFolder(), std::optional<qint64>(1));
+    // Folders load asynchronously; then "Notes", the first folder, is selected.
+    QTRY_COMPARE(sidebar->currentFolder(), std::optional<qint64>(1));
     const auto* tree = sidebar->findChild<QTreeView*>(QStringLiteral("sidebarTree"));
     QVERIFY(tree && tree->model());
-    QCOMPARE(tree->model()->rowCount(), 3);
+    QCOMPARE(tree->model()->rowCount(), 2); // On My Computer, Recently Deleted
 }
 
 QTEST_MAIN(tst_Sidebar)

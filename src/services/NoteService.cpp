@@ -210,4 +210,10 @@ QFuture<DbResult<QList<NoteSummary>>> NoteService::list(qint64 folderId, NoteSor
     });
 }
 
+QFuture<DbResult<QHash<qint64, int>>> NoteService::counts()
+{
+    const app::IClock* clock = &m_clock;
+    return m_db.post([clock](Database& db) { return NoteRepository(db, *clock).countsByFolder(); });
+}
+
 } // namespace notes::services

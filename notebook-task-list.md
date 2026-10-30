@@ -442,10 +442,10 @@ Record each in `docs/adr/`:
 
 ### 2.8 Qt models `M`
 
-- [ ] `FolderTreeModel` (`QAbstractItemModel`) backed by `FolderService`, updates on signals
-- [ ] `NoteListModel` (`QAbstractListModel`) with **lazy loading** (`canFetchMore`/`fetchMore`, pages of 200)
-- [ ] Date-group sections exposed as a role
-- [ ] Count badges per folder
+- [x] `FolderTreeModel` (`QAbstractItemModel`) backed by `FolderService`, updates on signals *(On My Computer › All Notes + folders, then Recently Deleted; tags join in Phase 7. Folder changes reload the tree with a model reset, which the sidebar already survives; note changes only update the badges)*
+- [x] `NoteListModel` (`QAbstractListModel`) with **lazy loading** (`canFetchMore`/`fetchMore`, pages of 200) *(keeps itself current from `NoteService` signals with row inserts/removes/`dataChanged`, never a reset; a note past the loaded pages arrives with its page)*
+- [x] Date-group sections exposed as a role *(`kSectionRole` on note rows, plus the header rows the view already draws; title sort uses one "Notes" section)*
+- [x] Count badges per folder *(`NoteRepository::countsByFolder()`: each folder's own notes, All Notes' total, Recently Deleted's)*
 
 **Tests**
 - `TC-STO-022` (U) Both models pass `QAbstractItemModelTester` while notes are added, moved, and deleted.
@@ -453,6 +453,8 @@ Record each in `docs/adr/`:
 - `TC-STO-024` (U) Updating a note's title emits `dataChanged` for that row only.
 
 **Done when:** fake models from Phase 1 are replaced.
+
+*Done: the window shows the database. `AppContext::openDatabase()` starts the DB thread (`~/.local/share/<app>/notes.db`, folder made `0700`), migrates, and makes sure "Notes" exists; selecting a folder loads its notes and selecting a note loads its body via `NoteService::get()`. The views now pick the first folder and note when rows arrive later, and the editor clears when a list is empty. The fake models moved to `tests/common/` for view tests and the scroll benchmark. Telling the user about migration errors, creating/editing notes from the UI, and the window test with a locked note (no way to lock one until Phase 6) are for 2.9–2.11 and Phase 6.*
 
 ### 2.9 Autosave `M`
 
