@@ -14,14 +14,19 @@
 #include <QToolBar>
 #include <QToolButton>
 
+#include <cmath>
 #include <memory>
+#include <numbers>
 
 using notes::ui::MainWindow;
 using notes::ui::WindowChrome;
 
 namespace {
+// Painted content starts here...
 constexpr int kMargin = WindowChrome::kShadowSize + WindowChrome::kBorderWidth;
-}
+// ...and the widgets reach a pixel further, trimmed along the rounded edge.
+constexpr int kLayoutMargin = kMargin - WindowChrome::kOverhang;
+} // namespace
 
 class tst_WindowChrome : public QObject
 {
@@ -42,6 +47,8 @@ private slots:
     void paintsShadowOutsideBorder();
     void cornersAreRounded();
     void headerAndToolbarSpacingIsBalanced();
+    void shadowFadesWithoutGaps_data();
+    void shadowFadesWithoutGaps();
 
 private:
     std::unique_ptr<MainWindow> showWindow();
@@ -87,7 +94,8 @@ void tst_WindowChrome::replacesSystemTitleBar()
     QVERIFY(window->testAttribute(Qt::WA_TranslucentBackground));
     // The title still names the window for the dock and Alt+Tab; it just isn't drawn.
     QVERIFY(!window->windowTitle().isEmpty());
-    QCOMPARE(window->contentsMargins(), QMargins(kMargin, kMargin, kMargin, kMargin));
+    QCOMPARE(window->contentsMargins(),
+             QMargins(kLayoutMargin, kLayoutMargin, kLayoutMargin, kLayoutMargin));
 }
 
 // TC-UI-040
@@ -122,7 +130,7 @@ void tst_WindowChrome::headerHasMenusAndWindowButtons()
     const QToolBar* toolBar = window->findChild<QToolBar*>(QStringLiteral("mainToolBar"));
     QVERIFY(toolBar);
     QVERIFY(header->geometry().bottom() < toolBar->geometry().top());
-    QCOMPARE(header->geometry().topLeft(), QPoint(kMargin, kMargin));
+    QCOMPARE(header->geometry().topLeft(), QPoint(kLayoutMargin, kLayoutMargin));
 }
 
 // TC-UI-041
@@ -141,7 +149,8 @@ void tst_WindowChrome::maximizeButtonTogglesAndDropsMargins()
 
     maximize->click();
     QTRY_VERIFY(!window->isMaximized());
-    QCOMPARE(window->contentsMargins(), QMargins(kMargin, kMargin, kMargin, kMargin));
+    QCOMPARE(window->contentsMargins(),
+             QMargins(kLayoutMargin, kLayoutMargin, kLayoutMargin, kLayoutMargin));
     QCOMPARE(maximize->toolTip(), QStringLiteral("Maximize"));
 }
 
@@ -290,6 +299,64 @@ void tst_WindowChrome::headerAndToolbarSpacingIsBalanced()
         const QToolButton* windowButton = button(*window, name);
         QCOMPARE(windowButton->size(), QSize(22, 22));
         QVERIFY2(windowButton->mapTo(window.get(), QPoint(0, 0)).y() - kMargin >= 6, name);
+    }
+}
+
+// UI bug (seen at 125 % display scale): a thin light line under the window and
+// at its corners. The shadow used to be pieced together around the shadow's
+// offset rectangle, leaving an unpainted strip just under the window and seams
+// at the corners. Moving outward from the window, the shadow must only fade.
+// At fractional scales the window's last device row must be anti-aliased
+// against the outside, not an opaque strip of window background.
+void tst_WindowChrome::shadowFadesWithoutGaps_data()
+{
+    QTest::addColumn<qreal>("scale");
+    QTest::newRow("100 %") << 1.0;
+    QTest::newRow("125 %") << 1.25;
+}
+
+void tst_WindowChrome::shadowFadesWithoutGaps()
+{
+    QFETCH(qreal, scale);
+    const auto window = showWindow();
+    QVERIFY(window);
+    QImage image((QSizeF(window->size()) * scale).toSize(), QImage::Format_ARGB32_Premultiplied);
+    image.setDevicePixelRatio(scale);
+    image.fill(Qt::transparent);
+    window->render(&image);
+    const auto alpha = [&](int x, int y) { return qAlpha(image.pixel(x, y)); };
+
+    // Walks outward from `start` in steps of (dx, dy) to the image edge: alpha
+    // may only decrease (1 level of rounding allowed).
+    const auto fadesOutward = [&](QPoint start, int dx, int dy, const char* where) {
+        int previous = alpha(start.x(), start.y());
+        for (QPoint p = start + QPoint(dx, dy); image.rect().contains(p); p += QPoint(dx, dy)) {
+            const int current = alpha(p.x(), p.y());
+            QVERIFY2(current <= previous + 1,
+                     qPrintable(QStringLiteral("%1: alpha rises from %2 to %3 at %4,%5")
+                                    .arg(QLatin1StringView(where))
+                                    .arg(previous)
+                                    .arg(current)
+                                    .arg(p.x())
+                                    .arg(p.y())));
+            previous = current;
+        }
+    };
+    const int edge = static_cast<int>(std::ceil(kMargin * scale)); // first device px of content
+    const int bottomOutside = static_cast<int>(std::ceil((window->height() - kMargin) * scale)) + 1;
+    fadesOutward(QPoint(image.width() * 3 / 4, bottomOutside), 0, 1, "below the window");
+    fadesOutward(QPoint(edge - 2, image.height() / 2), -1, 0, "left of the window");
+    // Diagonally out of the bottom-left corner, past the rounding.
+    const int corner = static_cast<int>(
+        (kMargin + (WindowChrome::kCornerRadius * (1 - (1 / std::numbers::sqrt2)))) * scale);
+    fadesOutward(QPoint(corner - 2, image.height() - corner + 1), -1, 1, "out of the corner");
+
+    // The last (partial) device row of the content blends with the outside.
+    const qreal bottom = (window->height() - kMargin) * scale;
+    if (bottom != std::floor(bottom)) {
+        const int lastRow = static_cast<int>(std::floor(bottom));
+        QVERIFY2(alpha(image.width() * 3 / 4, lastRow) < 255,
+                 "window background shows as an opaque strip at the bottom edge");
     }
 }
 

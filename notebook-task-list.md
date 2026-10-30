@@ -316,6 +316,7 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 - [x] Rounded window corners (12 px, as GNOME) *(an overlay above the content erases the corners outside the curve and draws the border along it; square when maximised)*
 - [x] Spacing per UI review: padding around the header row and toolbar, window buttons centred on the menu titles, search box as tall as the button groups, lighter shadow
 - [x] Second UI review: gap between the menu row and the toolbar buttons equal to the gap below them; window buttons at GNOME size (22 px, 14 px icons); roomier note list rows (more padding and line spacing, as macOS Notes)
+- [x] Bug fix (seen at 125 % display scale): thin light line under the window and at the corners, and a shadow that looked heavy. The shadow is now nested translucent rounded shapes (no seams, no unshaded strip under the window, lighter); the window edge is a faint translucent line instead of light grey; content widgets overhang the rounded edge by 1 px and the overlay trims them, so no background strip shows at fractional scales
 - [x] Toolbar buttons in joined, rounded groups as in macOS Notes: sidebar · list/gallery · delete/new note · format/checklist/table/attachment/lock · share; editing tools centred
 - [x] Search placeholder (magnifier + "Search") centred until the box is focused or has text
 

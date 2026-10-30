@@ -8,7 +8,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
-#include <QRadialGradient>
+#include <QRegion>
 #include <QToolButton>
 #include <QWindow>
 
@@ -16,8 +16,13 @@ namespace notes::ui {
 
 namespace {
 
-constexpr int kShadowOffsetY = 3; // light comes from slightly above
-constexpr int kShadowAlpha = 38;  // soft: a hint of depth, not a dark halo
+constexpr int kShadowOffsetY = 2; // light comes from slightly above
+// Opacity of the shadow right at the window's edge; it fades to 0 over
+// kShadowSize. Light: a hint of depth, not a dark halo.
+constexpr qreal kShadowAlpha = 0.09;
+// The window edge: a faint line in the text colour's direction, not a grey
+// line (a light seam between white panes and the shadow read as a stray line).
+constexpr int kBorderAlpha = 28;
 constexpr int kButtonSpacing = 8;
 constexpr int kButtonSize = 22; // GNOME header bar buttons
 constexpr int kButtonIconSize = 14;
@@ -34,47 +39,33 @@ QCursor cursorFor(Qt::Edges edges)
     return horizontal ? Qt::SizeHorCursor : Qt::SizeVerCursor;
 }
 
-// A soft shadow around the rounded rectangle `rect`: radial gradients at the
-// corners, linear along the sides (a nine-patch of gradients; no blur pass).
-void paintShadow(QPainter& painter, const QRectF& rect, qreal radius, qreal size)
+// A soft shadow around the rounded rectangle `rect`, as nested rounded
+// rectangles of tiny opacity whose sum fades out quadratically. Each layer is
+// one continuous shape, so there are no seams at fractional display scales
+// (125 %), unlike shadows pieced together from corner and side gradients.
+void paintShadow(QPainter& painter, const QRectF& rect, qreal radius, int size)
 {
-    const QColor dark(0, 0, 0, kShadowAlpha);
-    const QColor clear(0, 0, 0, 0);
-    const qreal r = radius;
-    const qreal s = size;
-    const qreal reach = r + s;
-
-    const auto corner = [&](QPointF center, QRectF area) {
-        QRadialGradient gradient(center, reach);
-        gradient.setColorAt(0, dark);
-        gradient.setColorAt(r / reach, dark);
-        gradient.setColorAt(1, clear);
-        painter.fillRect(area, gradient);
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(Qt::NoPen);
+    const auto falloff = [size](int distance) {
+        const qreal left = 1.0 - (static_cast<qreal>(distance) / size);
+        return left * left;
     };
-    corner(rect.topLeft() + QPointF(r, r), QRectF(rect.left() - s, rect.top() - s, reach, reach));
-    corner(rect.topRight() + QPointF(-r, r),
-           QRectF(rect.right() - r, rect.top() - s, reach, reach));
-    corner(rect.bottomLeft() + QPointF(r, -r),
-           QRectF(rect.left() - s, rect.bottom() - r, reach, reach));
-    corner(rect.bottomRight() + QPointF(-r, -r),
-           QRectF(rect.right() - r, rect.bottom() - r, reach, reach));
+    for (int layer = size; layer >= 1; --layer) {
+        const qreal alpha = kShadowAlpha * (falloff(layer - 1) - falloff(layer));
+        painter.setBrush(QColor::fromRgbF(0, 0, 0, static_cast<float>(alpha)));
+        const qreal grow = layer;
+        painter.drawRoundedRect(rect.adjusted(-grow, -grow, grow, grow), radius + grow,
+                                radius + grow);
+    }
+    painter.restore();
+}
 
-    const auto side = [&](QPointF from, QPointF to, QRectF area) {
-        QLinearGradient gradient(from, to);
-        gradient.setColorAt(0, dark);
-        gradient.setColorAt(1, clear);
-        painter.fillRect(area, gradient);
-    };
-    const qreal innerWidth = rect.width() - (2 * r);
-    const qreal innerHeight = rect.height() - (2 * r);
-    side(QPointF(0, rect.top()), QPointF(0, rect.top() - s),
-         QRectF(rect.left() + r, rect.top() - s, innerWidth, s));
-    side(QPointF(0, rect.bottom()), QPointF(0, rect.bottom() + s),
-         QRectF(rect.left() + r, rect.bottom(), innerWidth, s));
-    side(QPointF(rect.left(), 0), QPointF(rect.left() - s, 0),
-         QRectF(rect.left() - s, rect.top() + r, s, innerHeight));
-    side(QPointF(rect.right(), 0), QPointF(rect.right() + s, 0),
-         QRectF(rect.right(), rect.top() + r, s, innerHeight));
+QColor borderColor(const QPalette& palette)
+{
+    const bool dark = palette.color(QPalette::Window).lightness() < 128;
+    return dark ? QColor(255, 255, 255, kBorderAlpha) : QColor(0, 0, 0, kBorderAlpha);
 }
 
 QToolButton* windowButton(QWidget* parent, const char* name, Icon iconId, const QString& toolTip)
@@ -142,6 +133,15 @@ QMargins WindowChrome::frameMargins() const
     return {margin, margin, margin, margin};
 }
 
+QMargins WindowChrome::layoutMargins() const
+{
+    const QMargins frame = frameMargins();
+    if (frame.isNull()) {
+        return frame;
+    }
+    return frame - QMargins(kOverhang, kOverhang, kOverhang, kOverhang);
+}
+
 Qt::Edges WindowChrome::edgesAt(const QPoint& pos, const QSize& size, int margin)
 {
     Qt::Edges edges;
@@ -177,8 +177,15 @@ void WindowChrome::paint(QPainter& painter) const
     painter.setCompositionMode(QPainter::CompositionMode_Source);
     painter.fillRect(m_window->rect(), Qt::transparent);
     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-    painter.setRenderHint(QPainter::Antialiasing);
+
+    // The shadow only shows in the margin; clipping keeps its layers from being
+    // painted behind the content too.
+    painter.save();
+    painter.setClipRegion(QRegion(m_window->rect()) - QRegion(content.toRect()));
     paintShadow(painter, content.translated(0, kShadowOffsetY), kCornerRadius, kShadowSize);
+    painter.restore();
+
+    painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
     painter.setBrush(background);
     painter.drawRoundedRect(content, kCornerRadius, kCornerRadius);
@@ -190,24 +197,26 @@ void WindowChrome::paintCorners(QPainter& painter) const
         return; // maximised: square, edge to edge
     }
     const QRectF content = contentRect();
-    QPainterPath square;
-    square.addRect(content);
+    // Everything the content widgets may cover (they overhang the content by
+    // kOverhang, see layoutMargins()) outside the rounded shape.
+    QPainterPath around;
+    around.addRect(content.adjusted(-kOverhang, -kOverhang, kOverhang, kOverhang));
     QPainterPath rounded;
     rounded.addRoundedRect(content, kCornerRadius, kCornerRadius);
-    const QPainterPath corners = square.subtracted(rounded);
+    const QPainterPath outside = around.subtracted(rounded);
 
     painter.setRenderHint(QPainter::Antialiasing);
     // Erase what the content widgets painted outside the rounded shape...
     painter.setCompositionMode(QPainter::CompositionMode_DestinationOut);
-    painter.fillPath(corners, Qt::black);
+    painter.fillPath(outside, Qt::black);
     // ...put the shadow back there...
     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
     painter.save();
-    painter.setClipPath(corners);
+    painter.setClipPath(outside);
     paintShadow(painter, content.translated(0, kShadowOffsetY), kCornerRadius, kShadowSize);
     painter.restore();
     // ...and outline the shape, just outside the content.
-    painter.setPen(QPen(m_window->palette().color(QPalette::Mid), kBorderWidth));
+    painter.setPen(QPen(borderColor(m_window->palette()), kBorderWidth));
     painter.setBrush(Qt::NoBrush);
     const qreal half = kBorderWidth / 2.0;
     painter.drawRoundedRect(content.adjusted(-half, -half, half, half), kCornerRadius + half,
@@ -265,7 +274,7 @@ void WindowChrome::addDragArea(QWidget* area)
 
 void WindowChrome::updateFrame()
 {
-    m_window->setContentsMargins(frameMargins());
+    m_window->setContentsMargins(layoutMargins());
     if (m_overlay != nullptr) {
         m_overlay->update();
     }

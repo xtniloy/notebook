@@ -15,7 +15,7 @@
 QMenuBar#headerBar {
     background: ${window};
     color: ${text};
-    padding: 6px 10px 0 10px; /* clear of the rounded corners */
+    padding: 7px 10px 0 10px; /* clear of the rounded corners */
 }
 
 QMenuBar#headerBar::item {

@@ -48,6 +48,12 @@ public:
 
     // The shadow and border around the content; zero when maximised.
     [[nodiscard]] QMargins frameMargins() const;
+    // Where the content widgets are laid out: kOverhang pixels beyond the
+    // painted content on every side when framed. The corner overlay trims the
+    // overhang along the rounded edge, so at fractional display scales no row
+    // of window background can show between the widgets and the edge.
+    [[nodiscard]] QMargins layoutMargins() const;
+    static constexpr int kOverhang = 1;
 
     // Paints the shadow and the rounded content background. Call from the
     // window's paintEvent(); the corner overlay paints the rest.
