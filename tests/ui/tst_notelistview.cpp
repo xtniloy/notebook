@@ -9,6 +9,7 @@
 #include "models/SidebarRoles.h"
 #include "services/NoteService.h"
 #include "ui/MainWindow.h"
+#include "ui/NoteListDelegate.h"
 #include "ui/NoteListView.h"
 
 #include <QScrollBar>
@@ -32,6 +33,7 @@ private slots:
     void cleanup();
 
     void rowHeights();
+    void titleAndDetailFonts();
     void notesIndentedFromHeaders();
     void selectsFirstNoteInitially();
     void clickingNoteEmitsNoteSelected();
@@ -104,6 +106,23 @@ void tst_NoteListView::rowHeights()
 
 // UI review (as macOS Notes): notes start further right than the section
 // header above them, so the headers stand out; the header stays where it was.
+// UI review: titles are Bold (700); the time and preview are 0.1 pt smaller
+// (10.9 pt under the usual 11 pt system font), same family, regular weight.
+void tst_NoteListView::titleAndDetailFonts()
+{
+    QFont base(QStringLiteral("Inter"));
+    base.setPointSizeF(11.0);
+
+    const QFont title = notes::ui::NoteListDelegate::titleFont(base);
+    QCOMPARE(title.weight(), QFont::Bold);
+    QCOMPARE(title.pointSizeF(), 11.0);
+
+    const QFont detail = notes::ui::NoteListDelegate::detailFont(base);
+    QCOMPARE(detail.pointSizeF(), 10.9);
+    QCOMPARE(detail.families(), base.families());
+    QCOMPARE(detail.weight(), base.weight());
+}
+
 void tst_NoteListView::notesIndentedFromHeaders()
 {
     m_view->clearSelection(); // keep the highlight out of the measurement

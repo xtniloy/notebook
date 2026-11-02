@@ -25,11 +25,13 @@ constexpr qreal kHeaderScale = 1.1;
 constexpr int kHeaderTopPadding = 12;
 constexpr int kHeaderBottomPadding = 4;
 constexpr int kHighlightInset = 6;
+// The time and preview line is this much smaller than the title (detailFont()).
+constexpr qreal kDetailSizeReduction = 0.1;
 
-QFont boldFont(const QFont& base, qreal scale = 1.0)
+QFont boldFont(const QFont& base, qreal scale = 1.0, QFont::Weight weight = QFont::DemiBold)
 {
     QFont font = base;
-    font.setWeight(QFont::DemiBold);
+    font.setWeight(weight);
     if (scale != 1.0) {
         font.setPointSizeF(font.pointSizeF() * scale);
     }
@@ -109,11 +111,13 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
         content.setRight(static_cast<int>(slot.left()) - kHorizontalPadding);
     }
 
-    const QFont titleFont = boldFont(option.font);
+    const QFont titleFont = NoteListDelegate::titleFont(option.font);
     const QFontMetrics titleMetrics(titleFont);
+    const QFont smallFont = detailFont(option.font);
+    const QFontMetrics smallMetrics(smallFont);
     QRect titleLine(content.left(), content.top(), content.width(), titleMetrics.height());
     QRect detailLine(content.left(), titleLine.bottom() + 1 + kLineGap, content.width(),
-                     option.fontMetrics.height());
+                     smallMetrics.height());
 
     const QColor textColor = palette.color(selected ? QPalette::HighlightedText : QPalette::Text);
     const QColor mutedColor = selected ? textColor : palette.color(QPalette::PlaceholderText);
@@ -136,17 +140,30 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
         titleLine, Qt::AlignLeft | Qt::AlignVCenter,
         titleMetrics.elidedText(index.data().toString(), Qt::ElideRight, titleLine.width()));
 
-    painter->setFont(option.font);
+    painter->setFont(smallFont);
     const QString time = index.data(models::kTimeTextRole).toString();
     painter->drawText(detailLine, Qt::AlignLeft | Qt::AlignVCenter, time);
-    detailLine.setLeft(detailLine.left() + option.fontMetrics.horizontalAdvance(time) +
-                       (2 * kIconGap));
+    detailLine.setLeft(detailLine.left() + smallMetrics.horizontalAdvance(time) + (2 * kIconGap));
 
     const QString preview =
         locked ? NoteListDelegate::tr("Locked") : index.data(models::kPreviewRole).toString();
     painter->setPen(mutedColor);
     painter->drawText(detailLine, Qt::AlignLeft | Qt::AlignVCenter,
-                      option.fontMetrics.elidedText(preview, Qt::ElideRight, detailLine.width()));
+                      smallMetrics.elidedText(preview, Qt::ElideRight, detailLine.width()));
+}
+
+QFont NoteListDelegate::titleFont(const QFont& base)
+{
+    return boldFont(base, 1.0, QFont::Bold);
+}
+
+QFont NoteListDelegate::detailFont(const QFont& base)
+{
+    QFont font = base;
+    if (font.pointSizeF() > kDetailSizeReduction) { // -1 for pixel-sized fonts
+        font.setPointSizeF(font.pointSizeF() - kDetailSizeReduction);
+    }
+    return font;
 }
 
 QSize NoteListDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
@@ -157,8 +174,8 @@ QSize NoteListDelegate::sizeHint(const QStyleOptionViewItem& option, const QMode
         return {0, QFontMetrics(boldFont(option.font, kHeaderScale)).height() + kHeaderTopPadding +
                        kHeaderBottomPadding};
     }
-    const int height = QFontMetrics(boldFont(option.font)).height() + kLineGap +
-                       option.fontMetrics.height() + (2 * kVerticalPadding);
+    const int height = QFontMetrics(titleFont(option.font)).height() + kLineGap +
+                       QFontMetrics(detailFont(option.font)).height() + (2 * kVerticalPadding);
     return {0, height};
 }
 
