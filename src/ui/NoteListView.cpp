@@ -37,6 +37,10 @@ NoteListView::NoteListView(QWidget* parent)
     setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setFrameShape(QFrame::NoFrame);
+    // The base color under the scroll bar too (AppStyle draws it transparent),
+    // so the list is one white (or dark) column, not a gray strip at its edge.
+    setBackgroundRole(QPalette::Base);
+    setAutoFillBackground(true);
     setItemDelegate(new NoteListDelegate(this));
     // The delegate draws its own rounded highlight. Theme colors come with task 1.8.
     setStyleSheet(QStringLiteral("QListView { show-decoration-selected: 0; }"

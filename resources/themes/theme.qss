@@ -135,3 +135,7 @@ QSplitter#mainSplitter::handle {
                                 stop: 0.4 ${separator}, stop: 0.6 ${separator},
                                 stop: 0.6 ${base}, stop: 1 ${base});
 }
+
+/* Scroll bars: no rules here, AppStyle draws them (thin rounded handle; on
+   hover a track appears and the handle darkens). A QScrollBar rule would make
+   Qt draw them itself. */

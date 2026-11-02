@@ -35,6 +35,7 @@ private slots:
     void rowHeights();
     void titleAndDetailFonts();
     void separatorLines();
+    void baseColorUnderScrollBar();
     void notesIndentedFromHeaders();
     void selectsFirstNoteInitially();
     void clickingNoteEmitsNoteSelected();
@@ -163,6 +164,14 @@ void tst_NoteListView::separatorLines()
     const int header = rowOf(QStringLiteral("Today"));
     QVERIFY(header > 1);
     QVERIFY(!hasLine(m_view->visualRect(m_model->index(header - 1))));
+}
+
+// UI review: the scroll bar is drawn transparent (AppStyle), so the list fills
+// its whole area with the base color: no gray strip along its right edge.
+void tst_NoteListView::baseColorUnderScrollBar()
+{
+    QVERIFY(m_view->autoFillBackground());
+    QCOMPARE(m_view->backgroundRole(), QPalette::Base);
 }
 
 // UI review (as macOS Notes): notes start further right than the section

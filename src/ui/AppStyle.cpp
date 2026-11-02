@@ -2,6 +2,7 @@
 
 #include "ui/Icons.h"
 #include "ui/Shadow.h"
+#include "ui/ThemeManager.h"
 
 #include <QEvent>
 #include <QMenu>
@@ -9,6 +10,7 @@
 #include <QPainterPath>
 #include <QStyleFactory>
 #include <QStyleOptionMenuItem>
+#include <QStyleOptionSlider>
 
 #include <algorithm>
 
@@ -246,10 +248,111 @@ QSize AppStyle::sizeFromContents(ContentsType type, const QStyleOption* option,
     return {width, height};
 }
 
+namespace {
+
+// The theme's scroll bar colors, chosen by the palette's brightness.
+const ThemeColors& themeColors(const QPalette& palette)
+{
+    const bool dark = palette.color(QPalette::Window).lightness() < 128;
+    return ThemeManager::colors(dark ? Theme::Dark : Theme::Light);
+}
+
+} // namespace
+
+void AppStyle::drawComplexControl(ComplexControl control, const QStyleOptionComplex* option,
+                                  QPainter* painter, const QWidget* widget) const
+{
+    const auto* bar = qstyleoption_cast<const QStyleOptionSlider*>(option);
+    if (control != CC_ScrollBar || bar == nullptr) {
+        QProxyStyle::drawComplexControl(control, option, painter, widget);
+        return;
+    }
+    const ThemeColors& colors = themeColors(bar->palette);
+    const bool dragging =
+        (bar->state & State_Sunken) != 0 && (bar->activeSubControls & SC_ScrollBarSlider) != 0;
+    const bool hovered = (bar->state & State_MouseOver) != 0 || dragging;
+    const bool vertical = bar->orientation == Qt::Vertical;
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+    painter->setPen(Qt::NoPen);
+    if (hovered) {
+        // The track, with the same inset along the bar as the handle's ends.
+        const QRectF track =
+            vertical ? QRectF(bar->rect).adjusted(0, kScrollHandleInset, 0, -kScrollHandleInset)
+                     : QRectF(bar->rect).adjusted(kScrollHandleInset, 0, -kScrollHandleInset, 0);
+        const qreal radius = kScrollBarExtent / 2.0;
+        painter->setBrush(colors.scrollTrack);
+        painter->drawRoundedRect(track, radius, radius);
+    }
+    const QRect slider = subControlRect(CC_ScrollBar, bar, SC_ScrollBarSlider, widget);
+    if (slider.isValid() && bar->maximum > bar->minimum) {
+        // Thin at rest; on hover as wide as the track behind it (UI review).
+        const int inset = hovered ? 0 : kScrollHandleInset;
+        const QRectF handle = vertical ? QRectF(slider).adjusted(inset, 0, -inset, 0)
+                                       : QRectF(slider).adjusted(0, inset, 0, -inset);
+        const qreal radius = (kScrollBarExtent - (2 * inset)) / 2.0;
+        painter->setBrush(hovered ? colors.scrollHandleHover : colors.scrollHandle);
+        painter->drawRoundedRect(handle, radius, radius);
+    }
+    painter->restore();
+}
+
+QRect AppStyle::subControlRect(ComplexControl control, const QStyleOptionComplex* option,
+                               SubControl subControl, const QWidget* widget) const
+{
+    const auto* bar = qstyleoption_cast<const QStyleOptionSlider*>(option);
+    if (control != CC_ScrollBar || bar == nullptr) {
+        return QProxyStyle::subControlRect(control, option, subControl, widget);
+    }
+    // No arrow buttons: the groove is the whole bar, minus a small inset at
+    // the ends so the handle's rounded ends clear the track's.
+    const bool vertical = bar->orientation == Qt::Vertical;
+    const QRect groove = vertical
+                             ? bar->rect.adjusted(0, kScrollHandleInset, 0, -kScrollHandleInset)
+                             : bar->rect.adjusted(kScrollHandleInset, 0, -kScrollHandleInset, 0);
+    const int length = vertical ? groove.height() : groove.width();
+    const int range = bar->maximum - bar->minimum;
+    int sliderLength = length;
+    if (range > 0) {
+        const qint64 proportional =
+            (static_cast<qint64>(bar->pageStep) * length) / (range + bar->pageStep);
+        sliderLength = std::clamp(static_cast<int>(proportional),
+                                  std::min(kScrollHandleMinimum, length), length);
+    }
+    const int start = sliderPositionFromValue(bar->minimum, bar->maximum, bar->sliderPosition,
+                                              length - sliderLength, bar->upsideDown);
+    const auto along = [&](int from, int size) {
+        return vertical ? QRect(groove.left(), groove.top() + from, groove.width(), size)
+                        : QRect(groove.left() + from, groove.top(), size, groove.height());
+    };
+    switch (subControl) {
+    case SC_ScrollBarSlider:
+        return along(start, sliderLength);
+    case SC_ScrollBarSubPage:
+        return along(0, start);
+    case SC_ScrollBarAddPage:
+        return along(start + sliderLength, length - start - sliderLength);
+    case SC_ScrollBarGroove:
+        return groove;
+    case SC_ScrollBarAddLine:
+    case SC_ScrollBarSubLine:
+    case SC_ScrollBarFirst:
+    case SC_ScrollBarLast:
+        return {};
+    default:
+        return QProxyStyle::subControlRect(control, option, subControl, widget);
+    }
+}
+
 int AppStyle::pixelMetric(PixelMetric metric, const QStyleOption* option,
                           const QWidget* widget) const
 {
     switch (metric) {
+    case PM_ScrollBarExtent:
+        return kScrollBarExtent;
+    case PM_ScrollBarSliderMin:
+        return kScrollHandleMinimum;
     case PM_MenuPanelWidth:
         return kShadowMargin + 1; // the shadow, then the border
     case PM_MenuHMargin:

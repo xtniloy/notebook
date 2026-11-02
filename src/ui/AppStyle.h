@@ -14,11 +14,16 @@ namespace notes::ui {
 // themes work. Applies to every QMenu: menu bar, right-click menus and Qt's
 // own text field menus.
 //
+// Scroll bars, like other modern apps (UI review): a thin rounded handle with
+// no arrows and no visible track; while the mouse is over the bar (or drags
+// it) a rounded track appears behind the handle, and the handle darkens and
+// widens to the track's full width.
+//
 // The shadow needs a transparent margin around the panel: menus get a
 // translucent window, and are moved by that margin when they open, so the
 // visible panel lands where Qt meant the menu to be (under the menu title, at
 // the mouse). Keep theme.qss free of QMenu rules: with one, Qt's style sheet
-// engine draws menus itself and skips this style.
+// engine draws menus itself and skips this style. The same goes for QScrollBar.
 class AppStyle : public QProxyStyle
 {
     Q_OBJECT
@@ -41,6 +46,11 @@ public:
     static constexpr int kVerticalPadding = 5;
     static constexpr int kSeparatorHeight = 9;
 
+    // Scroll bars.
+    static constexpr int kScrollBarExtent = 12;  // thickness
+    static constexpr int kScrollHandleInset = 2; // handle from the bar's sides, at rest
+    static constexpr int kScrollHandleMinimum = 32;
+
     void polish(QWidget* widget) override;
     void unpolish(QWidget* widget) override;
     using QProxyStyle::polish;
@@ -58,6 +68,11 @@ public:
     [[nodiscard]] int styleHint(StyleHint hint, const QStyleOption* option = nullptr,
                                 const QWidget* widget = nullptr,
                                 QStyleHintReturn* returnData = nullptr) const override;
+    void drawComplexControl(ComplexControl control, const QStyleOptionComplex* option,
+                            QPainter* painter, const QWidget* widget = nullptr) const override;
+    [[nodiscard]] QRect subControlRect(ComplexControl control, const QStyleOptionComplex* option,
+                                       SubControl subControl,
+                                       const QWidget* widget = nullptr) const override;
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;

@@ -37,6 +37,11 @@ struct ThemeColors
     QColor accent;     // selection highlight, focus ring (Plan §3.6)
     QColor accentText; // text and icons on the accent
     QColor link;
+    // Scroll bars (drawn by AppStyle): a thin rounded handle; on hover a track
+    // appears behind it and the handle darkens (UI review).
+    QColor scrollHandle;
+    QColor scrollHandleHover;
+    QColor scrollTrack;
 };
 
 // Applies the light or dark theme to the whole application: Fusion style, a
