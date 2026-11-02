@@ -8,6 +8,7 @@
 #include "ui/WindowChrome.h"
 
 #include <QApplication>
+#include <QCursor>
 #include <QFrame>
 #include <QMenuBar>
 #include <QTest>
@@ -45,6 +46,7 @@ private slots:
     void doubleClickOnMenuTitleDoesNothing();
     void edgesAt_data();
     void edgesAt();
+    void cornerGripsSitInsideCorners();
     void paintsShadowOutsideBorder();
     void cornersAreRounded();
     void headerAndToolbarSpacingIsBalanced();
@@ -203,20 +205,36 @@ void tst_WindowChrome::doubleClickOnMenuTitleDoesNothing()
     }
 }
 
+// A 400 x 300 window with a 21 px shadow margin: the visible window spans
+// (21, 21) to (378, 278). Resizing happens within 10 px outside it (UI review:
+// the whole shadow was a handle, so the cursor changed far from the window),
+// diagonally within 20 px of a corner, and in 6 px grips inside the corners.
 void tst_WindowChrome::edgesAt_data()
 {
     QTest::addColumn<QPoint>("pos");
     QTest::addColumn<int>("margin");
     QTest::addColumn<int>("edges");
 
-    QTest::newRow("interior") << QPoint(200, 150) << 17 << 0;
-    QTest::newRow("left") << QPoint(3, 150) << 17 << int(Qt::LeftEdge);
-    QTest::newRow("right") << QPoint(390, 150) << 17 << int(Qt::RightEdge);
-    QTest::newRow("top") << QPoint(200, 0) << 17 << int(Qt::TopEdge);
-    QTest::newRow("bottom") << QPoint(200, 299) << 17 << int(Qt::BottomEdge);
-    QTest::newRow("top left") << QPoint(2, 2) << 17 << int(Qt::TopEdge | Qt::LeftEdge);
-    QTest::newRow("bottom right") << QPoint(399, 299) << 17 << int(Qt::BottomEdge | Qt::RightEdge);
-    QTest::newRow("just inside") << QPoint(17, 17) << 17 << 0;
+    constexpr int m = 21;
+    QTest::newRow("interior") << QPoint(200, 150) << m << 0;
+    QTest::newRow("outer shadow, left") << QPoint(3, 150) << m << 0;
+    QTest::newRow("outer shadow, top") << QPoint(200, 10) << m << 0;
+    QTest::newRow("left") << QPoint(15, 150) << m << int(Qt::LeftEdge);
+    QTest::newRow("left, at the edge") << QPoint(20, 150) << m << int(Qt::LeftEdge);
+    QTest::newRow("right") << QPoint(385, 150) << m << int(Qt::RightEdge);
+    QTest::newRow("top") << QPoint(200, 15) << m << int(Qt::TopEdge);
+    QTest::newRow("bottom") << QPoint(200, 285) << m << int(Qt::BottomEdge);
+    QTest::newRow("left band near the top")
+        << QPoint(15, 35) << m << int(Qt::TopEdge | Qt::LeftEdge);
+    QTest::newRow("top band near the left")
+        << QPoint(35, 15) << m << int(Qt::TopEdge | Qt::LeftEdge);
+    QTest::newRow("top band, past the corner zone") << QPoint(50, 15) << m << int(Qt::TopEdge);
+    QTest::newRow("bottom right") << QPoint(385, 285) << m << int(Qt::BottomEdge | Qt::RightEdge);
+    QTest::newRow("grip inside top left") << QPoint(23, 23) << m << int(Qt::TopEdge | Qt::LeftEdge);
+    QTest::newRow("grip inside bottom right")
+        << QPoint(375, 275) << m << int(Qt::BottomEdge | Qt::RightEdge);
+    QTest::newRow("inside, past the grip") << QPoint(27, 27) << m << 0;
+    QTest::newRow("inside, along the edge") << QPoint(23, 150) << m << 0;
     QTest::newRow("maximised") << QPoint(0, 0) << 0 << 0;
 }
 
@@ -226,6 +244,39 @@ void tst_WindowChrome::edgesAt()
     QFETCH(int, margin);
     QFETCH(int, edges);
     QCOMPARE(int(WindowChrome::edgesAt(pos, QSize(400, 300), margin)), edges);
+}
+
+// The rounded corners: small grips inside them resize diagonally, above the
+// content that would otherwise take the mouse there; gone when maximised.
+void tst_WindowChrome::cornerGripsSitInsideCorners()
+{
+    const auto window = showWindow();
+    QVERIFY(window);
+    const QList<QWidget*> grips =
+        window->findChildren<QWidget*>(QStringLiteral("windowCornerGrip"));
+    QCOMPARE(grips.size(), 4);
+    const QRect visible =
+        window->rect().marginsRemoved(QMargins(kMargin, kMargin, kMargin, kMargin));
+    QList<QPoint> corners;
+    for (const QWidget* grip : grips) {
+        QVERIFY(grip->isVisible());
+        QCOMPARE(grip->size(), QSize(WindowChrome::kCornerGrip, WindowChrome::kCornerGrip));
+        QVERIFY(visible.contains(grip->geometry()));
+        // Under the mouse there, nothing else: the grip is on top.
+        QCOMPARE(window->childAt(grip->geometry().center()), grip);
+        QVERIFY(grip->cursor().shape() == Qt::SizeFDiagCursor ||
+                grip->cursor().shape() == Qt::SizeBDiagCursor);
+        corners.append(grip->geometry().topLeft());
+    }
+    QVERIFY(corners.contains(visible.topLeft()));
+    QVERIFY(corners.contains(visible.bottomRight() -
+                             QPoint(WindowChrome::kCornerGrip - 1, WindowChrome::kCornerGrip - 1)));
+
+    window->showMaximized();
+    QTRY_VERIFY(window->isMaximized());
+    for (const QWidget* grip : grips) {
+        QVERIFY(!grip->isVisible());
+    }
 }
 
 void tst_WindowChrome::paintsShadowOutsideBorder()

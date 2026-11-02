@@ -14,6 +14,7 @@
 #include <QToolButton>
 #include <QWindow>
 
+#include <algorithm>
 #include <cmath>
 
 namespace notes::ui {
@@ -198,23 +199,56 @@ QMargins WindowChrome::layoutMargins() const
     return frame - QMargins(kOverhang, kOverhang, kOverhang, kOverhang);
 }
 
-Qt::Edges WindowChrome::edgesAt(const QPoint& pos, const QSize& size, int margin)
+namespace {
+
+// edgesAt() inside the visible window: only the grips in the corners.
+Qt::Edges gripEdgesAt(const QPoint& pos, const QRect& visible, int grip)
 {
+    const bool left = pos.x() < visible.left() + grip;
+    const bool right = pos.x() > visible.right() - grip;
+    const bool top = pos.y() < visible.top() + grip;
+    const bool bottom = pos.y() > visible.bottom() - grip;
+    if (!(left || right) || !(top || bottom)) {
+        return {};
+    }
+    return Qt::Edges(left ? Qt::LeftEdge : Qt::RightEdge) | (top ? Qt::TopEdge : Qt::BottomEdge);
+}
+
+// edgesAt() in the band outside the visible window: near a corner, along
+// either edge, diagonally.
+Qt::Edges bandEdgesAt(const QPoint& pos, const QRect& visible, int corner)
+{
+    const bool nearLeft = pos.x() < visible.left() + corner;
+    const bool nearRight = pos.x() > visible.right() - corner;
+    const bool nearTop = pos.y() < visible.top() + corner;
+    const bool nearBottom = pos.y() > visible.bottom() - corner;
+    const bool outsideX = pos.x() < visible.left() || pos.x() > visible.right();
+    const bool outsideY = pos.y() < visible.top() || pos.y() > visible.bottom();
     Qt::Edges edges;
-    if (margin <= 0) {
-        return edges;
+    if (outsideX || (outsideY && (nearLeft || nearRight))) {
+        edges |= nearLeft ? Qt::LeftEdge : Qt::RightEdge;
     }
-    if (pos.x() < margin) {
-        edges |= Qt::LeftEdge;
-    } else if (pos.x() >= size.width() - margin) {
-        edges |= Qt::RightEdge;
-    }
-    if (pos.y() < margin) {
-        edges |= Qt::TopEdge;
-    } else if (pos.y() >= size.height() - margin) {
-        edges |= Qt::BottomEdge;
+    if (outsideY || (outsideX && (nearTop || nearBottom))) {
+        edges |= nearTop ? Qt::TopEdge : Qt::BottomEdge;
     }
     return edges;
+}
+
+} // namespace
+
+Qt::Edges WindowChrome::edgesAt(const QPoint& pos, const QSize& size, int margin)
+{
+    if (margin <= 0) {
+        return {};
+    }
+    const QRect visible =
+        QRect(QPoint(0, 0), size).marginsRemoved(QMargins(margin, margin, margin, margin));
+    const int band = std::min(kResizeBand, margin);
+    if (!visible.adjusted(-band, -band, band, band).contains(pos)) {
+        return {}; // the outer part of the shadow
+    }
+    return visible.contains(pos) ? gripEdgesAt(pos, visible, kCornerGrip)
+                                 : bandEdgesAt(pos, visible, kResizeCorner);
 }
 
 QRect WindowChrome::contentRect() const
@@ -289,9 +323,38 @@ void WindowChrome::paintCorners(QPainter& painter) const
 
 void WindowChrome::placeOverlay()
 {
+    placeCornerGrips();
     m_overlay->setGeometry(m_window->rect());
     m_overlay->raise(); // above everything added since
     m_overlay->update();
+}
+
+void WindowChrome::placeCornerGrips()
+{
+    if (m_cornerGrips.isEmpty()) {
+        for (const Qt::Edges corner :
+             {Qt::TopEdge | Qt::LeftEdge, Qt::TopEdge | Qt::RightEdge,
+              Qt::BottomEdge | Qt::LeftEdge, Qt::BottomEdge | Qt::RightEdge}) {
+            auto* grip = new QWidget(m_window);
+            grip->setObjectName(QStringLiteral("windowCornerGrip"));
+            grip->setProperty("edges", static_cast<int>(corner));
+            grip->setCursor(cursorFor(corner));
+            grip->installEventFilter(this);
+            m_cornerGrips.append(grip);
+        }
+    }
+    const QRect visible = contentRect();
+    const bool framed = !frameMargins().isNull();
+    for (QWidget* grip : std::as_const(m_cornerGrips)) {
+        const auto corner = static_cast<Qt::Edges>(grip->property("edges").toInt());
+        const int x =
+            corner.testFlag(Qt::LeftEdge) ? visible.left() : visible.right() - kCornerGrip + 1;
+        const int y =
+            corner.testFlag(Qt::TopEdge) ? visible.top() : visible.bottom() - kCornerGrip + 1;
+        grip->setGeometry(x, y, kCornerGrip, kCornerGrip);
+        grip->setVisible(framed);
+        grip->raise(); // above the content; the overlay goes above all
+    }
 }
 
 void WindowChrome::toggleMaximized()
@@ -339,6 +402,7 @@ void WindowChrome::addDragArea(QWidget* area)
 void WindowChrome::updateFrame()
 {
     m_window->setContentsMargins(layoutMargins());
+    placeCornerGrips();
     if (m_overlay != nullptr) {
         m_overlay->update();
     }
@@ -359,6 +423,16 @@ bool WindowChrome::eventFilter(QObject* watched, QEvent* event)
     }
     auto* widget = qobject_cast<QWidget*>(watched);
     if (widget == nullptr) {
+        return false;
+    }
+    if (m_cornerGrips.contains(widget)) {
+        const auto* mouse = dynamic_cast<QMouseEvent*>(event);
+        if (event->type() == QEvent::MouseButtonPress && mouse != nullptr &&
+            mouse->button() == Qt::LeftButton && m_window->windowHandle() != nullptr) {
+            m_window->windowHandle()->startSystemResize(
+                static_cast<Qt::Edges>(widget->property("edges").toInt()));
+            return true;
+        }
         return false;
     }
     if (event->type() == QEvent::Enter && widget->parentWidget() == m_window) {

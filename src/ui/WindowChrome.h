@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QList>
 #include <QMargins>
 #include <QObject>
 #include <QSet>
@@ -34,6 +35,14 @@ public:
     static constexpr int kShadowSize = 20;
     static constexpr int kBorderWidth = 1;
     static constexpr int kCornerRadius = 12; // as GNOME (libadwaita) windows
+    // Resizing, as in GNOME's own apps: a band of this width just outside the
+    // visible edge (the rest of the shadow is not a handle)...
+    static constexpr int kResizeBand = 10;
+    // ...resizing diagonally within this distance of a corner along an edge...
+    static constexpr int kResizeCorner = 20;
+    // ...and a square this size just inside each rounded corner, where the
+    // content underneath would otherwise take the mouse.
+    static constexpr int kCornerGrip = 6;
 
     // Must run before the window is first shown (translucency can't be added later).
     explicit WindowChrome(QMainWindow* window);
@@ -61,8 +70,10 @@ public:
 
     void toggleMaximized();
 
-    // Which window edges a point in a window of `size` resizes, given a border
-    // of `margin` pixels. Empty for the interior or when `margin` is 0.
+    // Which window edges a point in a window of `size` resizes, when the
+    // visible window is inset by `margin` (the shadow): within kResizeBand
+    // outside the visible edge, diagonally near corners, and in the corner
+    // grips. Empty elsewhere, or when `margin` is 0 (maximised).
     [[nodiscard]] static Qt::Edges edgesAt(const QPoint& pos, const QSize& size, int margin);
 
 protected:
@@ -77,6 +88,8 @@ private:
     // and draws the border. Called by the overlay above all content.
     void paintCorners(QPainter& painter) const;
     void placeOverlay();
+    // The corner grips sit inside the visible corners; hidden when maximised.
+    void placeCornerGrips();
     bool handleWindowEvent(QEvent* event);
     bool handleDragAreaEvent(QWidget* area, QEvent* event);
     void updateFrame();
@@ -84,6 +97,7 @@ private:
     QMainWindow* m_window;
     QWidget* m_overlay = nullptr;
     QToolButton* m_maximizeButton = nullptr;
+    QList<QWidget*> m_cornerGrips;
     // Only compared, never dereferenced, so stale pointers are harmless.
     QSet<const QObject*> m_dragAreas;
 };
