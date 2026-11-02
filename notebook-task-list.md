@@ -499,7 +499,7 @@ Record each in `docs/adr/`:
 **Tests**
 - `TC-UI-021` (UI) `Ctrl+N` creates a note in the selected folder and focuses the editor.
 - `TC-UI-022` (UI) `Delete` key on a selected note moves it to Recently Deleted and selects the next note.
-- `TC-UI-023` (UI) Duplicate creates "<title> copy" with identical body.
+- `TC-UI-023` (UI) Duplicate creates "`<title> copy`" with identical body.
 - `TC-UI-024` (I) Full restart test: create folder + 3 notes, pin one, restart → same state.
 
 **Done when:** the app is usable for plain-text notes.
@@ -1286,7 +1286,7 @@ Record decisions in `docs/adr/0007-sync-design.md`:
 - [ ] **(M)** `ConflictResolver` as a **pure function** `(local, base, remote) → action` so it's fully unit-testable
 - [ ] **(S)** Remote changed, local not → apply remote
 - [ ] **(S)** Local changed, remote not → keep local (push later)
-- [ ] **(M)** Both changed → newer wins; the other saved as **"<title> (Conflicted copy)"** in the same folder; never lose data (Plan §9.5)
+- [ ] **(M)** Both changed → newer wins; the other saved as **"`<title> (Conflicted copy)`"** in the same folder; never lose data (Plan §9.5)
 - [ ] **(M)** Edit vs delete → edit wins (note restored), deletion recorded as overridden
 - [ ] **(S)** Note moved into a folder that was deleted remotely → note goes to "Notes"
 - [ ] **(S)** Folder cycles created by concurrent moves → break the cycle deterministically
