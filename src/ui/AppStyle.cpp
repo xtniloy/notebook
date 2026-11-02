@@ -199,12 +199,13 @@ void AppStyle::drawMenuItem(const QStyleOptionMenuItem& item, QPainter* painter,
         icon(Icon::Expand).paint(painter, arrow, Qt::AlignCenter, itemIconMode(true, selected));
         right -= kArrowWidth;
     }
-    drawItemText(item, QRect(left, row.top(), right - left, row.height()), text, muted, painter,
-                 widget);
+    drawMenuItemText(item, QRect(left, row.top(), right - left, row.height()), text, muted, painter,
+                     widget);
 }
 
-void AppStyle::drawItemText(const QStyleOptionMenuItem& item, const QRect& rect, const QColor& text,
-                            const QColor& muted, QPainter* painter, const QWidget* widget) const
+void AppStyle::drawMenuItemText(const QStyleOptionMenuItem& item, const QRect& rect,
+                                const QColor& text, const QColor& muted, QPainter* painter,
+                                const QWidget* widget) const
 {
     // "Label\tShortcut": the label on the left, the shortcut right-aligned.
     const qsizetype tab = item.text.indexOf(QLatin1Char('\t'));

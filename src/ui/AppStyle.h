@@ -80,8 +80,8 @@ protected:
 private:
     void drawMenuItem(const QStyleOptionMenuItem& item, QPainter* painter,
                       const QWidget* widget) const;
-    void drawItemText(const QStyleOptionMenuItem& item, const QRect& rect, const QColor& text,
-                      const QColor& muted, QPainter* painter, const QWidget* widget) const;
+    void drawMenuItemText(const QStyleOptionMenuItem& item, const QRect& rect, const QColor& text,
+                          const QColor& muted, QPainter* painter, const QWidget* widget) const;
 };
 
 } // namespace notes::ui
