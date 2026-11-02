@@ -13,6 +13,9 @@ namespace {
 
 constexpr int kHeaderTopMargin = 10;
 constexpr int kSideMargin = 24;
+// Between the scroll bar and the pane's right edge (UI review: flush against
+// the edge looked cramped).
+constexpr int kScrollBarGap = 3;
 
 QLabel* createMutedLabel(const QString& objectName, QWidget* parent)
 {
@@ -43,15 +46,16 @@ EditorView::EditorView(QWidget* parent)
     m_pages->addWidget(m_textEdit);
     m_pages->addWidget(m_placeholder);
 
-    // No right margin: the text edit reaches the pane's edge, so its scroll bar
-    // sits there, and keeps kSideMargin of padding before the text itself. The
-    // labels get that padding too, to stay centered over the text.
-    m_textEdit->setRightPadding(kSideMargin);
-    m_header->setContentsMargins(0, 0, kSideMargin, 0);
-    m_placeholder->setContentsMargins(0, 0, kSideMargin, 0);
+    // A small right margin: the text edit reaches almost to the pane's edge, so
+    // its scroll bar sits there, and pads the text so it still ends kSideMargin
+    // from the edge. The labels get the same padding, to stay centered over it.
+    constexpr int kRightPadding = kSideMargin - kScrollBarGap;
+    m_textEdit->setRightPadding(kRightPadding);
+    m_header->setContentsMargins(0, 0, kRightPadding, 0);
+    m_placeholder->setContentsMargins(0, 0, kRightPadding, 0);
 
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(kSideMargin, kHeaderTopMargin, 0, 0);
+    layout->setContentsMargins(kSideMargin, kHeaderTopMargin, kScrollBarGap, 0);
     layout->setSpacing(kHeaderTopMargin);
     layout->addWidget(m_header);
     layout->addWidget(m_pages, 1);

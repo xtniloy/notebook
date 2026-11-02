@@ -183,8 +183,8 @@ void tst_EditorView::editorIsPlainText()
     QVERIFY(!m_view->textEdit()->acceptRichText());
 }
 
-// UI review: the scroll bar sits at the pane's right edge, not against the
-// text; the text keeps 24 px of space on the right, and the date stays
+// UI review: the scroll bar sits 3 px from the pane's right edge, not against
+// the text; the text keeps 24 px of space on the right, and the date stays
 // centered over it.
 void tst_EditorView::scrollBarAtPaneEdge()
 {
@@ -200,7 +200,7 @@ void tst_EditorView::scrollBarAtPaneEdge()
     QVERIFY(bar->maximum() > 0);
 
     const int barRight = bar->mapTo(m_view.get(), QPoint(bar->width(), 0)).x();
-    QCOMPARE(barRight, m_view->width());
+    QCOMPARE(m_view->width() - barRight, 3);
     const QWidget* viewport = edit->viewport();
     const int textRight = viewport->mapTo(m_view.get(), QPoint(viewport->width(), 0)).x();
     QCOMPARE(m_view->width() - textRight, 24);
