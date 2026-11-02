@@ -1,6 +1,7 @@
 #include "ui/WindowChrome.h"
 
 #include "ui/Icons.h"
+#include "ui/Shadow.h"
 
 #include <QHBoxLayout>
 #include <QMainWindow>
@@ -44,27 +45,9 @@ QCursor cursorFor(Qt::Edges edges)
     return horizontal ? Qt::SizeHorCursor : Qt::SizeVerCursor;
 }
 
-// A soft shadow around the rounded rectangle `rect`, as nested rounded
-// rectangles of tiny opacity whose sum fades out quadratically. Each layer is
-// one continuous shape, so there are no seams at fractional display scales
-// (125 %), unlike shadows pieced together from corner and side gradients.
 void paintShadow(QPainter& painter, const QRectF& rect, qreal radius, int size)
 {
-    painter.save();
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(Qt::NoPen);
-    const auto falloff = [size](int distance) {
-        const qreal left = 1.0 - (static_cast<qreal>(distance) / size);
-        return left * left;
-    };
-    for (int layer = size; layer >= 1; --layer) {
-        const qreal alpha = kShadowAlpha * (falloff(layer - 1) - falloff(layer));
-        painter.setBrush(QColor::fromRgbF(0, 0, 0, static_cast<float>(alpha)));
-        const qreal grow = layer;
-        painter.drawRoundedRect(rect.adjusted(-grow, -grow, grow, grow), radius + grow,
-                                radius + grow);
-    }
-    painter.restore();
+    paintSoftShadow(painter, rect, radius, size, kShadowAlpha);
 }
 
 QColor borderColor(const QPalette& palette)

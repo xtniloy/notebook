@@ -29,6 +29,9 @@ QMenuBar#headerBar::item:pressed {
     background: ${hover};
 }
 
+/* Menus: no rules here. Any QMenu rule makes Qt draw menus itself, ignoring
+   AppStyle, which draws them (rounded, shadowed, right-aligned shortcuts). */
+
 /* GNOME-sized: 22 px circles, 14 px icons (sizes set in WindowChrome). */
 #windowButtons QToolButton {
     border: none;

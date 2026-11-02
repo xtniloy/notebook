@@ -14,3 +14,5 @@ notes_add_test(NAME tst_recentlydeleted SOURCES tst_recentlydeleted.cpp LABELS u
 notes_add_test(NAME tst_wiring SOURCES tst_wiring.cpp LABELS ui integration LIBS notesapp_ui)
 # TC-UI-025, TC-UI-026: drag & drop (task 2.12).
 notes_add_test(NAME tst_dragdrop SOURCES tst_dragdrop.cpp LABELS ui LIBS notesapp_ui)
+# UI review: menus drawn by AppStyle (rounded, shadow, right-aligned shortcuts).
+notes_add_test(NAME tst_appstyle SOURCES tst_appstyle.cpp LABELS ui LIBS notesapp_ui)

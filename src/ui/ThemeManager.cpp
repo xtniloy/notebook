@@ -1,5 +1,7 @@
 #include "ui/ThemeManager.h"
 
+#include "ui/AppStyle.h"
+
 #include <QApplication>
 #include <QFile>
 #include <QGraphicsOpacityEffect>
@@ -8,7 +10,6 @@
 #include <QPropertyAnimation>
 #include <QRegularExpression>
 #include <QSettings>
-#include <QStyleFactory>
 #include <QStyleHints>
 
 namespace notes::ui {
@@ -141,8 +142,12 @@ ThemeManager::ThemeManager(QSettings& settings, QObject* parent)
     // The palette and style sheet are written for Fusion; native styles (e.g.
     // Breeze) ignore parts of the palette. Set unconditionally: once a style sheet
     // is active, style() is Qt's style sheet wrapper and its name says nothing.
-    QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
+    // Fusion, with our own menus (AppStyle). QApplication takes ownership, which
+    // the analyzer can't see.
+    // NOLINTBEGIN(clang-analyzer-cplusplus.NewDeleteLeaks)
+    QApplication::setStyle(new AppStyle);
     disableBuiltInAnimations();
+    // NOLINTEND(clang-analyzer-cplusplus.NewDeleteLeaks)
 
     // The scheme comes from the signal's argument, not a fresh colorScheme() query,
     // so a test can emit the signal on platforms without a real color scheme.

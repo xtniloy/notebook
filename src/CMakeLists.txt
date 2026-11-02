@@ -82,6 +82,8 @@ add_library(notesapp_ui STATIC
     app/Application.h
     ui/ActionRegistry.cpp
     ui/ActionRegistry.h
+    ui/AppStyle.cpp
+    ui/AppStyle.h
     ui/dialogs/AboutDialog.cpp
     ui/dialogs/AboutDialog.h
     ui/EditorView.cpp
@@ -100,6 +102,8 @@ add_library(notesapp_ui STATIC
     ui/NoteTextEdit.h
     ui/SearchField.cpp
     ui/SearchField.h
+    ui/Shadow.cpp
+    ui/Shadow.h
     ui/Sidebar.cpp
     ui/Sidebar.h
     ui/SidebarDelegate.cpp

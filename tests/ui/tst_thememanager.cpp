@@ -18,6 +18,7 @@
 #include <QGraphicsOpacityEffect>
 #include <QLabel>
 #include <QPropertyAnimation>
+#include <QProxyStyle>
 #include <QRegularExpression>
 #include <QSignalSpy>
 #include <QStyle>
@@ -165,7 +166,10 @@ void tst_ThemeManager::usesFusionAndNoLongAnimations()
     // With a style sheet set, style() is Qt's style sheet wrapper; look underneath.
     const QString sheet = qApp->styleSheet();
     qApp->setStyleSheet({});
-    QCOMPARE(QApplication::style()->name().toLower(), QStringLiteral("fusion"));
+    // AppStyle: Fusion underneath, with our own menu items.
+    const auto* app = qobject_cast<const QProxyStyle*>(QApplication::style());
+    QVERIFY(app != nullptr);
+    QCOMPARE(app->baseStyle()->name().toLower(), QStringLiteral("fusion"));
     qApp->setStyleSheet(sheet);
     for (const Qt::UIEffect effect :
          {Qt::UI_AnimateMenu, Qt::UI_FadeMenu, Qt::UI_AnimateCombo, Qt::UI_AnimateTooltip,
