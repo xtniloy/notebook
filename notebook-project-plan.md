@@ -65,27 +65,44 @@ The goal is **the same layout, workflow and features** as macOS Notes. Copy the 
 
 ### 3.1 Main Window Layout
 
+The window draws its own frame (rounded corners, soft shadow) with no system title bar: the menu row is the header, and dragging its empty part, or empty toolbar space, moves the window.
+
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ ● ● ●   [≡]  [▦ ☰]  [🗑]      [Aa] [☑] [⊞] [📎] [🔒] [⇪]        [🔍 Search  ] │  ← Toolbar
-├──────────────┬────────────────────────┬──────────────────────────────────────┤
-│ iCloud-like  │ Pinned                 │ October 28, 2026 at 9:41 PM          │
-│ ─ Account ─  │ ┌────────────────────┐ │                                      │
-│ 📁 All Notes │ │ Shopping List   📌 │ │ Shopping List                        │  ← Title (1st line)
-│ 📁 Notes     │ │ 9:41 PM  Milk, eggs│ │                                      │
-│ 📁 Work      │ └────────────────────┘ │ ☑ Milk                               │
-│ 📁 Personal  │ Today                  │ ☐ Eggs                               │
-│ 📁 Passwords │ ┌────────────────────┐ │ ☐ Bread                              │
-│              │ │ 🔒 Bank Accounts   │ │                                      │
-│ ─ Tags ─     │ │ 8:15 PM  Locked    │ │                                      │
-│ #work #home  │ └────────────────────┘ │                                      │
-│              │ Previous 7 Days        │                                      │
-│ 🗑 Recently  │ ...                    │                                      │
-│   Deleted    │                        │                                      │
-│ [+ Folder]   │                        │                                      │
-├──────────────┴────────────────────────┴──────────────────────────────────────┤
-  Sidebar (220px)   Note List (300px)         Editor (flexible)
+╭────────────────────────────────────────────────────────────────────────────────╮
+│ File  Edit  Format  View  Help                                    [–] [□] [×]  │ ← Header (menus + window buttons)
+│ [▤] [☰|▦] [🗑|✎]          [Aa|☑|⊞|📎|🔒]           [⇪] [ 🔍 Search          ] │ ← Toolbar
+├────────────────┬──────────────────────────┬────────────────────────────────────┤
+│ On My Computer │ Pinned                   │   October 28, 2026 at 9:41 PM      │ ← Date (centered, gray)
+│  All Notes  12 │   Shopping List       📌 │                                    │
+│  Notes       5 │   9:41 PM  Milk, eggs    │ Shopping List                      │ ← Title = 1st line
+│ ▾ Work       4 │ Today                    │ Milk                               │
+│     Projects 2 │   Trip plan              │ Eggs                               │
+│  Personal    3 │   8:15 PM  Tickets, hotel│ Bread                              │
+│ Recently       │ Previous 7 Days          │                                    │
+│   Deleted    1 │   ...                    │                                    │
+│                │                          │                                    │
+│ [+ New Folder] │                          │                                    │
+╰────────────────┴──────────────────────────┴────────────────────────────────────╯
+  Sidebar           Note list                  Editor
+  220 px (≥ 160)    300 px (≥ 200)             the rest (≥ 320)
 ```
+
+**Sizes**
+- Window: opens at **1100 × 720**; minimum **760 × 480**, so the whole toolbar always fits (no "»" overflow menu) and the three panes fit at their minimum widths.
+- Panes are resized by dragging the 1 px dividers; they can't be collapsed. Resizing the window only changes the editor's width.
+- Window size and position, pane widths and whether the sidebar is shown are restored on the next start.
+
+**Header:** menus on the left (File, Edit, Format, View, Help); minimize, maximize and close on the right, as in GNOME.
+
+**Toolbar:** joined button groups with 18 px icons, the search field (200 px wide) as tall as the buttons; see §3.2 for the actions. Groups: sidebar toggle · list/gallery · delete/new note on the left; text tools in the middle; share and search on the right.
+
+**Sidebar:** "On My Computer" holds **All Notes**, the default **Notes** folder and user folders (nested, expandable), each with a note count; **Recently Deleted** sits below it. **New Folder** is at the bottom. See §3.3.
+
+**Note list:** notes under section headers (**Pinned**, Today, Yesterday, Previous 7 Days, Previous 30 Days, months, years), indented past the headers. Each row: bold title, then time and preview; a pin marks pinned notes. In Recently Deleted the time is replaced by "N days remaining". See §3.4.
+
+**Editor:** the date and time centered in gray above the text; the first line is the note's title. "No note selected" when the list is empty. See §3.5.
+
+*Planned, not yet in the window:* the account name once Google sync is on (Phase 9), **Tags** and **Smart Folders** in the sidebar (Phases 7–8), thumbnails in note rows and the gallery view (Phases 3 and 8), and the rich-text tools in the toolbar's middle group (Phase 3).
 
 ### 3.2 Toolbar (left to right)
 

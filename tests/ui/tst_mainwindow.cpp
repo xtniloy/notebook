@@ -11,6 +11,7 @@
 #include <QSettings>
 #include <QSplitter>
 #include <QTest>
+#include <QToolBar>
 
 #include <memory>
 #include <numeric>
@@ -31,6 +32,7 @@ private slots:
     void sidebarToggleKeepsWidth();
     void hiddenSidebarIsRestored();
     void panesCannotCollapse();
+    void windowHasGentleMinimumSize();
     void corruptSettingsFallBackToDefaults_data();
     void corruptSettingsFallBackToDefaults();
     void aboutListsThirdPartyLicenses();
@@ -195,6 +197,33 @@ void tst_MainWindow::panesCannotCollapse()
     QVERIFY(splitter->sizes().at(0) >= MainWindow::kSidebarMinimumWidth);
     QVERIFY(splitter->sizes().at(1) >= MainWindow::kNoteListMinimumWidth);
     QVERIFY(splitter->sizes().at(2) >= MainWindow::kEditorMinimumWidth);
+}
+
+void tst_MainWindow::windowHasGentleMinimumSize()
+{
+    const auto window = showWindow();
+    QVERIFY(window);
+    window->resize(100, 100);
+    QCOMPARE(window->size(), MainWindow::kMinimumWindowSize);
+
+    // At its smallest the whole toolbar fits: Qt's overflow button stays hidden.
+    const auto* toolBar = window->findChild<QToolBar*>(QStringLiteral("mainToolBar"));
+    QVERIFY(toolBar);
+    QVERIFY(toolBar->sizeHint().width() <= MainWindow::kMinimumWindowSize.width());
+    if (const auto* overflow =
+            toolBar->findChild<QWidget*>(QStringLiteral("qt_toolbar_ext_button"))) {
+        QVERIFY(!overflow->isVisible());
+    }
+    // And the three panes fit at their minimum widths.
+    const QSplitter* splitter = splitterOf(*window);
+    QVERIFY(MainWindow::kSidebarMinimumWidth + MainWindow::kNoteListMinimumWidth +
+                MainWindow::kEditorMinimumWidth + (2 * splitter->handleWidth()) <=
+            MainWindow::kMinimumWindowSize.width());
+
+    // A saved geometry smaller than that comes back at the minimum.
+    window->setGeometry(QRect(QPoint(50, 50), QSize(300, 200)));
+    QVERIFY(window->width() >= MainWindow::kMinimumWindowSize.width());
+    QVERIFY(window->height() >= MainWindow::kMinimumWindowSize.height());
 }
 
 void tst_MainWindow::corruptSettingsFallBackToDefaults_data()

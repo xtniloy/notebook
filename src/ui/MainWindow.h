@@ -3,6 +3,7 @@
 #include "storage/NoteRepository.h"
 
 #include <QMainWindow>
+#include <QSize>
 
 #include <optional>
 
@@ -46,6 +47,10 @@ public:
     static constexpr int kSidebarMinimumWidth = 160;
     static constexpr int kNoteListMinimumWidth = 200;
     static constexpr int kEditorMinimumWidth = 320;
+    // The smallest window: wide enough for the whole toolbar (no "»" overflow
+    // menu) and the three panes at their minimum widths, tall enough for a
+    // usable note list and editor.
+    static constexpr QSize kMinimumWindowSize{760, 480};
 
     explicit MainWindow(app::AppContext& context, QWidget* parent = nullptr);
     ~MainWindow() override;

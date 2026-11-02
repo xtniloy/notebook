@@ -155,6 +155,7 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     , m_sort(sortFromSettings(context.settings().value(kSortKey).toString()))
 {
     setWindowTitle(QString::fromLatin1(config::kDisplayName));
+    setMinimumSize(kMinimumWindowSize);
 
     m_splitter->setObjectName(QStringLiteral("mainSplitter"));
     m_splitter->setChildrenCollapsible(false);
