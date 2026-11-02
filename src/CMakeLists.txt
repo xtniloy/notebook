@@ -80,6 +80,8 @@ target_link_libraries(notesapp_core
 add_library(notesapp_ui STATIC
     app/Application.cpp
     app/Application.h
+    editor/NoteFormat.cpp
+    editor/NoteFormat.h
     ui/ActionRegistry.cpp
     ui/ActionRegistry.h
     ui/AppStyle.cpp

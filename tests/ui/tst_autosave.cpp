@@ -4,6 +4,7 @@
 // 500 ms timers.
 
 #include "TestHelpers.h"
+#include "editor/NoteFormat.h"
 #include "models/Note.h"
 #include "models/SidebarRoles.h"
 #include "services/Autosave.h"
@@ -15,6 +16,7 @@
 
 #include <QSignalSpy>
 #include <QTest>
+#include <QTextDocument>
 
 #include <chrono>
 #include <memory>
@@ -114,7 +116,13 @@ void tst_Autosave::typingSavesOnceAfterDelay()
 
     QTest::qWait(static_cast<int>(Autosave::kDelay.count()) + 300);
     QCOMPARE(saves.count(), 1);
-    QCOMPARE(reload(m_second).bodyText, QStringLiteral("Second abcdefghi"));
+    const Note saved = reload(m_second);
+    QCOMPARE(saved.bodyText, QStringLiteral("Second abcdefghi"));
+    // Saved in the note format (task 3.1), which reads back to the same text.
+    QCOMPARE(saved.formatVersion, notes::models::kBodyFormatJson);
+    QTextDocument stored;
+    QVERIFY(!notes::editor::NoteFormat::deserialize(saved.body, stored).has_value());
+    QCOMPARE(stored.toPlainText(), saved.bodyText);
     QTest::qWait(static_cast<int>(Autosave::kDelay.count()) + 100);
     QCOMPARE(saves.count(), 1); // nothing more to save
 }

@@ -304,7 +304,7 @@ void tst_Wiring::duplicateCopiesBody()
     const Note copy = await(m_context->notes().get(m_list->currentNote().value_or(0))).value();
     QCOMPARE(copy.title, QStringLiteral("Plan copy"));
     QCOMPARE(copy.bodyText, plan.bodyText);
-    QCOMPARE(copy.bodyHtml, plan.bodyHtml);
+    QCOMPARE(copy.body, plan.body);
     QCOMPARE(copy.folderId, plan.folderId);
     QVERIFY(copy.uuid != plan.uuid);
     QTRY_VERIFY(listedTitles().contains(QStringLiteral("Plan copy")));

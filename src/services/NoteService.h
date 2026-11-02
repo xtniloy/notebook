@@ -44,14 +44,16 @@ public:
     // A new note in `folderId`, the folder selected in the sidebar. With All
     // Notes selected it goes into the default "Notes" folder; Recently Deleted
     // can't take new notes.
-    QFuture<storage::DbResult<models::Note>> create(qint64 folderId, const QString& bodyHtml,
+    // `body` is in the current format (models::kBodyFormatCurrent, from
+    // editor::NoteFormat); `bodyText` is its plain text.
+    QFuture<storage::DbResult<models::Note>> create(qint64 folderId, const QString& body,
                                                     const QString& bodyText);
     // A new note in the same folder with the same body, titled "<title> copy"
     // (TC-UI-023); noteCreated(). Not for trashed or locked notes.
     QFuture<storage::DbResult<models::Note>> duplicate(qint64 id);
     [[nodiscard]] QFuture<storage::DbResult<models::Note>> get(qint64 id);
     // Saves the editor's content; the title and snippet follow from the text.
-    QFuture<storage::DbResult<models::Note>> updateBody(qint64 id, const QString& bodyHtml,
+    QFuture<storage::DbResult<models::Note>> updateBody(qint64 id, const QString& body,
                                                         const QString& bodyText);
     QFuture<storage::DbStatus> setPinned(qint64 id, bool pinned);
     QFuture<storage::DbStatus> moveToFolder(qint64 id, qint64 folderId);

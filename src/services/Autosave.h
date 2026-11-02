@@ -31,7 +31,7 @@ public:
 
     struct Content
     {
-        QString html;
+        QString body; // in the current note format (editor::NoteFormat)
         QString text;
     };
     using Reader = std::function<Content()>;

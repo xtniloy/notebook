@@ -66,7 +66,7 @@ void Autosave::flush()
         return; // e.g. typed, then undid it
     }
     m_savedHash = std::move(hash);
-    m_notes.updateBody(m_noteId, content.html, content.text)
+    m_notes.updateBody(m_noteId, content.body, content.text)
         .then(this, [](const storage::DbResult<models::Note>& result) {
             if (!result) {
                 // Category and code only: never note content.
@@ -78,7 +78,7 @@ void Autosave::flush()
 QByteArray Autosave::hashOf(const Content& content)
 {
     QCryptographicHash hash(QCryptographicHash::Sha256);
-    hash.addData(content.html.toUtf8());
+    hash.addData(content.body.toUtf8());
     hash.addData(QByteArrayView("\0", 1)); // so "ab"+"c" differs from "a"+"bc"
     hash.addData(content.text.toUtf8());
     return hash.result();

@@ -65,6 +65,7 @@ private slots:
     void embeddedMigrationsAreNumbered();
     void emptyDatabaseReachesLatest();
     void dataSurvivesLaterMigrations();
+    void phase2BodiesKeepTheirFormat();
     void failingMigrationRollsBack();
     void newerDatabaseIsLeftAlone();
     void secondRunIsNoOp();
@@ -160,9 +161,9 @@ void tst_Migrator::emptyDatabaseReachesLatest()
         return QSet<QString>(list.begin(), list.end());
     }();
     for (const char* name :
-         {"id", "uuid", "folder_id", "title", "snippet", "body_html", "body_text", "is_pinned",
+         {"id", "uuid", "folder_id", "title", "snippet", "body", "body_text", "is_pinned",
           "is_locked", "locked_blob", "locked_nonce", "wrapped_key", "created_at", "updated_at",
-          "trashed_at", "deleted_at", "version", "sync_state"}) {
+          "trashed_at", "deleted_at", "version", "sync_state", "format_version"}) {
         QVERIFY2(noteColumns.contains(QLatin1StringView(name)), name);
     }
 
@@ -199,6 +200,25 @@ void tst_Migrator::dataSurvivesLaterMigrations()
     QCOMPARE(scalar(*m_db, QStringLiteral("SELECT typeof(color) FROM notes")),
              QStringLiteral("null"));
     QCOMPARE(Migrator::currentVersion(*m_db).value(), 2);
+}
+
+// Migration 002 (task 3.1, ADR 0006): bodies saved by the Phase 2 editor keep
+// their HTML, now in `body`, marked as format 1 so the editor still reads them.
+void tst_Migrator::phase2BodiesKeepTheirFormat()
+{
+    QVERIFY(Migrator(migrationDir()).migrate(*m_db)); // schema 1 only
+    QVERIFY(m_db->exec(QStringLiteral(
+        "INSERT INTO folders (id, uuid, name, created_at, updated_at)"
+        "  VALUES (1, '3f2504e0-4f89-41d3-9a0c-0305e82c3301', 'Notes', 1, 1);"
+        "INSERT INTO notes (uuid, folder_id, title, body_html, body_text, created_at, updated_at)"
+        "  VALUES ('5b1c4e2a-0d7e-4c55-9a1e-8f3e2d1c0b9a', 1, 'Old', '<p>Old note</p>',"
+        "          'Old note', 2, 3);")));
+
+    const DbResult<Migrator::Result> result = Migrator().migrate(*m_db); // the real ones
+    QVERIFY2(result, qPrintable(result.error().message));
+    QVERIFY(result.value().toVersion >= 2);
+    QCOMPARE(scalar(*m_db, QStringLiteral("SELECT body || '|' || format_version FROM notes")),
+             QStringLiteral("<p>Old note</p>|1"));
 }
 
 // TC-MIG-003

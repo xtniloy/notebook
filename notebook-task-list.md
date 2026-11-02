@@ -527,16 +527,16 @@ Record each in `docs/adr/`:
 
 **Do this first.** Custom `QTextFormat` properties are **not** written by `QTextDocument::toHtml()`, so anything stored only as a custom property (checklist state, collapsed headings, attachment IDs) will be lost on save unless you design for it.
 
-- [ ] Build a test document with every planned feature (headings, lists, checklist items via `QTextBlockFormat::MarkerType`, monospace, image, table)
-- [ ] Save with `toHtml()`, load with `setHtml()`, compare block-by-block
-- [ ] Record which properties survive and which don't
-- [ ] Measure load and save time (`setHtml`/`toHtml`, our JSON, `setMarkdown`/`toMarkdown`) and stored size for 5 KB, 100 KB and 1 MB notes; record the numbers in the ADR *(budget: open a note < 50 ms, Plan §10)*
-- [ ] Check the Markdown edges with the fixture: paste a sample AI chat answer (headings, lists, code block, table) as Markdown, and export the fixture with `toMarkdown()`; record what Markdown can't carry (underline, highlight, colors, image size, collapsed sections)
-- [ ] Decide in `docs/adr/0006-note-format.md`:
+- [x] Build a test document with every planned feature (headings, lists, checklist items via `QTextBlockFormat::MarkerType`, monospace, image, table) *(`tests/common/EditorFixture.h`: `buildFixture()` plus `dumpDocument()`, a block-by-block description for comparisons; reused by every later editor task)*
+- [x] Save with `toHtml()`, load with `setHtml()`, compare block-by-block
+- [x] Record which properties survive and which don't *(ADR 0006: Qt HTML drops our custom properties and the code block's no-wrap, adds a 9 pt size to every fragment, and isn't stable: a table right after a list moves 40 px right on every save)*
+- [x] Measure load and save time (`setHtml`/`toHtml`, our JSON, `setMarkdown`/`toMarkdown`) and stored size for 5 KB, 100 KB and 1 MB notes; record the numbers in the ADR *(budget: open a note < 50 ms, Plan §10)* *(`bench_noteformat`: a realistic 100 KB note opens in ~5 ms with JSON, ~19 ms with Qt HTML; JSON is ~1.6× the text, half of Qt HTML)*
+- [x] Check the Markdown edges with the fixture: paste a sample AI chat answer (headings, lists, code block, table) as Markdown, and export the fixture with `toMarkdown()`; record what Markdown can't carry (underline, highlight, colors, image size, collapsed sections) *(an AI answer survives the format, code block language included; `toMarkdown()` also garbles adjacent inline formats and leaks checklist markers, which export (8.3) must work around)*
+- [x] Decide in `docs/adr/0006-note-format.md`: *(**B**: the spike ruled out A, since Qt's own HTML output would need repairs, not just additions)*
   - **A:** Qt HTML + a small post-processor that adds `data-*` attributes for lost properties *(preferred if the spike shows little is lost)*
   - **B:** Own versioned JSON format for the document tree *(more work, full control)*
   - *Not Markdown as storage: it can't hold underline, colors, highlight, image size or collapsed sections, and converting in and out on every save would change notes slightly each time. Markdown is supported at the edges instead: paste (3.8), export and copy (8.3)*
-- [ ] Add `format_version` to the stored body so the format can change later
+- [x] Add `format_version` to the stored body so the format can change later *(migration 002: `notes.body_html` → `body`, plus `format_version` (1 = Phase 2 Qt HTML, 2 = JSON). The editor reads both and saves JSON; `editor/NoteFormat`)*
 
 **Tests**
 - `TC-EDT-001` (U) Round-trip harness: `serialize(deserialize(serialize(doc))) == serialize(doc)` for a fixture document. This harness is reused by every later editor task.

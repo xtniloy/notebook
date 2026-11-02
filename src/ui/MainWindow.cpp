@@ -398,37 +398,39 @@ void MainWindow::openNote(qint64 noteId)
     // load below is queued behind the save, so reopening it shows the saved text.
     m_autosave->flush();
     m_openingNote = noteId;
-    m_context.notes().get(noteId).then(this, [this,
-                                              noteId](const storage::DbResult<models::Note>& note) {
-        if (noteId != m_openingNote) {
-            return; // another note was selected meanwhile
-        }
-        // Anything typed into the old note while this one loaded.
-        m_autosave->untrack();
-        if (!note) {
-            m_editor->clear();
-            return;
-        }
-        const QDateTime modified = QDateTime::fromMSecsSinceEpoch(note.value().updatedAt);
-        if (note.value().locked) {
-            m_editor->showLockedNote(modified);
-            return;
-        }
-        m_editor->showNote(note.value().bodyText, modified);
-        if (noteId == m_focusEditorFor) {
-            m_focusEditorFor = 0;
-            m_editor->textEdit()->setFocus(Qt::OtherFocusReason);
-        }
-        if (note.value().isTrashed()) {
-            // Read-only in Recently Deleted, as in macOS Notes: recover it to edit.
-            m_editor->textEdit()->setReadOnly(true);
-            return;
-        }
-        const NoteTextEdit* edit = m_editor->textEdit();
-        m_autosave->track(noteId, [edit] {
-            return services::Autosave::Content{.html = edit->toHtml(), .text = edit->toPlainText()};
+    m_context.notes().get(noteId).then(
+        this, [this, noteId](const storage::DbResult<models::Note>& note) {
+            if (noteId != m_openingNote) {
+                return; // another note was selected meanwhile
+            }
+            // Anything typed into the old note while this one loaded.
+            m_autosave->untrack();
+            if (!note) {
+                m_editor->clear();
+                return;
+            }
+            const QDateTime modified = QDateTime::fromMSecsSinceEpoch(note.value().updatedAt);
+            if (note.value().locked) {
+                m_editor->showLockedNote(modified);
+                return;
+            }
+            m_editor->showNoteBody(note.value().body, note.value().formatVersion,
+                                   note.value().bodyText, modified);
+            if (noteId == m_focusEditorFor) {
+                m_focusEditorFor = 0;
+                m_editor->textEdit()->setFocus(Qt::OtherFocusReason);
+            }
+            if (note.value().isTrashed()) {
+                // Read-only in Recently Deleted, as in macOS Notes: recover it to edit.
+                m_editor->textEdit()->setReadOnly(true);
+                return;
+            }
+            const NoteTextEdit* edit = m_editor->textEdit();
+            m_autosave->track(noteId, [edit] {
+                return services::Autosave::Content{.body = edit->noteBody(),
+                                                   .text = edit->toPlainText()};
+            });
         });
-    });
 }
 
 void MainWindow::deleteCurrentNote()

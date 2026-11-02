@@ -16,10 +16,11 @@ using Kind = DbError::Kind;
 namespace {
 
 constexpr QLatin1StringView
-    kNoteColumns("id, uuid, folder_id, title, snippet, body_html, body_text, is_pinned, is_locked,"
-                 " created_at, updated_at, trashed_at, deleted_at, version, sync_state");
+    kNoteColumns("id, uuid, folder_id, title, snippet, body, body_text, is_pinned, is_locked,"
+                 " created_at, updated_at, trashed_at, deleted_at, version, sync_state,"
+                 " format_version");
 
-// What lists read: no body_html / body_text (TC-STO-014).
+// What lists read: no body / body_text (TC-STO-014).
 constexpr QLatin1StringView kSummaryColumns(
     "id, uuid, folder_id, title, snippet, is_pinned, is_locked, created_at, updated_at,"
     " trashed_at");
@@ -37,7 +38,7 @@ Note readNote(const Statement& row)
     note.folderId = row.column<qint64>(2);
     note.title = row.column<QString>(3);
     note.snippet = row.column<QString>(4);
-    note.bodyHtml = row.column<QString>(5);
+    note.body = row.column<QString>(5);
     note.bodyText = row.column<QString>(6);
     note.pinned = row.column<bool>(7);
     note.locked = row.column<bool>(8);
@@ -47,6 +48,7 @@ Note readNote(const Statement& row)
     note.deletedAt = row.column<std::optional<qint64>>(12);
     note.version = row.column<int>(13);
     note.syncState = row.column<models::SyncState>(14);
+    note.formatVersion = row.column<int>(15);
     return note;
 }
 
@@ -154,9 +156,9 @@ DbResult<Note> NoteRepository::create(qint64 folderId, const NoteContent& conten
     }
     const qint64 now = m_clock.nowMs();
     DbResult<ScopedStatement> insert = m_db.prepare(QStringLiteral(
-        "INSERT INTO notes (uuid, folder_id, title, snippet, body_html, body_text,"
-        " created_at, updated_at) VALUES (:uuid, :folder, :title, :snippet, :html, :text,"
-        " :now, :now)"));
+        "INSERT INTO notes (uuid, folder_id, title, snippet, body, body_text, format_version,"
+        " created_at, updated_at) VALUES (:uuid, :folder, :title, :snippet, :body, :text,"
+        " :format, :now, :now)"));
     if (!insert) {
         return insert.error();
     }
@@ -165,8 +167,9 @@ DbResult<Note> NoteRepository::create(qint64 folderId, const NoteContent& conten
                                     .bind(":folder", folderId)
                                     .bind(":title", content.title)
                                     .bind(":snippet", content.snippet)
-                                    .bind(":html", content.bodyHtml)
+                                    .bind(":body", content.body)
                                     .bind(":text", content.bodyText)
+                                    .bind(":format", content.formatVersion)
                                     .bind(":now", now)
                                     .run();
         !status) {
@@ -186,8 +189,9 @@ DbResult<Note> NoteRepository::updateBody(qint64 id, const NoteContent& content)
         return DbError::make(Kind::Protected, QStringLiteral("Note %1 is locked").arg(id));
     }
     DbResult<ScopedStatement> update = m_db.prepare(
-        QStringLiteral("UPDATE notes SET title = :title, snippet = :snippet, body_html = :html,"
-                       " body_text = :text, updated_at = :now, %1 WHERE id = :id")
+        QStringLiteral("UPDATE notes SET title = :title, snippet = :snippet, body = :body,"
+                       " body_text = :text, format_version = :format, updated_at = :now, %1"
+                       " WHERE id = :id")
             .arg(kBump));
     if (!update) {
         return update.error();
@@ -195,8 +199,9 @@ DbResult<Note> NoteRepository::updateBody(qint64 id, const NoteContent& content)
     if (const DbStatus status = update.value()
                                     ->bind(":title", content.title)
                                     .bind(":snippet", content.snippet)
-                                    .bind(":html", content.bodyHtml)
+                                    .bind(":body", content.body)
                                     .bind(":text", content.bodyText)
+                                    .bind(":format", content.formatVersion)
                                     .bind(":now", m_clock.nowMs())
                                     .bind(":id", id)
                                     .run();
@@ -320,7 +325,7 @@ DbStatus NoteRepository::purge(qint64 id)
         // A tombstone: identity and timestamps stay for sync, the content goes.
         DbResult<ScopedStatement> wipe = m_db.prepare(
             QStringLiteral(
-                "UPDATE notes SET title = '', snippet = NULL, body_html = NULL, body_text = NULL,"
+                "UPDATE notes SET title = '', snippet = NULL, body = NULL, body_text = NULL,"
                 " locked_blob = NULL, locked_nonce = NULL, wrapped_key = NULL, is_pinned = 0,"
                 " deleted_at = ?, %1 WHERE id = ?")
                 .arg(kBump));

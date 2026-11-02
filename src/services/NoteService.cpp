@@ -22,11 +22,11 @@ using Kind = DbError::Kind;
 
 namespace {
 
-NoteContent contentFor(const QString& bodyHtml, const QString& bodyText)
+NoteContent contentFor(const QString& body, const QString& bodyText)
 {
     return {.title = NoteText::title(bodyText),
             .snippet = NoteText::snippet(bodyText),
-            .bodyHtml = bodyHtml,
+            .body = body,
             .bodyText = bodyText};
 }
 
@@ -40,13 +40,13 @@ NoteService::NoteService(storage::DbThread& db, const app::IClock& clock, QObjec
 
 NoteService::~NoteService() = default;
 
-QFuture<DbResult<Note>> NoteService::create(qint64 folderId, const QString& bodyHtml,
+QFuture<DbResult<Note>> NoteService::create(qint64 folderId, const QString& body,
                                             const QString& bodyText)
 {
     const app::IClock* clock = &m_clock;
     return m_db
         .post([clock, folderId,
-               content = contentFor(bodyHtml, bodyText)](Database& db) -> DbResult<Note> {
+               content = contentFor(body, bodyText)](Database& db) -> DbResult<Note> {
             qint64 target = folderId;
             if (folderId == models::kRecentlyDeletedFolderId) {
                 return DbError::make(Kind::InvalidArgument,
@@ -92,8 +92,9 @@ QFuture<DbResult<Note>> NoteService::duplicate(qint64 id)
             const NoteContent copy{.title = note.title.isEmpty() ? QString()
                                                                  : titleFormat.arg(note.title),
                                    .snippet = note.snippet,
-                                   .bodyHtml = note.bodyHtml,
-                                   .bodyText = note.bodyText};
+                                   .body = note.body,
+                                   .bodyText = note.bodyText,
+                                   .formatVersion = note.formatVersion};
             return notes.create(note.folderId, copy);
         })
         .then(this, [this](DbResult<Note> result) {
@@ -110,12 +111,12 @@ QFuture<DbResult<Note>> NoteService::get(qint64 id)
     return m_db.post([clock, id](Database& db) { return NoteRepository(db, *clock).get(id); });
 }
 
-QFuture<DbResult<Note>> NoteService::updateBody(qint64 id, const QString& bodyHtml,
+QFuture<DbResult<Note>> NoteService::updateBody(qint64 id, const QString& body,
                                                 const QString& bodyText)
 {
     const app::IClock* clock = &m_clock;
     return m_db
-        .post([clock, id, content = contentFor(bodyHtml, bodyText)](Database& db) {
+        .post([clock, id, content = contentFor(body, bodyText)](Database& db) {
             return NoteRepository(db, *clock).updateBody(id, content);
         })
         .then(this, [this](DbResult<Note> result) {

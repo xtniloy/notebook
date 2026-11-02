@@ -27,8 +27,9 @@ struct NoteContent
 {
     QString title;
     QString snippet;
-    QString bodyHtml;
+    QString body; // in `formatVersion`'s encoding (models/Note.h)
     QString bodyText;
+    int formatVersion = models::kBodyFormatCurrent;
 };
 
 enum class NoteSort : std::uint8_t {

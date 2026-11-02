@@ -166,7 +166,7 @@ void tst_Services::updateBodyDerivesTitleAndSnippet()
     QVERIFY(updated);
     QCOMPARE(updated.value().title, QStringLiteral("Trip"));
     QCOMPARE(updated.value().snippet, QStringLiteral("Tickets Hotel"));
-    QCOMPARE(updated.value().bodyHtml, QStringLiteral("<h1>Trip</h1>"));
+    QCOMPARE(updated.value().body, QStringLiteral("<h1>Trip</h1>"));
     QCOMPARE(updated.value().updatedAt, m_clock.nowMs());
     QCOMPARE(spy.count(), 1);
     QCOMPARE(spy.takeFirst().at(0).value<Note>(), updated.value());

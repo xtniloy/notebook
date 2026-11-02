@@ -37,7 +37,7 @@ NoteContent content(const QString& title, const QString& body = {})
 {
     return {.title = title,
             .snippet = title + QStringLiteral(" snippet"),
-            .bodyHtml = QStringLiteral("<p>%1</p>").arg(body.isEmpty() ? title : body),
+            .body = QStringLiteral("<p>%1</p>").arg(body.isEmpty() ? title : body),
             .bodyText = body.isEmpty() ? title : body};
 }
 
@@ -72,6 +72,7 @@ private slots:
     void dateSorts();
     void updateBodyBumpsVersionAndTime();
     void oneMegabyteBodyRoundTrips();
+    void formatVersionIsStored();
     void metadataChangesKeepEditTime();
     void moveToFolder();
     void trashAndRestore();
@@ -141,9 +142,9 @@ void tst_NoteRepository::createThenGetIsIdentical()
 {
     const NoteContent body{.title = QStringLiteral("Shopping List"),
                            .snippet = QStringLiteral("Milk, eggs"),
-                           .bodyHtml = QStringLiteral("<h1>Shopping List</h1><p>Milk, eggs 🥚 ") +
-                                       QString::fromLatin1(notes::test::kSecretMarker) +
-                                       QStringLiteral("</p>"),
+                           .body = QStringLiteral("<h1>Shopping List</h1><p>Milk, eggs 🥚 ") +
+                                   QString::fromLatin1(notes::test::kSecretMarker) +
+                                   QStringLiteral("</p>"),
                            .bodyText = QStringLiteral("Shopping List\nMilk, eggs 🥚 ") +
                                        QString::fromLatin1(notes::test::kSecretMarker)};
     const DbResult<Note> created = m_notes->create(m_work, body);
@@ -158,7 +159,7 @@ void tst_NoteRepository::createThenGetIsIdentical()
     QCOMPARE(note.folderId, m_work);
     QCOMPARE(note.title, body.title);
     QCOMPARE(note.snippet, body.snippet);
-    QCOMPARE(note.bodyHtml, body.bodyHtml);
+    QCOMPARE(note.body, body.body);
     QCOMPARE(note.bodyText, body.bodyText);
     QCOMPARE(note.createdAt, m_clock.nowMs());
     QCOMPARE(note.updatedAt, m_clock.nowMs());
@@ -192,11 +193,11 @@ void tst_NoteRepository::listsNeverLoadBodies()
 
     QCOMPARE(listSql.size(), 3);
     for (const QString& sql : listSql) {
-        QVERIFY2(!sql.contains(QStringLiteral("body_html")), qPrintable(sql));
+        QVERIFY2(!sql.contains(QStringLiteral("body")), qPrintable(sql));
         QVERIFY2(!sql.contains(QStringLiteral("body_text")), qPrintable(sql));
         QVERIFY2(!sql.contains(QLatin1Char('*')), qPrintable(sql));
     }
-    QVERIFY(getSql.join(QLatin1Char(' ')).contains(QStringLiteral("body_html")));
+    QVERIFY(getSql.join(QLatin1Char(' ')).contains(QStringLiteral("body")));
 }
 
 // TC-STO-015
@@ -288,17 +289,31 @@ void tst_NoteRepository::oneMegabyteBodyRoundTrips()
     QVERIFY(text.toUtf8().size() >= 1 << 20);
     const NoteContent big{.title = QStringLiteral("Big"),
                           .snippet = QString(),
-                          .bodyHtml = QStringLiteral("<pre>") + text + QStringLiteral("</pre>"),
+                          .body = QStringLiteral("<pre>") + text + QStringLiteral("</pre>"),
                           .bodyText = text};
 
     const DbResult<Note> created = m_notes->create(m_work, big);
     QVERIFY(created);
     const Note loaded = m_notes->get(created.value().id).value();
     QCOMPARE(loaded.bodyText, big.bodyText);
-    QCOMPARE(loaded.bodyHtml, big.bodyHtml);
+    QCOMPARE(loaded.body, big.body);
 }
 
 // Only content changes move a note in "date edited" order; every change is synced.
+// Task 3.1: the body's format travels with it (ADR 0006).
+void tst_NoteRepository::formatVersionIsStored()
+{
+    NoteContent legacy = content(QStringLiteral("Old"));
+    legacy.formatVersion = notes::models::kBodyFormatLegacyHtml;
+    const Note created = m_notes->create(m_work, legacy).value();
+    QCOMPARE(created.formatVersion, notes::models::kBodyFormatLegacyHtml);
+    QCOMPARE(m_notes->get(created.id).value().formatVersion, notes::models::kBodyFormatLegacyHtml);
+
+    // Saving rewrites the body in the format given: the current one by default.
+    const Note saved = m_notes->updateBody(created.id, content(QStringLiteral("New"))).value();
+    QCOMPARE(saved.formatVersion, notes::models::kBodyFormatCurrent);
+}
+
 void tst_NoteRepository::metadataChangesKeepEditTime()
 {
     const Note note = create(QStringLiteral("Note"));
@@ -400,7 +415,7 @@ void tst_NoteRepository::purgeLeavesContentFreeTombstone()
     QCOMPARE(tombstone.syncState, SyncState::Dirty);
     QVERIFY(tombstone.title.isEmpty());
     QVERIFY(tombstone.snippet.isNull());
-    QVERIFY(tombstone.bodyHtml.isNull());
+    QVERIFY(tombstone.body.isNull());
     QVERIFY(tombstone.bodyText.isNull());
 
     const auto count = [&](const char* table) {

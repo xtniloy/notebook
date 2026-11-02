@@ -201,7 +201,7 @@ void tst_NoteListModel::initialLoadFetchesOnePage()
         for (int i = 0; i < kNotes; ++i) {
             const auto note = repo.create(folder, {.title = QString::number(i),
                                                    .snippet = {},
-                                                   .bodyHtml = {},
+                                                   .body = {},
                                                    .bodyText = QString::number(i)});
             if (!note) {
                 return note.error();

@@ -24,3 +24,6 @@ notes_add_test(NAME tst_foldertreemodel SOURCES tst_foldertreemodel.cpp LABELS u
 
 # Task 2.9: autosave on its own (the window's TC-STO-025..028 are in tests/ui).
 notes_add_test(NAME tst_autosave_unit SOURCES tst_autosave_unit.cpp LABELS unit)
+
+# TC-EDT-001: the note body format's round-trip harness (task 3.1).
+notes_add_test(NAME tst_noteformat SOURCES tst_noteformat.cpp LABELS unit LIBS notesapp_ui)

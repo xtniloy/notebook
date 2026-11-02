@@ -1,5 +1,7 @@
 #include "ui/NoteTextEdit.h"
 
+#include "editor/NoteFormat.h"
+
 #include <QEvent>
 #include <QScrollBar>
 #include <QTextDocument>
@@ -33,10 +35,17 @@ int NoteTextEdit::rightInset() const
     return m_rightPadding + verticalScrollBar()->sizeHint().width();
 }
 
-void NoteTextEdit::setNoteText(const QString& text)
+void NoteTextEdit::setNoteBody(const QString& body, int formatVersion, const QString& plainText)
 {
-    setPlainText(text);
+    editor::NoteFormat::load(body, formatVersion, plainText, *document());
+    // Loading isn't an edit: start the note with no undo history.
+    document()->clearUndoRedoStacks();
     applyBottomPadding();
+}
+
+QString NoteTextEdit::noteBody() const
+{
+    return editor::NoteFormat::serialize(*document());
 }
 
 void NoteTextEdit::applyBottomPadding()
