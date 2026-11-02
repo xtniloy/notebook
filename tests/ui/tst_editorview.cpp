@@ -14,6 +14,7 @@
 
 #include <QDateTime>
 #include <QLabel>
+#include <QScrollBar>
 #include <QStackedWidget>
 #include <QTest>
 
@@ -55,6 +56,7 @@ private slots:
     void lockedNoteHidesContent();
     void headerText();
     void editorIsPlainText();
+    void scrollBarAtPaneEdge();
 
     void mainWindowOpensFirstNote();
     void selectingNoteShowsItInEditor();
@@ -179,6 +181,34 @@ void tst_EditorView::headerText()
 void tst_EditorView::editorIsPlainText()
 {
     QVERIFY(!m_view->textEdit()->acceptRichText());
+}
+
+// UI review: the scroll bar sits at the pane's right edge, not against the
+// text; the text keeps 24 px of space on the right, and the date stays
+// centered over it.
+void tst_EditorView::scrollBarAtPaneEdge()
+{
+    QString text;
+    for (int line = 0; line < 200; ++line) {
+        text += QStringLiteral("Line %1\n").arg(line);
+    }
+    m_view->showNote(text, modifiedTime());
+    QCoreApplication::processEvents();
+    const auto* edit = m_view->textEdit();
+    const QScrollBar* bar = edit->verticalScrollBar();
+    QVERIFY(bar->isVisible());
+    QVERIFY(bar->maximum() > 0);
+
+    const int barRight = bar->mapTo(m_view.get(), QPoint(bar->width(), 0)).x();
+    QCOMPARE(barRight, m_view->width());
+    const QWidget* viewport = edit->viewport();
+    const int textRight = viewport->mapTo(m_view.get(), QPoint(viewport->width(), 0)).x();
+    QCOMPARE(m_view->width() - textRight, 24);
+
+    const QLabel* header = headerOf(*m_view);
+    const int headerCenter = header->mapTo(m_view.get(), header->contentsRect().center()).x();
+    const int textLeft = viewport->mapTo(m_view.get(), QPoint(0, 0)).x();
+    QVERIFY(qAbs(headerCenter - ((textLeft + textRight) / 2)) <= 1);
 }
 
 void tst_EditorView::mainWindowOpensFirstNote()

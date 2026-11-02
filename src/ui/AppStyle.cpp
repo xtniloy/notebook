@@ -276,7 +276,8 @@ void AppStyle::drawComplexControl(ComplexControl control, const QStyleOptionComp
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
     painter->setPen(Qt::NoPen);
-    if (hovered) {
+    const bool scrollable = bar->maximum > bar->minimum;
+    if (hovered && scrollable) { // nothing to show for a bar with nothing to scroll
         // The track, with the same inset along the bar as the handle's ends.
         const QRectF track =
             vertical ? QRectF(bar->rect).adjusted(0, kScrollHandleInset, 0, -kScrollHandleInset)
@@ -286,7 +287,7 @@ void AppStyle::drawComplexControl(ComplexControl control, const QStyleOptionComp
         painter->drawRoundedRect(track, radius, radius);
     }
     const QRect slider = subControlRect(CC_ScrollBar, bar, SC_ScrollBarSlider, widget);
-    if (slider.isValid() && bar->maximum > bar->minimum) {
+    if (slider.isValid() && scrollable) {
         // Thin at rest; on hover as wide as the track behind it (UI review).
         const int inset = hovered ? 0 : kScrollHandleInset;
         const QRectF handle = vertical ? QRectF(slider).adjusted(inset, 0, -inset, 0)

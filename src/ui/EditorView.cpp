@@ -43,8 +43,15 @@ EditorView::EditorView(QWidget* parent)
     m_pages->addWidget(m_textEdit);
     m_pages->addWidget(m_placeholder);
 
+    // No right margin: the text edit reaches the pane's edge, so its scroll bar
+    // sits there, and keeps kSideMargin of padding before the text itself. The
+    // labels get that padding too, to stay centered over the text.
+    m_textEdit->setRightPadding(kSideMargin);
+    m_header->setContentsMargins(0, 0, kSideMargin, 0);
+    m_placeholder->setContentsMargins(0, 0, kSideMargin, 0);
+
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(kSideMargin, kHeaderTopMargin, kSideMargin, 0);
+    layout->setContentsMargins(kSideMargin, kHeaderTopMargin, 0, 0);
     layout->setSpacing(kHeaderTopMargin);
     layout->addWidget(m_header);
     layout->addWidget(m_pages, 1);
