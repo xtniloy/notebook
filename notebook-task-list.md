@@ -530,9 +530,12 @@ Record each in `docs/adr/`:
 - [ ] Build a test document with every planned feature (headings, lists, checklist items via `QTextBlockFormat::MarkerType`, monospace, image, table)
 - [ ] Save with `toHtml()`, load with `setHtml()`, compare block-by-block
 - [ ] Record which properties survive and which don't
+- [ ] Measure load and save time (`setHtml`/`toHtml`, our JSON, `setMarkdown`/`toMarkdown`) and stored size for 5 KB, 100 KB and 1 MB notes; record the numbers in the ADR *(budget: open a note < 50 ms, Plan §10)*
+- [ ] Check the Markdown edges with the fixture: paste a sample AI chat answer (headings, lists, code block, table) as Markdown, and export the fixture with `toMarkdown()`; record what Markdown can't carry (underline, highlight, colors, image size, collapsed sections)
 - [ ] Decide in `docs/adr/0006-note-format.md`:
-  - **A:** Qt HTML + a small post-processor that adds `data-*` attributes for lost properties
+  - **A:** Qt HTML + a small post-processor that adds `data-*` attributes for lost properties *(preferred if the spike shows little is lost)*
   - **B:** Own versioned JSON format for the document tree *(more work, full control)*
+  - *Not Markdown as storage: it can't hold underline, colors, highlight, image size or collapsed sections, and converting in and out on every save would change notes slightly each time. Markdown is supported at the edges instead: paste (3.8), export and copy (8.3)*
 - [ ] Add `format_version` to the stored body so the format can change later
 
 **Tests**
@@ -638,11 +641,17 @@ Record each in `docs/adr/`:
 - [ ] Paste from web pages/other apps: keep supported formatting (bold, italic, lists, headings), strip everything else (fonts, colors, scripts, styles)
 - [ ] **Never fetch remote images or URLs** from pasted HTML (privacy: prevents tracking pixels); convert remote `<img>` to a link or drop it
 - [ ] `Ctrl+Shift+V` = paste as plain text
+- [ ] **Markdown paste** (e.g. an AI chat answer copied with its Copy button, which puts Markdown on the clipboard): plain-text clipboard content that clearly looks like Markdown (headings, lists, `**bold**`, fenced code, tables; several signals, not one `*`) is converted with `QTextDocument::setMarkdown()` and goes through the same sanitizing as HTML paste
+- [ ] **Edit › Paste as Markdown** (`Ctrl+Alt+V`) forces the conversion; `Ctrl+Shift+V` always pastes the raw text
+- [ ] HTML on the clipboard wins over Markdown detection (it's the formatted version of the same content)
 
 **Tests**
 - `TC-EDT-027` (UI) Paste HTML with `<img src="http://127.0.0.1:<port>/pixel.png">` → local test server receives **zero** requests.
 - `TC-EDT-028` (U) Pasted `<script>`, `<style>`, `onclick` attributes are removed.
 - `TC-EDT-029` (UI) `Ctrl+Shift+V` pastes plain text only.
+- `TC-EDT-052` (UI) Paste plain text `## Plan\n- one\n- two\n\n**Done**` → a Heading block, a two-item list, and bold "Done".
+- `TC-EDT-053` (U) Ordinary prose with a lone `*` or `-` is **not** detected as Markdown.
+- `TC-EDT-054` (UI) `Ctrl+Alt+V` converts text that auto-detection left alone; `Ctrl+Shift+V` on Markdown keeps the `#` and `*` characters.
 
 **Done when:** paste is safe and clean.
 
@@ -1130,12 +1139,14 @@ For beta testers who used Phase 2/3 builds.
 - [ ] Export all → folder structure mirrors the app's folders
 - [ ] Locked notes: export only if unlocked; otherwise skipped with a summary
 - [ ] Warning before export: "Exported files are not encrypted"
+- [ ] **Copy as Markdown** for the selection or the whole note (e.g. to paste into an AI chat); images become their alt text or a placeholder, never file paths
 
 **Tests**
 - `TC-EXP-001` (I) Export note with heading, list, checklist, image → Markdown contains `#`, `-`, `- [x]`, and a relative image link that exists.
 - `TC-EXP-002` (I) PDF export produces a valid PDF (starts with `%PDF`, page count ≥ 1).
 - `TC-EXP-003` (I) Export all with 2 locked notes while locked → summary says "2 skipped"; no locked content in output.
 - `TC-EXP-004` (I) Note titles with `/`, `:`, `..` produce safe file names (no path traversal).
+- `TC-EXP-006` (UI) Copy as Markdown on a note with a heading, list and checklist → clipboard text has `#`, `-`, `- [ ]`; pasting it back with Markdown paste (3.8) gives the same blocks.
 
 ### 8.4 Print `S`
 
