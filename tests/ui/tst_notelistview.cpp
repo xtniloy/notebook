@@ -34,6 +34,7 @@ private slots:
 
     void rowHeights();
     void titleAndDetailFonts();
+    void separatorLines();
     void notesIndentedFromHeaders();
     void selectsFirstNoteInitially();
     void clickingNoteEmitsNoteSelected();
@@ -104,8 +105,6 @@ void tst_NoteListView::rowHeights()
     QCOMPARE(m_view->visualRect(m_model->index(1)).width(), m_view->viewport()->width());
 }
 
-// UI review (as macOS Notes): notes start further right than the section
-// header above them, so the headers stand out; the header stays where it was.
 // UI review: titles are Bold (700); the time and preview are 0.1 pt smaller
 // (10.9 pt under the usual 11 pt system font), same family, regular weight.
 void tst_NoteListView::titleAndDetailFonts()
@@ -123,6 +122,51 @@ void tst_NoteListView::titleAndDetailFonts()
     QCOMPARE(detail.weight(), base.weight());
 }
 
+// UI review: a visible but light line, the theme's separator color at half
+// strength, between notes and under each section header; none above a header
+// (its gap is enough) or around the selected note.
+void tst_NoteListView::separatorLines()
+{
+    const QImage image = m_view->viewport()->grab().toImage();
+    // The separator color blended over the list's background.
+    const QColor mid = m_view->palette().color(QPalette::Mid);
+    const QColor base = m_view->palette().color(QPalette::Base);
+    const qreal alpha = notes::ui::NoteListDelegate::kSeparatorOpacity;
+    const QColor line =
+        QColor::fromRgbF(static_cast<float>((alpha * mid.redF()) + ((1 - alpha) * base.redF())),
+                         static_cast<float>((alpha * mid.greenF()) + ((1 - alpha) * base.greenF())),
+                         static_cast<float>((alpha * mid.blueF()) + ((1 - alpha) * base.blueF())));
+    const qreal ratio = image.devicePixelRatio();
+    const auto pixel = [&](int x, int y) {
+        return image.pixelColor(static_cast<int>(x * ratio), static_cast<int>(y * ratio));
+    };
+    // 8 bits per channel in the grabbed image: allow rounding.
+    const auto hasLine = [&](const QRect& rect) {
+        const QColor seen = pixel(rect.center().x(), rect.bottom());
+        return qAbs(seen.red() - line.red()) <= 2 && qAbs(seen.green() - line.green()) <= 2 &&
+               qAbs(seen.blue() - line.blue()) <= 2;
+    };
+
+    QCOMPARE(m_model->index(0).data().toString(), QStringLiteral("Pinned"));
+    QVERIFY2(hasLine(m_view->visualRect(m_model->index(0))), "under the header");
+
+    // Two unselected notes in a row: a line between them, full strength.
+    int row = 1;
+    while (row + 1 < m_model->rowCount() &&
+           (m_model->index(row + 1).data(roles::kIsSectionHeaderRole).toBool() ||
+            m_view->currentIndex().row() == row)) {
+        ++row;
+    }
+    QVERIFY2(hasLine(m_view->visualRect(m_model->index(row))), "between notes");
+
+    // The last note of a section: no line above the next header.
+    const int header = rowOf(QStringLiteral("Today"));
+    QVERIFY(header > 1);
+    QVERIFY(!hasLine(m_view->visualRect(m_model->index(header - 1))));
+}
+
+// UI review (as macOS Notes): notes start further right than the section
+// header above them, so the headers stand out; the header stays where it was.
 void tst_NoteListView::notesIndentedFromHeaders()
 {
     m_view->clearSelection(); // keep the highlight out of the measurement
@@ -140,9 +184,14 @@ void tst_NoteListView::notesIndentedFromHeaders()
         }
         return -1;
     };
+    // The bottom pixel row holds the separator line (separatorLines()), which
+    // starts at the padding: leave it out, measure the text.
+    const auto textArea = [&](int row) {
+        return m_view->visualRect(m_model->index(row)).adjusted(0, 0, 0, -1);
+    };
     const int today = rowOf(QStringLiteral("Today"));
-    const int header = inkStart(m_view->visualRect(m_model->index(today)));
-    const int note = inkStart(m_view->visualRect(m_model->index(today + 1)));
+    const int header = inkStart(textArea(today));
+    const int note = inkStart(textArea(today + 1));
     QVERIFY(header > 0 && note > 0);
     // Unchanged: the 16 px padding (plus up to 2 px of glyph side bearing).
     QVERIFY2(header >= 16 && header <= 18, qPrintable(QString::number(header)));

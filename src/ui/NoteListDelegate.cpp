@@ -38,6 +38,19 @@ QFont boldFont(const QFont& base, qreal scale = 1.0, QFont::Weight weight = QFon
     return font;
 }
 
+// A crisp 1 px line in the theme's separator color at half strength along the
+// bottom of `rect`, inset like the row's text (UI review: full strength was too
+// heavy, 35% smeared over two pixel rows barely visible). Filled, not stroked:
+// an antialiased 1 px stroke on a pixel edge smears into two rows.
+void drawSeparator(QPainter* painter, const QRect& rect, const QPalette& palette)
+{
+    QColor line = palette.color(QPalette::Mid);
+    line.setAlphaF(NoteListDelegate::kSeparatorOpacity);
+    painter->fillRect(QRect(rect.left() + kHorizontalPadding, rect.bottom(),
+                            rect.width() - (2 * kHorizontalPadding), 1),
+                      line);
+}
+
 QRect iconRect(int left, const QRect& line)
 {
     return {left, line.center().y() - (kIconSize / 2) + 1, kIconSize, kIconSize};
@@ -69,6 +82,8 @@ void NoteListDelegate::paintHeader(QPainter* painter, const QStyleOptionViewItem
     painter->drawText(
         rect, Qt::AlignLeft | Qt::AlignBottom,
         painter->fontMetrics().elidedText(index.data().toString(), Qt::ElideRight, rect.width()));
+    // The same line as between notes, under the header.
+    drawSeparator(painter, option.rect, option.palette);
 }
 
 void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& option,
@@ -88,12 +103,7 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
         // Hairline between notes, but not above the next section's header.
         const QModelIndex next = index.siblingAtRow(index.row() + 1);
         if (next.isValid() && !next.data(models::kIsSectionHeaderRole).toBool()) {
-            QColor line = palette.color(QPalette::Mid);
-            line.setAlphaF(0.35F);
-            painter->setPen(line);
-            const int y = option.rect.bottom();
-            painter->drawLine(option.rect.left() + kHorizontalPadding, y,
-                              option.rect.right() - kHorizontalPadding, y);
+            drawSeparator(painter, option.rect, palette);
         }
     }
 

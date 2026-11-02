@@ -18,6 +18,10 @@ class NoteListDelegate : public QStyledItemDelegate
     Q_OBJECT
 
 public:
+    // How strongly the lines between notes and under section headers show the
+    // theme's separator color.
+    static constexpr float kSeparatorOpacity = 0.5F;
+
     using QStyledItemDelegate::QStyledItemDelegate;
 
     void paint(QPainter* painter, const QStyleOptionViewItem& option,
