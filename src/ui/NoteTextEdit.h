@@ -15,20 +15,27 @@ public:
     explicit NoteTextEdit(QWidget* parent = nullptr);
     ~NoteTextEdit() override;
 
-    // Empty space between the text and the widget's right edge. The vertical
-    // scroll bar sits at that edge, inside this space, and always has its room
-    // reserved, so the text doesn't re-wrap when a note becomes long enough to
-    // scroll (UI review: the scroll bar sat right against the text).
-    void setRightPadding(int padding);
-    [[nodiscard]] int rightPadding() const { return m_rightPadding; }
+    // Space around the text (UI review: the margins should look even). `right`
+    // is between the text and the vertical scroll bar, which sits at the
+    // widget's right edge and always has its room reserved, so the text doesn't
+    // re-wrap when a note becomes long enough to scroll. `bottom` is below the
+    // last line, reached by scrolling to the end.
+    void setTextPadding(int right, int bottom);
+    // From the text to the widget's right edge: the padding plus the scroll bar.
+    [[nodiscard]] int rightInset() const;
+
+    // setPlainText(), keeping the bottom padding (a new text resets it).
+    void setNoteText(const QString& text);
 
 protected:
     void changeEvent(QEvent* event) override;
 
 private:
     void updateViewportMargins();
+    void applyBottomPadding();
 
     int m_rightPadding = 0;
+    int m_bottomPadding = 0;
 };
 
 } // namespace notes::ui

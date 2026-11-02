@@ -17,6 +17,8 @@
 #include <QScrollBar>
 #include <QStackedWidget>
 #include <QTest>
+#include <QTextDocument>
+#include <QTextFrame>
 
 #include <memory>
 
@@ -184,8 +186,9 @@ void tst_EditorView::editorIsPlainText()
 }
 
 // UI review: the scroll bar sits 3 px from the pane's right edge, not against
-// the text; the text keeps 24 px of space on the right, and the date stays
-// centered over it.
+// the text, and the margins around the text are even: the same space left of
+// the text, between the text and the scroll bar, and below the last line. The
+// date stays centered over the text.
 void tst_EditorView::scrollBarAtPaneEdge()
 {
     QString text;
@@ -199,15 +202,28 @@ void tst_EditorView::scrollBarAtPaneEdge()
     QVERIFY(bar->isVisible());
     QVERIFY(bar->maximum() > 0);
 
+    const int barLeft = bar->mapTo(m_view.get(), QPoint(0, 0)).x();
     const int barRight = bar->mapTo(m_view.get(), QPoint(bar->width(), 0)).x();
     QCOMPARE(m_view->width() - barRight, 3);
+
     const QWidget* viewport = edit->viewport();
+    const int textLeft = viewport->mapTo(m_view.get(), QPoint(0, 0)).x();
     const int textRight = viewport->mapTo(m_view.get(), QPoint(viewport->width(), 0)).x();
-    QCOMPARE(m_view->width() - textRight, 24);
+    QCOMPARE(textLeft, 24);            // from the pane's left edge
+    QCOMPARE(barLeft - textRight, 24); // the same between the text and the scroll bar
+
+    // Below the last line: the same again, on top of Qt's document margin, and
+    // kept when another note is shown.
+    const auto bottomMargin = [&] {
+        return edit->document()->rootFrame()->frameFormat().bottomMargin() -
+               edit->document()->documentMargin();
+    };
+    QCOMPARE(bottomMargin(), 24.0);
+    m_view->showNote(QStringLiteral("Another note"), modifiedTime());
+    QCOMPARE(bottomMargin(), 24.0);
 
     const QLabel* header = headerOf(*m_view);
     const int headerCenter = header->mapTo(m_view.get(), header->contentsRect().center()).x();
-    const int textLeft = viewport->mapTo(m_view.get(), QPoint(0, 0)).x();
     QVERIFY(qAbs(headerCenter - ((textLeft + textRight) / 2)) <= 1);
 }
 

@@ -46,13 +46,14 @@ EditorView::EditorView(QWidget* parent)
     m_pages->addWidget(m_textEdit);
     m_pages->addWidget(m_placeholder);
 
-    // A small right margin: the text edit reaches almost to the pane's edge, so
-    // its scroll bar sits there, and pads the text so it still ends kSideMargin
-    // from the edge. The labels get the same padding, to stay centered over it.
-    constexpr int kRightPadding = kSideMargin - kScrollBarGap;
-    m_textEdit->setRightPadding(kRightPadding);
-    m_header->setContentsMargins(0, 0, kRightPadding, 0);
-    m_placeholder->setContentsMargins(0, 0, kRightPadding, 0);
+    // Even margins around the text (UI review): kSideMargin on the left, the
+    // same between the text and the scroll bar on the right, and below the last
+    // line. The text edit reaches almost to the pane's edge, so its scroll bar
+    // sits there. The labels get the same right inset, to stay centered over
+    // the text.
+    m_textEdit->setTextPadding(kSideMargin, kSideMargin);
+    m_header->setContentsMargins(0, 0, m_textEdit->rightInset(), 0);
+    m_placeholder->setContentsMargins(0, 0, m_textEdit->rightInset(), 0);
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(kSideMargin, kHeaderTopMargin, kScrollBarGap, 0);
@@ -69,7 +70,7 @@ void EditorView::showNote(const QString& text, const QDateTime& modified)
 {
     m_header->setText(headerText(modified));
     m_header->show();
-    m_textEdit->setPlainText(text); // also resets undo history
+    m_textEdit->setNoteText(text); // also resets undo history
     m_textEdit->setReadOnly(false);
     m_pages->setCurrentWidget(m_textEdit);
     m_hasNote = true;
