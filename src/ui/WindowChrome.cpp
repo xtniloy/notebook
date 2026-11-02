@@ -9,8 +9,12 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QRegion>
+#include <QStyleOptionToolButton>
+#include <QStylePainter>
 #include <QToolButton>
 #include <QWindow>
+
+#include <cmath>
 
 namespace notes::ui {
 
@@ -68,9 +72,61 @@ QColor borderColor(const QPalette& palette)
     return dark ? QColor(255, 255, 255, kBorderAlpha) : QColor(0, 0, 0, kBorderAlpha);
 }
 
+// A round header button whose icon is drawn on whole screen pixels, centered on
+// the circle. At fractional scaling the circle's center can fall between
+// pixels (at 125% the 22 px circle is 27.5 pixels, and the buttons themselves
+// sit at fractional positions), and the style then resampled the icon onto
+// half pixels, blurring one side so it looked off-center. The circle still
+// comes from the style sheet; only the icon is placed here.
+class WindowButton : public QToolButton
+{
+public:
+    using QToolButton::QToolButton;
+
+protected:
+    void paintEvent(QPaintEvent* /*event*/) override
+    {
+        QStylePainter painter(this);
+        QStyleOptionToolButton option;
+        initStyleOption(&option);
+        option.icon = QIcon(); // background only; the icon follows
+        painter.drawComplexControl(QStyle::CC_ToolButton, option);
+
+        // In device pixels: where the circle's center is, and the icon sizes
+        // within a pixel of the exact one (17.5 at 125%). An odd size centers
+        // exactly on a half-pixel center, an even one on a whole-pixel center;
+        // the best fit wins, and on a tie the size closest to the exact one.
+        const QTransform toDevice = painter.deviceTransform();
+        const QPointF center = toDevice.map(QRectF(rect()).center());
+        const qreal exact = iconSize().width() * toDevice.m11();
+        QRectF best;
+        qreal bestScore = 0;
+        const auto smallest = static_cast<int>(std::ceil(exact - 1));
+        const auto largest = static_cast<int>(std::floor(exact + 1));
+        for (int pixels = smallest; pixels <= largest; ++pixels) {
+            const auto side = static_cast<qreal>(pixels);
+            const QRectF candidate(std::round(center.x() - (side / 2)),
+                                   std::round(center.y() - (side / 2)), side, side);
+            const qreal score = (candidate.center() - center).manhattanLength() +
+                                (std::abs(side - exact) / 100); // tie-break
+            if (best.isNull() || score < bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+        // Rendered at exactly that many pixels, then shown 1:1.
+        QPixmap pixmap = icon().pixmap(best.size().toSize(), 1.0);
+        if (pixmap.isNull()) {
+            return;
+        }
+        pixmap.setDevicePixelRatio(devicePixelRatioF());
+        painter.drawPixmap(toDevice.inverted().map(best.topLeft()), pixmap);
+    }
+};
+
 QToolButton* windowButton(QWidget* parent, const char* name, Icon iconId, const QString& toolTip)
 {
-    auto* button = new QToolButton(parent);
+    auto* button = new WindowButton(parent);
     button->setObjectName(QLatin1StringView(name));
     button->setIcon(icon(iconId));
     button->setToolTip(toolTip);

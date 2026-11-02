@@ -14,6 +14,7 @@
 #include <QToolBar>
 #include <QToolButton>
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <numbers>
@@ -47,6 +48,7 @@ private slots:
     void paintsShadowOutsideBorder();
     void cornersAreRounded();
     void headerAndToolbarSpacingIsBalanced();
+    void windowButtonIconsAreCentered();
     void shadowFadesWithoutGaps_data();
     void shadowFadesWithoutGaps();
 
@@ -299,6 +301,47 @@ void tst_WindowChrome::headerAndToolbarSpacingIsBalanced()
         const QToolButton* windowButton = button(*window, name);
         QCOMPARE(windowButton->size(), QSize(22, 22));
         QVERIFY2(windowButton->mapTo(window.get(), QPoint(0, 0)).y() - kMargin >= 6, name);
+    }
+}
+
+// UI bug (seen at 125 % display scale): the window buttons' icons looked
+// off-center, resampled onto half pixels. They are drawn on whole pixels now,
+// centered on the circle, at the original 22 px / 14 px size.
+void tst_WindowChrome::windowButtonIconsAreCentered()
+{
+    const auto window = showWindow();
+    QVERIFY(window);
+    const QImage image = window->grab().toImage();
+    const qreal ratio = image.devicePixelRatio();
+    for (const char* name : {"windowMinimizeButton", "windowMaximizeButton", "windowCloseButton"}) {
+        const QToolButton* windowButton = button(*window, name);
+        QCOMPARE(windowButton->size(), QSize(22, 22));
+        QCOMPARE(windowButton->iconSize(), QSize(14, 14));
+
+        // The icon's ink, weighted by darkness against the circle, centers on
+        // the button.
+        const QPointF center =
+            (QPointF(windowButton->mapTo(window.get(), QPoint(0, 0))) + QPointF(11, 11)) * ratio;
+        const int reach = static_cast<int>(9 * ratio);
+        const int circle =
+            image.pixelColor(static_cast<int>(center.x()) - reach, static_cast<int>(center.y()))
+                .lightness();
+        double sumX = 0;
+        double sumY = 0;
+        double total = 0;
+        for (int y = static_cast<int>(center.y()) - reach;
+             y <= static_cast<int>(center.y()) + reach; ++y) {
+            for (int x = static_cast<int>(center.x()) - reach;
+                 x <= static_cast<int>(center.x()) + reach; ++x) {
+                const double ink = std::max(0, circle - image.pixelColor(x, y).lightness());
+                sumX += ink * (x + 0.5);
+                sumY += ink * (y + 0.5);
+                total += ink;
+            }
+        }
+        QVERIFY2(total > 0, name); // the icon is drawn
+        QVERIFY2(std::abs((sumX / total) - center.x()) <= 0.5, name);
+        QVERIFY2(std::abs((sumY / total) - center.y()) <= 0.5, name);
     }
 }
 
