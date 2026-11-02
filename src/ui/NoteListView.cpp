@@ -41,6 +41,9 @@ NoteListView::NoteListView(QWidget* parent)
     // so the list is one white (or dark) column, not a gray strip at its edge.
     setBackgroundRole(QPalette::Base);
     setAutoFillBackground(true);
+    // A little space under the last note, so it doesn't touch the bottom edge
+    // when scrolled to the end (UI review).
+    setViewportMargins(0, 0, 0, kBottomPadding);
     setItemDelegate(new NoteListDelegate(this));
     // The delegate draws its own rounded highlight. Theme colors come with task 1.8.
     setStyleSheet(QStringLiteral("QListView { show-decoration-selected: 0; }"

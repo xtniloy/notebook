@@ -16,6 +16,9 @@ class NoteListView : public QListView
     Q_DISABLE_COPY_MOVE(NoteListView)
 
 public:
+    // Space under the last note (UI review).
+    static constexpr int kBottomPadding = 12;
+
     explicit NoteListView(QWidget* parent = nullptr);
     ~NoteListView() override;
 

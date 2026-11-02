@@ -36,6 +36,7 @@ private slots:
     void titleAndDetailFonts();
     void separatorLines();
     void baseColorUnderScrollBar();
+    void spaceUnderLastNote();
     void notesIndentedFromHeaders();
     void selectsFirstNoteInitially();
     void clickingNoteEmitsNoteSelected();
@@ -172,6 +173,17 @@ void tst_NoteListView::baseColorUnderScrollBar()
 {
     QVERIFY(m_view->autoFillBackground());
     QCOMPARE(m_view->backgroundRole(), QPalette::Base);
+}
+
+// UI review: scrolled to the end, the last note doesn't touch the bottom edge.
+void tst_NoteListView::spaceUnderLastNote()
+{
+    m_view->scrollToBottom();
+    QCoreApplication::processEvents();
+    const QModelIndex last = m_model->index(m_model->rowCount() - 1);
+    const int lastBottom =
+        m_view->viewport()->mapTo(m_view.get(), m_view->visualRect(last).bottomLeft()).y();
+    QCOMPARE(m_view->height() - 1 - lastBottom, notes::ui::NoteListView::kBottomPadding);
 }
 
 // UI review (as macOS Notes): notes start further right than the section
