@@ -12,3 +12,5 @@ notes_add_test(NAME tst_autosave SOURCES tst_autosave.cpp LABELS ui integration 
 notes_add_test(NAME tst_recentlydeleted SOURCES tst_recentlydeleted.cpp LABELS ui LIBS notesapp_ui)
 # TC-UI-021 .. TC-UI-024: the window on real data (task 2.11).
 notes_add_test(NAME tst_wiring SOURCES tst_wiring.cpp LABELS ui integration LIBS notesapp_ui)
+# TC-UI-025, TC-UI-026: drag & drop (task 2.12).
+notes_add_test(NAME tst_dragdrop SOURCES tst_dragdrop.cpp LABELS ui LIBS notesapp_ui)

@@ -335,6 +335,28 @@ DbStatus NoteRepository::purge(qint64 id)
     return tx.value().commit();
 }
 
+DbResult<QList<qint64>> NoteRepository::liveIdsForUuids(const QStringList& uuids)
+{
+    DbResult<ScopedStatement> select =
+        m_db.prepare(QStringLiteral("SELECT id FROM notes WHERE uuid = ? AND trashed_at IS NULL"
+                                    " AND deleted_at IS NULL"));
+    if (!select) {
+        return select.error();
+    }
+    QList<qint64> ids;
+    for (const QString& uuid : uuids) {
+        select.value()->reset();
+        DbResult<bool> row = select.value()->bind(1, uuid).step();
+        if (!row) {
+            return row.error();
+        }
+        if (row.value()) {
+            ids.append(select.value()->column<qint64>(0));
+        }
+    }
+    return ids;
+}
+
 DbResult<QList<qint64>> NoteRepository::purgeExpired()
 {
     DbResult<ScopedStatement> select = m_db.prepare(

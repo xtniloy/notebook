@@ -14,11 +14,17 @@ class SidebarDelegate : public QStyledItemDelegate
 public:
     static constexpr int kRowHeight = 28;
     static constexpr int kHeaderHeight = 30;
+    // A QPersistentModelIndex property on the view: the row a drag would drop
+    // onto, drawn with an accent outline (task 2.12).
+    static constexpr char kDropTargetProperty[] = "dropTarget";
 
     using QStyledItemDelegate::QStyledItemDelegate;
 
     void paint(QPainter* painter, const QStyleOptionViewItem& option,
                const QModelIndex& index) const override;
+    // Whether `index` is the view's kDropTargetProperty.
+    [[nodiscard]] static bool isDropTarget(const QStyleOptionViewItem& option,
+                                           const QModelIndex& index);
     [[nodiscard]] QSize sizeHint(const QStyleOptionViewItem& option,
                                  const QModelIndex& index) const override;
 };

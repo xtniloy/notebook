@@ -506,9 +506,9 @@ Record each in `docs/adr/`:
 
 ### 2.12 Drag & drop `S`
 
-- [ ] Drag notes from list onto sidebar folders (custom MIME type `application/x-notesapp-note-uuids`)
-- [ ] Drag folders to nest/reorder
-- [ ] Drop highlight on hover
+- [x] Drag notes from list onto sidebar folders (custom MIME type `application/x-notesapp-note-uuids`) *(UUIDs, one per line; dropping on Recently Deleted deletes them. Notes in Recently Deleted aren't draggable: Recover is in their menu)*
+- [x] Drag folders to nest/reorder *(`application/x-notesapp-folder-uuids`: onto a folder nests it, onto "On My Computer" makes it top-level, between rows reorders; "Notes" only reorders)*
+- [x] Drop highlight on hover *(accent outline on the row a drop would land on; Qt's line marks drops between rows)*
 
 **Tests**
 - `TC-UI-025` (UI) Simulated drop of 2 notes on folder B → both moved, counts updated.

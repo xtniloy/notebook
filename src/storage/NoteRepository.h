@@ -7,6 +7,7 @@
 #include <QHash>
 #include <QList>
 #include <QString>
+#include <QStringList>
 
 #include <chrono>
 #include <cstdint>
@@ -60,6 +61,9 @@ public:
     [[nodiscard]] DbResult<models::Note> create(qint64 folderId, const NoteContent& content);
     // Any note, including trashed ones and tombstones.
     [[nodiscard]] DbResult<models::Note> get(qint64 id);
+    // The ids of the live notes among `uuids`, in the same order; unknown,
+    // trashed and purged ones are left out (drag & drop, task 2.12).
+    [[nodiscard]] DbResult<QList<qint64>> liveIdsForUuids(const QStringList& uuids);
 
     [[nodiscard]] DbResult<models::Note> updateBody(qint64 id, const NoteContent& content);
     DbStatus setPinned(qint64 id, bool pinned);

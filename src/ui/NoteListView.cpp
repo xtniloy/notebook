@@ -30,6 +30,10 @@ NoteListView::NoteListView(QWidget* parent)
     setUniformItemSizes(false);
     setSelectionMode(QAbstractItemView::SingleSelection);
     setEditTriggers(QAbstractItemView::NoEditTriggers);
+    // Notes can be dragged onto sidebar folders (task 2.12); the list itself
+    // takes no drops.
+    setDragDropMode(QAbstractItemView::DragOnly);
+    setDefaultDropAction(Qt::MoveAction);
     setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setFrameShape(QFrame::NoFrame);

@@ -16,6 +16,7 @@ add_library(notesapp_core STATIC
     models/Attachment.h
     models/DateGrouping.cpp
     models/DateGrouping.h
+    models/DragMime.h
     models/Folder.h
     models/FolderTreeModel.cpp
     models/FolderTreeModel.h

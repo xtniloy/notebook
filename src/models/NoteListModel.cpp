@@ -2,11 +2,13 @@
 
 #include "app/IClock.h"
 #include "models/DateGrouping.h"
+#include "models/DragMime.h"
 #include "models/Note.h"
 #include "models/NoteListRoles.h"
 #include "services/NoteService.h"
 
 #include <QLoggingCategory>
+#include <QMimeData>
 
 #include <algorithm>
 #include <chrono>
@@ -381,9 +383,45 @@ Qt::ItemFlags NoteListModel::flags(const QModelIndex& index) const
     }
     Q_ASSERT(checkIndex(index));
     // Headers are disabled so clicks and arrow keys pass over them (as before).
-    return m_rows.at(index.row()).isHeader
-               ? Qt::NoItemFlags
-               : Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemNeverHasChildren;
+    const Row& row = m_rows.at(index.row());
+    if (row.isHeader) {
+        return Qt::NoItemFlags;
+    }
+    Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemNeverHasChildren;
+    // Recently Deleted's notes are recovered from the menu, not dragged.
+    if (!row.note.trashedAt) {
+        flags |= Qt::ItemIsDragEnabled;
+    }
+    return flags;
+}
+
+QStringList NoteListModel::mimeTypes() const
+{
+    return {QString(kNoteUuidsMime)};
+}
+
+QMimeData* NoteListModel::mimeData(const QModelIndexList& indexes) const
+{
+    QStringList uuids;
+    for (const QModelIndex& index : indexes) {
+        if (index.isValid() && flags(index).testFlag(Qt::ItemIsDragEnabled)) {
+            const QString& uuid = m_rows.at(index.row()).note.uuid;
+            if (!uuids.contains(uuid)) {
+                uuids.append(uuid);
+            }
+        }
+    }
+    if (uuids.isEmpty()) {
+        return nullptr;
+    }
+    auto* data = new QMimeData;
+    data->setData(QString(kNoteUuidsMime), encodeUuids(uuids));
+    return data;
+}
+
+Qt::DropActions NoteListModel::supportedDragActions() const
+{
+    return Qt::MoveAction;
 }
 
 } // namespace notes::models

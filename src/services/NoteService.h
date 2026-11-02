@@ -55,6 +55,9 @@ public:
                                                         const QString& bodyText);
     QFuture<storage::DbStatus> setPinned(qint64 id, bool pinned);
     QFuture<storage::DbStatus> moveToFolder(qint64 id, qint64 folderId);
+    // NoteRepository::liveIdsForUuids(), for drops.
+    [[nodiscard]] QFuture<storage::DbResult<QList<qint64>>>
+    liveIdsForUuids(const QStringList& uuids);
     QFuture<storage::DbStatus> trash(qint64 id);
     QFuture<storage::DbStatus> restore(qint64 id);
     QFuture<storage::DbStatus> purge(qint64 id);

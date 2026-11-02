@@ -4,6 +4,9 @@
 #include "ui/Icons.h"
 
 #include <QPainter>
+#include <QPen>
+#include <QPersistentModelIndex>
+#include <QWidget>
 
 #include <optional>
 
@@ -48,6 +51,15 @@ std::optional<Icon> iconFor(SidebarItemKind kind)
 
 } // namespace
 
+bool SidebarDelegate::isDropTarget(const QStyleOptionViewItem& option, const QModelIndex& index)
+{
+    if (option.widget == nullptr) {
+        return false;
+    }
+    const auto target = option.widget->property(kDropTargetProperty).value<QPersistentModelIndex>();
+    return target.isValid() && target == index;
+}
+
 void SidebarDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                             const QModelIndex& index) const
 {
@@ -64,6 +76,14 @@ void SidebarDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
         painter->setPen(Qt::NoPen);
         painter->setBrush(palette.highlight());
         painter->drawRoundedRect(rect, kHighlightRadius, kHighlightRadius);
+    }
+    if (isDropTarget(option, index)) {
+        QColor fill = palette.color(QPalette::Highlight);
+        fill.setAlpha(60);
+        painter->setPen(QPen(palette.color(QPalette::Highlight), 2));
+        painter->setBrush(fill);
+        painter->drawRoundedRect(QRectF(rect).adjusted(1, 1, -1, -1), kHighlightRadius,
+                                 kHighlightRadius);
     }
     rect.adjust(kPadding, 0, -kPadding, 0);
 

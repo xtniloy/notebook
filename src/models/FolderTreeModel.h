@@ -7,6 +7,9 @@
 #include <QHash>
 #include <QList>
 #include <QString>
+#include <QStringList>
+
+#include <optional>
 
 namespace notes::services {
 class FolderService;
@@ -52,6 +55,22 @@ public:
     [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
     [[nodiscard]] Qt::ItemFlags flags(const QModelIndex& index) const override;
 
+    // Drag & drop (task 2.12). Notes (kNoteUuidsMime) can be dropped on a folder
+    // to move them there, or on Recently Deleted to delete them. Folders
+    // (kFolderUuidsMime) can be dropped on a folder to nest them, on "On My
+    // Computer" to make them top-level, or between rows to reorder them. A
+    // folder never goes into itself or its own subfolders (TC-UI-026), and
+    // "Notes" only reorders. Drops act through the services; the tree and
+    // counts update from their signals.
+    [[nodiscard]] QStringList mimeTypes() const override;
+    [[nodiscard]] QMimeData* mimeData(const QModelIndexList& indexes) const override;
+    [[nodiscard]] Qt::DropActions supportedDragActions() const override;
+    [[nodiscard]] Qt::DropActions supportedDropActions() const override;
+    [[nodiscard]] bool canDropMimeData(const QMimeData* data, Qt::DropAction action, int row,
+                                       int column, const QModelIndex& parent) const override;
+    bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column,
+                      const QModelIndex& parent) override;
+
 signals:
     // After each finished reload() or reloadCounts(), for tests and startup.
     void loaded();
@@ -64,6 +83,7 @@ private:
         QString name;
         qint64 folderId = 0;    // 0: selects nothing (headers)
         bool isDefault = false; // the "Notes" folder
+        QString uuid;           // folders only, for drag & drop
         qsizetype parent = -1;  // -1: top level
         int row = 0;            // among its parent's children
         QList<qsizetype> children;
@@ -71,10 +91,30 @@ private:
 
     void rebuild(const QList<storage::FolderTreeEntry>& folders);
     qsizetype addNode(SidebarItemKind kind, const QString& name, qint64 folderId, qsizetype parent,
-                      bool isDefault = false);
+                      const QString& uuid = {});
     void applyCounts(const QHash<qint64, int>& counts);
     [[nodiscard]] const QList<qsizetype>& childrenOf(const QModelIndex& parent) const;
     [[nodiscard]] QModelIndex indexOf(qsizetype node) const;
+    [[nodiscard]] const Node* nodeAt(const QModelIndex& index) const;
+
+    // Where a folder drop lands: the new parent (nullopt: top level), and the
+    // position among its subfolders (-1: keep the order, append).
+    struct FolderDrop
+    {
+        std::optional<qint64> parentId;
+        qsizetype parentNode = -1;
+        int position = -1;
+    };
+    [[nodiscard]] std::optional<FolderDrop> folderDropTarget(int row,
+                                                             const QModelIndex& parent) const;
+    // The dragged folders' nodes; empty if any is unknown.
+    [[nodiscard]] QList<qsizetype> draggedFolders(const QMimeData* data) const;
+    [[nodiscard]] bool isSelfOrAncestor(qsizetype candidate, qsizetype node) const;
+    void dropNotes(const QStringList& uuids, const Node& target);
+    void dropFolders(const QList<qsizetype>& dragged, const FolderDrop& drop);
+    // The new parent's subfolder order: the dragged ones at the drop position.
+    [[nodiscard]] QList<qint64> orderAfterDrop(const QList<qint64>& draggedIds,
+                                               const FolderDrop& drop) const;
 
     services::FolderService& m_folders;
     services::NoteService& m_notes;

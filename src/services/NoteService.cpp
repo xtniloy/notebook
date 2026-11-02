@@ -178,6 +178,13 @@ QFuture<DbStatus> NoteService::moveToFolder(qint64 id, qint64 folderId)
         });
 }
 
+QFuture<DbResult<QList<qint64>>> NoteService::liveIdsForUuids(const QStringList& uuids)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db.post(
+        [clock, uuids](Database& db) { return NoteRepository(db, *clock).liveIdsForUuids(uuids); });
+}
+
 QFuture<DbStatus> NoteService::trash(qint64 id)
 {
     const app::IClock* clock = &m_clock;

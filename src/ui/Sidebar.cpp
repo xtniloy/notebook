@@ -4,6 +4,7 @@
 #include "ui/Icons.h"
 #include "ui/SidebarDelegate.h"
 
+#include <QDragMoveEvent>
 #include <QHeaderView>
 #include <QItemSelectionModel>
 #include <QToolButton>
@@ -49,6 +50,25 @@ public:
     using QTreeView::QTreeView;
 
 protected:
+    // Drop highlight (task 2.12): the row a drag would drop onto is outlined by
+    // SidebarDelegate, which reads it from the kDropTargetProperty property.
+    void dragMoveEvent(QDragMoveEvent* event) override
+    {
+        QTreeView::dragMoveEvent(event);
+        const bool onItem = event->isAccepted() && dropIndicatorPosition() == OnItem;
+        setDropTarget(onItem ? indexAt(event->position().toPoint()) : QModelIndex());
+    }
+    void dragLeaveEvent(QDragLeaveEvent* event) override
+    {
+        QTreeView::dragLeaveEvent(event);
+        setDropTarget({});
+    }
+    void dropEvent(QDropEvent* event) override
+    {
+        QTreeView::dropEvent(event);
+        setDropTarget({});
+    }
+
     void drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const override
     {
         if (model() == nullptr || !model()->hasChildren(index)) {
@@ -60,6 +80,17 @@ protected:
         icon(isExpanded(index) ? Icon::Collapse : Icon::Expand)
             .paint(painter, arrow.adjusted(4, 4, -4, -4), Qt::AlignCenter,
                    selected ? QIcon::Selected : QIcon::Normal);
+    }
+
+private:
+    void setDropTarget(const QModelIndex& index)
+    {
+        const QPersistentModelIndex target(index);
+        if (property(SidebarDelegate::kDropTargetProperty).value<QPersistentModelIndex>() !=
+            target) {
+            setProperty(SidebarDelegate::kDropTargetProperty, QVariant::fromValue(target));
+            viewport()->update();
+        }
     }
 };
 
@@ -81,6 +112,10 @@ Sidebar::Sidebar(QWidget* parent)
     m_tree->setFrameShape(QFrame::NoFrame);
     m_tree->setSelectionMode(QAbstractItemView::SingleSelection);
     m_tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    // Notes dragged from the list, and folders moved within the tree (task 2.12).
+    m_tree->setDragDropMode(QAbstractItemView::DragDrop);
+    m_tree->setDefaultDropAction(Qt::MoveAction);
+    m_tree->setDropIndicatorShown(true);
     m_tree->setItemDelegate(new SidebarDelegate(m_tree));
     m_tree->setAttribute(Qt::WA_MacShowFocusRect, false);
     // The delegate draws its own rounded highlight; keep the style's square one
