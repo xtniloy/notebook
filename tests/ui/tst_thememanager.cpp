@@ -8,6 +8,7 @@
 #include "ui/EditorView.h"
 #include "ui/Icons.h"
 #include "ui/MainWindow.h"
+#include "ui/NoteListDelegate.h"
 #include "ui/NoteTextEdit.h"
 #include "ui/Sidebar.h"
 #include "ui/ThemeManager.h"
@@ -300,6 +301,11 @@ void tst_ThemeManager::colorsAreReadable()
     check(c.mutedText, c.base, "muted text on base");
     check(c.mutedText, c.sidebar, "muted text on sidebar");
     check(c.accentText, c.accent, "selected text");
+    // The note preview on a selected row: muted, still readable.
+    const QColor selectedMuted =
+        notes::ui::NoteListDelegate::selectedMutedColor(ThemeManager::palette(theme));
+    check(selectedMuted, c.accent, "selected muted text");
+    QVERIFY(contrast(selectedMuted, c.accent) < contrast(c.accentText, c.accent)); // muted
     check(c.link, c.base, "link on base");
     QCOMPARE(c.accent, ThemeManager::colors(Theme::Light).accent); // shared accent
 }

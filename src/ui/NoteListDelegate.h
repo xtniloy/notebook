@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QColor>
 #include <QFont>
+#include <QPalette>
 #include <QStyledItemDelegate>
 
 namespace notes::ui {
@@ -28,6 +30,10 @@ public:
     // The time and preview line: 0.1 pt smaller than `base`, the title's size
     // (10.9 pt under an 11 pt system font), regular weight.
     [[nodiscard]] static QFont detailFont(const QFont& base);
+    // The preview's muted color on a selected row: the selection's text color
+    // at 70% over the accent, so the preview stays secondary there too while
+    // keeping WCAG AA contrast (4.5:1).
+    [[nodiscard]] static QColor selectedMutedColor(const QPalette& palette);
 
 private:
     static void paintHeader(QPainter* painter, const QStyleOptionViewItem& option,

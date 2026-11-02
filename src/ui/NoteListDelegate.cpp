@@ -120,7 +120,8 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
                      smallMetrics.height());
 
     const QColor textColor = palette.color(selected ? QPalette::HighlightedText : QPalette::Text);
-    const QColor mutedColor = selected ? textColor : palette.color(QPalette::PlaceholderText);
+    const QColor mutedColor =
+        selected ? selectedMutedColor(palette) : palette.color(QPalette::PlaceholderText);
 
     const QIcon::Mode iconMode = selected ? QIcon::Selected : QIcon::Normal;
     if (locked) {
@@ -150,6 +151,19 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
     painter->setPen(mutedColor);
     painter->drawText(detailLine, Qt::AlignLeft | Qt::AlignVCenter,
                       smallMetrics.elidedText(preview, Qt::ElideRight, detailLine.width()));
+}
+
+QColor NoteListDelegate::selectedMutedColor(const QPalette& palette)
+{
+    constexpr qreal kTextShare = 0.7;
+    const QColor text = palette.color(QPalette::HighlightedText);
+    const QColor accent = palette.color(QPalette::Highlight);
+    const auto mix = [&](qreal fg, qreal bg) {
+        return (kTextShare * fg) + ((1.0 - kTextShare) * bg);
+    };
+    return QColor::fromRgbF(static_cast<float>(mix(text.redF(), accent.redF())),
+                            static_cast<float>(mix(text.greenF(), accent.greenF())),
+                            static_cast<float>(mix(text.blueF(), accent.blueF())));
 }
 
 QFont NoteListDelegate::titleFont(const QFont& base)
