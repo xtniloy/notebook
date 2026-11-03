@@ -1,11 +1,14 @@
 #include "editor/StyleManager.h"
 
+#include "editor/NoteFormat.h"
+
 #include <QFont>
 #include <QList>
 #include <QStringList>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTextList>
 
 #include <algorithm>
 
@@ -106,25 +109,9 @@ void editRuns(const QTextBlock& block, Edit edit)
     QTextCursor(block).setBlockCharFormat(blockFormat);
 }
 
-} // namespace
-
-int StyleManager::headingLevel(ParagraphStyle style)
-{
-    switch (style) {
-    case ParagraphStyle::Title:
-        return 1;
-    case ParagraphStyle::Heading:
-        return 2;
-    case ParagraphStyle::Subheading:
-        return 3;
-    case ParagraphStyle::Body:
-    case ParagraphStyle::Monospaced:
-        break;
-    }
-    return 0;
-}
-
-ParagraphStyle StyleManager::styleOf(const QTextBlock& block)
+// The text style of `block` regardless of any list: heading, Monospaced or
+// Body. A list item's text is Body (or Monospaced).
+ParagraphStyle textStyleOf(const QTextBlock& block)
 {
     switch (block.blockFormat().headingLevel()) {
     case 0:
@@ -142,15 +129,140 @@ ParagraphStyle StyleManager::styleOf(const QTextBlock& block)
         if (format.isImageFormat()) {
             continue;
         }
-        if (!isMonospaced(format)) {
+        if (!StyleManager::isMonospaced(format)) {
             return ParagraphStyle::Body;
         }
         hasText = true;
     }
-    if (!hasText && !isMonospaced(block.charFormat())) {
+    if (!hasText && !StyleManager::isMonospaced(block.charFormat())) {
         return ParagraphStyle::Body;
     }
     return ParagraphStyle::Monospaced;
+}
+
+// Takes `block` out of its list. QTextList::remove() adds the list's indent to
+// the paragraph's; the paragraph keeps the indent it had instead.
+void leaveList(const QTextBlock& block)
+{
+    QTextList* list = block.textList();
+    if (list == nullptr) {
+        return;
+    }
+    const int indent = block.blockFormat().indent();
+    list->remove(block);
+    QTextBlockFormat format = block.blockFormat();
+    format.setIndent(indent);
+    QTextCursor(block).setBlockFormat(format);
+}
+
+// Puts `block` into a list of `style` at `indent`: the nearest list above at
+// that level when it is the same kind (so its numbering continues), else a
+// new one. `block` must not be in a list.
+void joinList(const QTextBlock& block, ParagraphStyle style, int indent)
+{
+    for (QTextBlock above = block.previous(); above.isValid() && above.textList() != nullptr;
+         above = above.previous()) {
+        QTextList* list = above.textList();
+        const int level = list->format().indent();
+        if (level == indent && StyleManager::listStyleOf(*list) == style) {
+            list->add(block);
+            return;
+        }
+        if (level < indent) {
+            break; // a shallower item: no list at this level to continue
+        }
+    }
+    QTextCursor(block).createList(StyleManager::listFormat(style, indent));
+}
+
+// The selected paragraphs, first to last.
+QList<QTextBlock> selectedBlocks(const QTextCursor& cursor)
+{
+    QList<QTextBlock> blocks;
+    const QTextDocument* document = cursor.document();
+    const QTextBlock last = document->findBlock(cursor.selectionEnd());
+    for (QTextBlock block = document->findBlock(cursor.selectionStart()); block.isValid();
+         block = block.next()) {
+        blocks.append(block);
+        if (block == last) {
+            break;
+        }
+    }
+    return blocks;
+}
+
+} // namespace
+
+int StyleManager::headingLevel(ParagraphStyle style)
+{
+    switch (style) {
+    case ParagraphStyle::Title:
+        return 1;
+    case ParagraphStyle::Heading:
+        return 2;
+    case ParagraphStyle::Subheading:
+        return 3;
+    case ParagraphStyle::Body:
+    case ParagraphStyle::Monospaced:
+    case ParagraphStyle::BulletedList:
+    case ParagraphStyle::DashedList:
+    case ParagraphStyle::NumberedList:
+        break;
+    }
+    return 0;
+}
+
+bool StyleManager::isList(ParagraphStyle style)
+{
+    return style == ParagraphStyle::BulletedList || style == ParagraphStyle::DashedList ||
+           style == ParagraphStyle::NumberedList;
+}
+
+ParagraphStyle StyleManager::styleOf(const QTextBlock& block)
+{
+    if (const QTextList* list = block.textList()) {
+        return listStyleOf(*list);
+    }
+    return textStyleOf(block);
+}
+
+ParagraphStyle StyleManager::listStyleOf(const QTextList& list)
+{
+    const QTextListFormat format = list.format();
+    if (format.boolProperty(NoteFormat::kDashedListProperty)) {
+        return ParagraphStyle::DashedList;
+    }
+    switch (format.style()) {
+    case QTextListFormat::ListDecimal:
+    case QTextListFormat::ListLowerAlpha:
+    case QTextListFormat::ListUpperAlpha:
+    case QTextListFormat::ListLowerRoman:
+    case QTextListFormat::ListUpperRoman:
+        return ParagraphStyle::NumberedList;
+    default:
+        return ParagraphStyle::BulletedList;
+    }
+}
+
+QTextListFormat StyleManager::listFormat(ParagraphStyle style, int indent)
+{
+    QTextListFormat format;
+    format.setIndent(std::clamp(indent, 1, kMaxListIndent));
+    switch (style) {
+    case ParagraphStyle::DashedList:
+        // Qt has no dash marker: no style (Qt draws none), and NoteTextEdit
+        // draws the dash (NoteFormat::kDashedListProperty).
+        format.setStyle(QTextListFormat::ListStyleUndefined);
+        format.setProperty(NoteFormat::kDashedListProperty, true);
+        break;
+    case ParagraphStyle::NumberedList:
+        format.setStyle(QTextListFormat::ListDecimal);
+        break;
+    default:
+        format.setStyle(QTextListFormat::ListDisc);
+        break;
+    }
+    return format;
 }
 
 void StyleManager::apply(QTextCursor& cursor, ParagraphStyle style)
@@ -160,25 +272,73 @@ void StyleManager::apply(QTextCursor& cursor, ParagraphStyle style)
         return;
     }
     const QFont base = document->defaultFont();
-    const QTextBlock first = document->findBlock(cursor.selectionStart());
-    const QTextBlock last = document->findBlock(cursor.selectionEnd());
+    const QList<QTextBlock> blocks = selectedBlocks(cursor);
+    // A list item's text is Body.
+    const ParagraphStyle text = isList(style) ? ParagraphStyle::Body : style;
 
     cursor.beginEditBlock();
-    for (QTextBlock block = first; block.isValid(); block = block.next()) {
-        const ParagraphStyle from = styleOf(block);
+    QTextList* joined = nullptr; // the list the selection's plain paragraphs went into
+    for (const QTextBlock& block : blocks) {
+        const ParagraphStyle from = textStyleOf(block);
         QTextBlockFormat format = block.blockFormat();
-        format.setHeadingLevel(headingLevel(style));
-        if (style != ParagraphStyle::Monospaced) {
+        format.setHeadingLevel(headingLevel(text));
+        if (text != ParagraphStyle::Monospaced) {
             // A code block (from pasted Markdown) becomes ordinary text.
             format.clearProperty(QTextFormat::BlockCodeFence);
             format.clearProperty(QTextFormat::BlockCodeLanguage);
             format.setNonBreakableLines(false);
         }
         QTextCursor(block).setBlockFormat(format);
-        editRuns(block, [&](QTextCharFormat& run) { restyleRun(run, from, style, base); });
-        if (block == last) {
-            break;
+        editRuns(block, [&](QTextCharFormat& run) { restyleRun(run, from, text, base); });
+
+        QTextList* list = block.textList();
+        if (!isList(style)) {
+            leaveList(block);
+        } else if (list != nullptr) {
+            // Already a list item: the whole list changes kind.
+            if (listStyleOf(*list) != style) {
+                list->setFormat(listFormat(style, list->format().indent()));
+            }
+        } else if (joined != nullptr) {
+            joined->add(block);
+        } else {
+            joinList(block, style, 1);
+            joined = block.textList();
         }
+    }
+    cursor.endEditBlock();
+}
+
+bool StyleManager::indentList(QTextCursor& cursor, int levels)
+{
+    QList<QTextBlock> items = selectedBlocks(cursor);
+    items.removeIf([](const QTextBlock& block) { return block.textList() == nullptr; });
+    if (items.isEmpty()) {
+        return false;
+    }
+    cursor.beginEditBlock();
+    for (const QTextBlock& block : items) {
+        const QTextList* list = block.textList();
+        const ParagraphStyle style = listStyleOf(*list);
+        const int from = list->format().indent();
+        const int to = std::min(from + levels, kMaxListIndent);
+        if (to == from) {
+            continue;
+        }
+        leaveList(block);
+        if (to >= 1) {
+            joinList(block, style, to);
+        }
+    }
+    cursor.endEditBlock();
+    return true;
+}
+
+void StyleManager::removeFromList(QTextCursor& cursor)
+{
+    cursor.beginEditBlock();
+    for (const QTextBlock& block : selectedBlocks(cursor)) {
+        leaveList(block);
     }
     cursor.endEditBlock();
 }

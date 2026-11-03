@@ -4,6 +4,8 @@
 
 #include <QTextEdit>
 
+#include <optional>
+
 namespace notes::ui {
 
 // The note body editor (Plan §3.5): paragraph styles (task 3.2); lists, tables
@@ -49,11 +51,23 @@ public:
 
 protected:
     void changeEvent(QEvent* event) override;
-    // Enter at the end of a heading starts a Body paragraph, as in macOS Notes;
-    // elsewhere in a heading it splits it into two headings.
     void keyPressEvent(QKeyEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
 
 private:
+    // Enter in a heading: at its end a Body paragraph follows, as in macOS
+    // Notes; elsewhere it splits into two headings. True if handled.
+    bool headingKey(const QKeyEvent* event);
+    // Lists (task 3.5): Tab / Shift+Tab nest and un-nest items, Enter on an
+    // empty item goes up a level (or out of the list), Backspace at the start
+    // of an item removes its marker. True if handled.
+    bool listKey(const QKeyEvent* event);
+    // The list a Space would start: "- " dashed, "* " bulleted, "1. "
+    // numbered, typed at the start of a Body paragraph.
+    [[nodiscard]] std::optional<editor::ParagraphStyle> listMarker(const QKeyEvent* event) const;
+    // The dashes of dashed lists, which Qt can't draw.
+    void paintDashes();
+
     void updateViewportMargins();
     void applyBottomPadding();
 

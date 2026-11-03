@@ -26,7 +26,7 @@ namespace notes::test {
 inline constexpr char kFixtureImage[] = "attachment://3f2a6c1e-0b5d-4c7e-9a41-6d2e8f1b7c90";
 
 // Headings 1-3 (one collapsed), every inline format and a link, a monospaced
-// line, bulleted / "dashed" (square) / numbered / nested lists, a checklist
+// line, bulleted / dashed / numbered / nested lists, a checklist
 // with a checked and an open item, an image, a table directly after a list
 // (the case Qt's HTML moves on every save), and text after the table.
 inline void buildFixture(QTextDocument& document)
@@ -108,7 +108,13 @@ inline void buildFixture(QTextDocument& document)
         }
     };
     list(QTextListFormat::ListDisc, 1, {QStringLiteral("Passport"), QStringLiteral("Charger")});
-    list(QTextListFormat::ListSquare, 1, {QStringLiteral("Dashed item")});
+    list(QTextListFormat::ListStyleUndefined, 1, {QStringLiteral("Dashed item")});
+    {
+        // Qt has no dash style: our property marks the list (task 3.5).
+        QTextListFormat dashed = cursor.currentList()->format();
+        dashed.setProperty(editor::NoteFormat::kDashedListProperty, true);
+        cursor.currentList()->setFormat(dashed);
+    }
     list(QTextListFormat::ListDecimal, 1, {QStringLiteral("Book hotel"), QStringLiteral("Pack")});
     list(QTextListFormat::ListDecimal, 2, {QStringLiteral("Nested step")});
 
@@ -151,10 +157,13 @@ inline QStringList dumpDocument(const QTextDocument& document)
             if (!lists.contains(list)) {
                 lists.append(list);
             }
-            line += QStringLiteral(" list#%1(style %2, indent %3)")
+            line += QStringLiteral(" list#%1(style %2, indent %3%4)")
                         .arg(lists.indexOf(list))
                         .arg(static_cast<int>(list->format().style()))
-                        .arg(list->format().indent());
+                        .arg(list->format().indent())
+                        .arg(list->format().boolProperty(editor::NoteFormat::kDashedListProperty)
+                                 ? QStringLiteral(", dash")
+                                 : QString());
         }
         if (format.marker() != QTextBlockFormat::MarkerType::NoMarker) {
             line += format.marker() == QTextBlockFormat::MarkerType::Checked

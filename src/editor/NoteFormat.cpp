@@ -26,7 +26,7 @@ namespace {
 // JSON shape (NoteFormat::kVersion 1; "v" is written from version 2 on):
 //
 //   { "v": <version>,
-//     "lists":  [ { "style": "disc", "indent": 1 }, ... ],
+//     "lists":  [ { "style": "disc", "indent": 1 }, ... ],   // "dash": a dashed list
 //     "blocks": [ <paragraph> | { "table": { "rows": 2, "cols": 2,
 //                                            "cells": [ [<paragraph>...], ... ] } } ] }
 //
@@ -194,8 +194,11 @@ private:
         }
         const QTextListFormat format = list->format();
         QJsonObject entry{{QStringLiteral("indent"), format.indent()}};
+        if (format.boolProperty(NoteFormat::kDashedListProperty)) {
+            entry.insert(QStringLiteral("style"), QStringLiteral("dash"));
+        }
         for (const auto& [style, name] : kListStyles) {
-            if (format.style() == style) {
+            if (!entry.contains(QStringLiteral("style")) && format.style() == style) {
                 entry.insert(QStringLiteral("style"), QLatin1StringView(name));
             }
         }
@@ -315,6 +318,12 @@ QTextListFormat listFormatFor(const QJsonObject& entry)
     QTextListFormat format;
     format.setStyle(QTextListFormat::ListDisc);
     const QString style = entry.value(QStringLiteral("style")).toString();
+    if (style == u"dash") {
+        // Qt has no dash marker: no style (Qt then draws none) and our
+        // property, and the editor draws the dash.
+        format.setStyle(QTextListFormat::ListStyleUndefined);
+        format.setProperty(NoteFormat::kDashedListProperty, true);
+    }
     for (const auto& [listStyle, name] : kListStyles) {
         if (style == QLatin1StringView(name)) {
             format.setStyle(listStyle);

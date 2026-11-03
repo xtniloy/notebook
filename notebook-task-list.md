@@ -586,11 +586,11 @@ Record each in `docs/adr/`:
 
 ### 3.5 Lists `M`
 
-- [ ] Bulleted, dashed, numbered lists from the Format menu
-- [ ] Auto-format at line start: `- `, `* ` → list; `1. ` → numbered
-- [ ] `Tab` / `Shift+Tab` indent/outdent
-- [ ] `Enter` on an empty item exits the list
-- [ ] `Backspace` at the start of an item removes the bullet first
+- [x] Bulleted, dashed, numbered lists from the Format menu *(with the paragraph styles in one pick-one group, as macOS Notes; `Ctrl+Shift+7/8/9`. An item's text is Body. A new item below a list of the same kind continues it; choosing another kind for an item changes its whole list; any other style takes it out. Qt has no dash marker: a dashed list has no Qt style plus our `NoteFormat::kDashedListProperty`, stored as `"dash"`, and `NoteTextEdit` draws the en dash where Qt would draw a bullet. Old `"square"` lists still load as squares)*
+- [x] Auto-format at line start: `- `, `* ` → list; `1. ` → numbered *(`- ` dashed, `* ` bulleted, as macOS. Only in Body paragraphs, not headings or Monospaced. Ctrl+Z gives the marker back as text)*
+- [x] `Tab` / `Shift+Tab` indent/outdent *(an item joins the nearest list above at its new level, so a new nested level numbers from 1; at most 8 levels; Shift+Tab at the top level leaves the list. Outside a list, Tab types a tab)*
+- [x] `Enter` on an empty item exits the list *(a nested empty item goes up a level first)*
+- [x] `Backspace` at the start of an item removes the bullet first *(the paragraph keeps its own indent rather than the list's)*
 
 **Tests**
 - `TC-EDT-011` (UI) Type `- item` → becomes a dashed list item with text "item".

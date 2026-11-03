@@ -20,3 +20,5 @@ notes_add_test(NAME tst_appstyle SOURCES tst_appstyle.cpp LABELS ui LIBS notesap
 notes_add_test(NAME tst_paragraphstyles SOURCES tst_paragraphstyles.cpp LABELS ui LIBS notesapp_ui)
 # TC-EDT-008, TC-EDT-009: inline formats in the window (task 3.4).
 notes_add_test(NAME tst_inlineformats SOURCES tst_inlineformats.cpp LABELS ui LIBS notesapp_ui)
+# TC-EDT-011 .. TC-EDT-013: lists in the window (task 3.5).
+notes_add_test(NAME tst_lists SOURCES tst_lists.cpp LABELS ui LIBS notesapp_ui)

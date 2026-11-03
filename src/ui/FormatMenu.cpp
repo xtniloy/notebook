@@ -21,7 +21,7 @@ struct StyleSpec
 
 // macOS Notes' shortcuts, with Ctrl for Cmd. None clashes with the app's
 // other shortcuts (Ctrl+Shift+L checklist, +A attach, +N new folder).
-constexpr std::array<StyleSpec, 5> kStyles{{
+constexpr std::array<StyleSpec, 8> kStyles{{
     {.style = ParagraphStyle::Title,
      .objectName = "titleStyleAction",
      .text = QT_TRANSLATE_NOOP("notes::ui::FormatMenu", "&Title"),
@@ -42,6 +42,18 @@ constexpr std::array<StyleSpec, 5> kStyles{{
      .objectName = "monospacedStyleAction",
      .text = QT_TRANSLATE_NOOP("notes::ui::FormatMenu", "&Monospaced"),
      .shortcut = Qt::CTRL | Qt::SHIFT | Qt::Key_M},
+    {.style = ParagraphStyle::BulletedList,
+     .objectName = "bulletedListAction",
+     .text = QT_TRANSLATE_NOOP("notes::ui::FormatMenu", "B&ulleted List"),
+     .shortcut = Qt::CTRL | Qt::SHIFT | Qt::Key_7},
+    {.style = ParagraphStyle::DashedList,
+     .objectName = "dashedListAction",
+     .text = QT_TRANSLATE_NOOP("notes::ui::FormatMenu", "&Dashed List"),
+     .shortcut = Qt::CTRL | Qt::SHIFT | Qt::Key_8},
+    {.style = ParagraphStyle::NumberedList,
+     .objectName = "numberedListAction",
+     .text = QT_TRANSLATE_NOOP("notes::ui::FormatMenu", "&Numbered List"),
+     .shortcut = Qt::CTRL | Qt::SHIFT | Qt::Key_9},
 }};
 
 constexpr bool inStyleOrder()
@@ -104,6 +116,9 @@ FormatMenu::FormatMenu(QWidget* parent)
     m_group->setExclusive(true);
     for (std::size_t i = 0; i < kStyles.size(); ++i) {
         const StyleSpec& spec = kStyles.at(i);
+        if (spec.style == ParagraphStyle::BulletedList) {
+            addSeparator(); // the lists, as macOS Notes
+        }
         auto* action = new QAction(tr(spec.text), this);
         action->setObjectName(QLatin1StringView(spec.objectName));
         action->setShortcut(QKeySequence(spec.shortcut));

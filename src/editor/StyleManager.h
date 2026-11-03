@@ -8,6 +8,8 @@ class QTextBlock;
 class QTextCharFormat;
 class QTextCursor;
 class QTextDocument;
+class QTextList;
+class QTextListFormat;
 
 namespace notes::editor {
 
@@ -18,6 +20,10 @@ enum class ParagraphStyle : std::uint8_t {
     Subheading,
     Body,
     Monospaced,
+    // Lists (task 3.5): Body text in a list.
+    BulletedList,
+    DashedList,
+    NumberedList,
 };
 
 // Inline formats (task 3.4), in the Format menu's order.
@@ -44,17 +50,42 @@ public:
     static constexpr qreal kHeadingScale = 1.4;
     static constexpr qreal kSubheadingScale = 1.15;
 
-    // 1, 2, 3 for the headings; 0 for Body and Monospaced.
-    [[nodiscard]] static int headingLevel(ParagraphStyle style);
+    // How deep lists nest.
+    static constexpr int kMaxListIndent = 8;
 
-    // The style of `block`: by heading level (4 to 6, from pasted Markdown,
-    // count as Subheading), else Monospaced when all its text is, else Body.
+    // 1, 2, 3 for the headings; 0 for the others.
+    [[nodiscard]] static int headingLevel(ParagraphStyle style);
+    [[nodiscard]] static bool isList(ParagraphStyle style);
+
+    // The style of `block`: its list's kind when it is in a list (bulleted
+    // covers Qt's discs, circles and squares; numbered its numbers, letters
+    // and Roman numerals), else by heading level (4 to 6, from pasted
+    // Markdown, count as Subheading), else Monospaced when all its text is,
+    // else Body.
     [[nodiscard]] static ParagraphStyle styleOf(const QTextBlock& block);
+    // The kind of list: BulletedList, DashedList or NumberedList.
+    [[nodiscard]] static ParagraphStyle listStyleOf(const QTextList& list);
+    // A list of `style` (a list style) at nesting level `indent` (1 = top).
+    [[nodiscard]] static QTextListFormat listFormat(ParagraphStyle style, int indent);
 
     // Gives every paragraph the cursor's selection touches `style`, as one
     // undo step. Typing then continues in the style: new text takes the
     // format of the text before it, or an empty paragraph's own.
+    //
+    // A list style makes the paragraphs list items: they join the list just
+    // above when it is the same kind, and a list they are already in changes
+    // kind as a whole. Any other style takes them out of their list.
     static void apply(QTextCursor& cursor, ParagraphStyle style);
+
+    // Moves the selected list items `levels` deeper (Tab: 1) or shallower
+    // (Shift+Tab: -1), as one undo step. An item joins the nearest list above
+    // at its new level, so a new nested level starts its numbering at 1; out
+    // of the top level, an item leaves its list. False if no list item is
+    // selected.
+    static bool indentList(QTextCursor& cursor, int levels);
+    // Takes the selected paragraphs out of their lists, as one undo step;
+    // their text and style stay.
+    static void removeFromList(QTextCursor& cursor);
 
     // Heading fonts for every heading in `document`, after loading (not an
     // edit: the caller decides about undo).

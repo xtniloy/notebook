@@ -35,6 +35,10 @@ public:
 
     // Our own block properties, kept by the format (Qt's HTML drops these).
     static constexpr int kCollapsedProperty = QTextFormat::UserProperty + 1; // bool, headings
+    // bool, on a QTextListFormat: a dashed list ("dash"). Qt has no dash
+    // marker, so such a list has no style (Qt draws no marker) and
+    // NoteTextEdit draws the dash.
+    static constexpr int kDashedListProperty = QTextFormat::UserProperty + 2;
 
     // The document as compact JSON.
     [[nodiscard]] static QString serialize(const QTextDocument& document);

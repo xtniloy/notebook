@@ -11,7 +11,8 @@ class QActionGroup;
 namespace notes::ui {
 
 // The paragraph styles (Plan §3.2 "Aa", task 3.2): Title, Heading,
-// Subheading, Body and Monospaced, the current one checked; then the inline
+// Subheading, Body and Monospaced, then the lists (task 3.5): Bulleted,
+// Dashed and Numbered, the current one checked; then the inline
 // formats (task 3.4): Bold, Italic, Underline and Strikethrough, checked when
 // the text at the cursor has them. Pops up from the toolbar's Aa button; the
 // same actions, with their shortcuts, are in the menu bar's Format menu.
@@ -42,7 +43,7 @@ signals:
     void inlineStyleToggled(notes::editor::InlineStyle style, bool on);
 
 private:
-    static constexpr std::size_t kStyleCount = 5;
+    static constexpr std::size_t kStyleCount = 8;
     static constexpr std::size_t kInlineCount = 4;
     std::array<QAction*, kStyleCount> m_actions{};
     std::array<QAction*, kInlineCount> m_inlineActions{};

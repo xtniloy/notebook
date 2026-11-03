@@ -202,7 +202,9 @@ void tst_ParagraphStyles::menuShowsCurrentStyle()
         }
     }
     QVERIFY(bar);
-    QCOMPARE(bar->actions().mid(0, 5), menu->styleActions());
+    QList<QAction*> items = bar->actions();
+    items.removeIf([](const QAction* item) { return item->isSeparator(); });
+    QCOMPARE(items.mid(0, menu->styleActions().size()), menu->styleActions());
 }
 
 void tst_ParagraphStyles::aaButtonOpensStyles()

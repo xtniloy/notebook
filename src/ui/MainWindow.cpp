@@ -359,7 +359,11 @@ void MainWindow::createMenus()
     add(editMenu, {ActionId::FindInNote, ActionId::SearchAllNotes});
 
     QMenu* formatMenu = menuBar()->addMenu(tr("F&ormat"));
-    formatMenu->addActions(m_formatMenu->styleActions());
+    const QList<QAction*> styles = m_formatMenu->styleActions();
+    const auto lists = static_cast<qsizetype>(editor::ParagraphStyle::BulletedList);
+    formatMenu->addActions(styles.first(lists));
+    formatMenu->addSeparator();
+    formatMenu->addActions(styles.sliced(lists));
     formatMenu->addSeparator();
     formatMenu->addActions(m_formatMenu->inlineActions());
     formatMenu->addSeparator();
