@@ -44,6 +44,10 @@ void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText)
     // Loading isn't an edit: start the note with no undo history.
     document()->clearUndoRedoStacks();
     applyBottomPadding();
+    // Filled directly rather than through setPlainText(), an empty document's
+    // only line was left without a layout, and Qt draws no caret there: a new
+    // note showed no caret until the first key. Lay it all out again.
+    document()->markContentsDirty(0, document()->characterCount());
 }
 
 QString NoteTextEdit::noteBody() const

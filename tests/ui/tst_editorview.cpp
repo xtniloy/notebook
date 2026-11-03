@@ -13,6 +13,7 @@
 #include "ui/NoteListView.h"
 #include "ui/NoteTextEdit.h"
 
+#include <QApplication>
 #include <QDateTime>
 #include <QLabel>
 #include <QScrollBar>
@@ -60,6 +61,7 @@ private slots:
     void headerText();
     void editorIsPlainText();
     void scrollBarAtPaneEdge();
+    void emptyNoteShowsCaret();
 
     void mainWindowOpensFirstNote();
     void selectingNoteShowsItInEditor();
@@ -268,6 +270,33 @@ void tst_EditorView::selectingNoteShowsItInEditor()
     QTRY_COMPARE(editor->textEdit()->toPlainText(), first.bodyText);
     QCOMPARE(headerOf(*editor)->text(),
              EditorView::headerText(QDateTime::fromMSecsSinceEpoch(first.updatedAt)));
+}
+
+// A new note is empty; its caret must show as soon as it opens, not only
+// after the first key (an empty body loaded into the document had no layout
+// for its only line, so Qt drew no caret).
+void tst_EditorView::emptyNoteShowsCaret()
+{
+    const int flashTime = QApplication::cursorFlashTime();
+    QApplication::setCursorFlashTime(0); // no blinking: the caret is always drawn
+    notes::ui::NoteTextEdit* edit = m_view->textEdit();
+    m_view->showNote(QStringLiteral("Some text"), modifiedTime());
+    m_view->showNoteBody({}, {}, modifiedTime());
+    m_view->activateWindow();
+    edit->setFocus();
+    QTRY_VERIFY(edit->hasFocus());
+
+    const QImage image = edit->viewport()->grab().toImage();
+    const QRect caret = edit->cursorRect().adjusted(-1, 0, 1, 0) & image.rect();
+    int dark = 0;
+    for (int y = caret.top(); y <= caret.bottom(); ++y) {
+        for (int x = caret.left(); x <= caret.right(); ++x) {
+            dark += qGray(image.pixel(x, y)) < 128 ? 1 : 0;
+        }
+    }
+    QApplication::setCursorFlashTime(flashTime);
+    QVERIFY2(dark >= edit->fontMetrics().height() / 2,
+             qPrintable(QStringLiteral("caret pixels: %1").arg(dark)));
 }
 
 QTEST_MAIN(tst_EditorView)
