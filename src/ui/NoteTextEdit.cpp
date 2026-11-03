@@ -41,6 +41,14 @@ int NoteTextEdit::rightInset() const
 void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText)
 {
     editor::NoteFormat::load(body, plainText, *document());
+    if (document()->isEmpty()) {
+        // A new (empty) note starts with its title, as in macOS Notes (task
+        // 3.3): typing goes into a Title paragraph, and Enter then gives Body.
+        QTextBlockFormat title;
+        title.setHeadingLevel(editor::StyleManager::headingLevel(editor::ParagraphStyle::Title));
+        QTextCursor(document()).setBlockFormat(title);
+        editor::StyleManager::styleHeadings(*document());
+    }
     // Loading isn't an edit: start the note with no undo history.
     document()->clearUndoRedoStacks();
     applyBottomPadding();

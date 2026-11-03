@@ -561,9 +561,9 @@ Record each in `docs/adr/`:
 
 ### 3.3 First line becomes title `S`
 
-- [ ] The first block is always styled as Title when the note is new
-- [ ] Pressing Enter after the title switches the next block to Body
-- [ ] If the user deletes the first line, the new first line becomes the title (service re-derives on save)
+- [x] The first block is always styled as Title when the note is new *(`NoteTextEdit::setNoteBody()`: an empty note opens with a Title paragraph, not as an edit (no undo step, no save). An existing note emptied and reopened starts with a title again)*
+- [x] Pressing Enter after the title switches the next block to Body *(done in 3.2 for every heading)*
+- [x] If the user deletes the first line, the new first line becomes the title (service re-derives on save) *(the note's name: `NoteText::title()` already takes the first non-empty line on every save. The new first line keeps its own style, as in macOS Notes)*
 
 **Tests**
 - `TC-EDT-006` (UI) New note, type "Groceries⏎Milk" → block 0 is Title, block 1 is Body, note title = "Groceries".

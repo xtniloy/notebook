@@ -27,7 +27,7 @@ public:
     [[nodiscard]] int rightInset() const;
 
     // A stored body (editor::NoteFormat::load()), keeping the bottom padding.
-    // No undo history.
+    // No undo history. An empty note starts in the Title style (task 3.3).
     void setNoteBody(const QString& body, const QString& plainText);
     // The document in the note format, for saving.
     [[nodiscard]] QString noteBody() const;

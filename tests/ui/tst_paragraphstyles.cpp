@@ -1,6 +1,7 @@
 // Paragraph styles in the window (task 3.2): shortcuts and the Format menu
 // apply them, the menu checks the current one, one Ctrl+Z undoes a change,
-// Enter after a heading continues in Body, and styles survive saving.
+// Enter after a heading continues in Body, and styles survive saving. And the
+// first line as title (task 3.3).
 
 #include "TestHelpers.h"
 #include "editor/NoteFormat.h"
@@ -13,6 +14,7 @@
 #include "ui/EditorView.h"
 #include "ui/FormatMenu.h"
 #include "ui/MainWindow.h"
+#include "ui/NoteListView.h"
 #include "ui/NoteTextEdit.h"
 #include "ui/Sidebar.h"
 
@@ -26,6 +28,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 
 using namespace std::chrono_literals;
 using notes::editor::ParagraphStyle;
@@ -56,6 +59,8 @@ private slots:
     void enterAfterHeadingContinuesInBody();
     void stylesSurviveSaving();
     void stylesNeedAnEditableNote();
+    void newNoteStartsWithTitle();
+    void deletingFirstLineRenamesNote();
 
 private:
     void openWindow();
@@ -63,6 +68,10 @@ private:
     void moveToParagraph(int index);
     [[nodiscard]] ParagraphStyle styleOfParagraph(int index) const;
     [[nodiscard]] FormatMenu* formatMenu() const;
+    // Creates a note with the New Note action; the editor has it, focused.
+    void newNote();
+    // Closes the window (which saves) and returns the note that was open.
+    [[nodiscard]] Note closeAndReload();
 
     std::unique_ptr<notes::test::TempDb> m_dir;
     std::unique_ptr<notes::app::AppContext> m_context;
@@ -119,6 +128,23 @@ ParagraphStyle tst_ParagraphStyles::styleOfParagraph(int index) const
 FormatMenu* tst_ParagraphStyles::formatMenu() const
 {
     return m_window->findChild<FormatMenu*>(QStringLiteral("formatMenu"));
+}
+
+void tst_ParagraphStyles::newNote()
+{
+    m_window->actions().action(ActionId::NewNote)->trigger();
+    QTRY_VERIFY(m_edit->toPlainText().isEmpty());
+    QTRY_VERIFY(m_edit->hasFocus());
+}
+
+Note tst_ParagraphStyles::closeAndReload()
+{
+    const std::optional<qint64> open =
+        m_window->findChild<notes::ui::NoteListView*>(QStringLiteral("noteListPane"))
+            ->currentNote();
+    m_window->close(); // saves
+    m_window = nullptr;
+    return await(m_context->notes().get(open.value_or(0))).value();
 }
 
 // TC-EDT-002
@@ -282,6 +308,52 @@ void tst_ParagraphStyles::stylesNeedAnEditableNote()
     QTRY_VERIFY(m_editor->textEdit()->isReadOnly());
     QVERIFY(!m_window->actions().action(ActionId::Format)->isEnabled());
     QVERIFY(!formatMenu()->styleAction(ParagraphStyle::Title)->isEnabled());
+}
+
+// TC-EDT-006: a new note starts with its title, and Enter gives Body.
+void tst_ParagraphStyles::newNoteStartsWithTitle()
+{
+    openWindow();
+    newNote();
+    QCOMPARE(styleOfParagraph(0), ParagraphStyle::Title);
+    QVERIFY(formatMenu()->styleAction(ParagraphStyle::Title)->isChecked());
+    QVERIFY(!m_edit->document()->isUndoAvailable()); // not an edit
+
+    QTest::keyClicks(m_edit, QStringLiteral("Groceries"));
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QTest::keyClicks(m_edit, QStringLiteral("Milk"));
+    QCOMPARE(styleOfParagraph(0), ParagraphStyle::Title);
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Body);
+    // Typed in the title's font, not just marked as a heading.
+    const QTextBlock title = m_edit->document()->firstBlock();
+    QVERIFY(title.begin().fragment().charFormat().fontWeight() >= QFont::Bold);
+
+    const Note saved = closeAndReload();
+    QCOMPARE(saved.title, QStringLiteral("Groceries"));
+    QCOMPARE(saved.bodyText, QStringLiteral("Groceries\nMilk"));
+    QTextDocument stored;
+    QVERIFY(!notes::editor::NoteFormat::deserialize(saved.body, stored).has_value());
+    QCOMPARE(StyleManager::styleOf(stored.firstBlock()), ParagraphStyle::Title);
+    QCOMPARE(StyleManager::styleOf(stored.findBlockByNumber(1)), ParagraphStyle::Body);
+}
+
+// TC-EDT-007: the note's title is its first line, whatever that is now.
+void tst_ParagraphStyles::deletingFirstLineRenamesNote()
+{
+    openWindow();
+    newNote();
+    QTest::keyClicks(m_edit, QStringLiteral("Groceries"));
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QTest::keyClicks(m_edit, QStringLiteral("Milk"));
+
+    QTextCursor firstLine(m_edit->document()->firstBlock());
+    firstLine.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
+    m_edit->setTextCursor(firstLine);
+    QTest::keyClick(m_edit, Qt::Key_Delete);
+    QCOMPARE(m_edit->toPlainText(), QStringLiteral("Milk"));
+
+    const Note saved = closeAndReload();
+    QCOMPARE(saved.title, QStringLiteral("Milk"));
 }
 
 QTEST_MAIN(tst_ParagraphStyles)
