@@ -20,6 +20,14 @@ enum class ParagraphStyle : std::uint8_t {
     Monospaced,
 };
 
+// Inline formats (task 3.4), in the Format menu's order.
+enum class InlineStyle : std::uint8_t {
+    Bold,
+    Italic,
+    Underline,
+    Strikethrough,
+};
+
 // Paragraph styles (task 3.2). A style is stored as what it means: Title,
 // Heading and Subheading are heading levels 1, 2 and 3, Monospaced is text in
 // JetBrains Mono, Body is neither. Fonts and sizes are not stored (ADR 0006):
@@ -55,6 +63,15 @@ public:
     // Whether text in `format` is monospaced: ours (JetBrains Mono, fixed
     // pitch) or Qt's Markdown code ("monospace" family).
     [[nodiscard]] static bool isMonospaced(const QTextCharFormat& format);
+
+    // Inline formats (task 3.4).
+    [[nodiscard]] static bool hasInline(const QTextCharFormat& format, InlineStyle style);
+    // The format to merge to turn `style` on or off.
+    [[nodiscard]] static QTextCharFormat inlineFormat(InlineStyle style, bool on);
+    // Turns `style` on or off for the cursor's selection, as one undo step.
+    // Bold skips headings: their bold is the style's (and isn't stored), so
+    // the user's bold or not-bold wouldn't survive saving there.
+    static void setInline(QTextCursor& cursor, InlineStyle style, bool on);
 };
 
 } // namespace notes::editor

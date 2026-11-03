@@ -7,6 +7,8 @@
 #include <QTextCursor>
 #include <QTextDocument>
 
+#include <algorithm>
+
 namespace notes::editor {
 
 namespace {
@@ -189,6 +191,67 @@ void StyleManager::styleHeadings(QTextDocument& document)
             editRuns(block, [&](QTextCharFormat& run) { styleHeadingRun(run, level, base); });
         }
     }
+}
+
+bool StyleManager::hasInline(const QTextCharFormat& format, InlineStyle style)
+{
+    switch (style) {
+    case InlineStyle::Bold:
+        return format.fontWeight() >= QFont::Bold;
+    case InlineStyle::Italic:
+        return format.fontItalic();
+    case InlineStyle::Underline:
+        return format.fontUnderline();
+    case InlineStyle::Strikethrough:
+        return format.fontStrikeOut();
+    }
+    return false;
+}
+
+QTextCharFormat StyleManager::inlineFormat(InlineStyle style, bool on)
+{
+    QTextCharFormat format;
+    switch (style) {
+    case InlineStyle::Bold:
+        format.setFontWeight(on ? QFont::Bold : QFont::Normal);
+        break;
+    case InlineStyle::Italic:
+        format.setFontItalic(on);
+        break;
+    case InlineStyle::Underline:
+        format.setFontUnderline(on);
+        break;
+    case InlineStyle::Strikethrough:
+        format.setFontStrikeOut(on);
+        break;
+    }
+    return format;
+}
+
+void StyleManager::setInline(QTextCursor& cursor, InlineStyle style, bool on)
+{
+    const QTextDocument* document = cursor.document();
+    if (document == nullptr || !cursor.hasSelection()) {
+        return;
+    }
+    const QTextCharFormat format = inlineFormat(style, on);
+    const int start = cursor.selectionStart();
+    const int end = cursor.selectionEnd();
+    cursor.beginEditBlock();
+    for (QTextBlock block = document->findBlock(start); block.isValid() && block.position() < end;
+         block = block.next()) {
+        if (style == InlineStyle::Bold && block.blockFormat().headingLevel() > 0) {
+            continue;
+        }
+        QTextCursor part(cursor.document());
+        part.setPosition(std::max(start, block.position()));
+        part.setPosition(std::min(end, block.position() + block.length() - 1),
+                         QTextCursor::KeepAnchor);
+        if (part.hasSelection()) {
+            part.mergeCharFormat(format);
+        }
+    }
+    cursor.endEditBlock();
 }
 
 bool StyleManager::isMonospaced(const QTextCharFormat& format)

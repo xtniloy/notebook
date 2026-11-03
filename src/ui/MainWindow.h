@@ -105,8 +105,9 @@ private:
     void restoreLayout();
     void saveLayout();
     void showAbout();
-    // The Format menu follows the editor: the current paragraph's style is
-    // checked, and styles can be chosen only while a note can be edited.
+    // The Format menu follows the editor: the current paragraph's style and
+    // the inline formats at the cursor are checked, and both can be chosen
+    // only while a note can be edited.
     void updateFormatMenu();
 
     app::AppContext& m_context;

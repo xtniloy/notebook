@@ -7,6 +7,8 @@
 #include "ui/dialogs/AboutDialog.h"
 
 #include <QAction>
+#include <QHash>
+#include <QKeySequence>
 #include <QPlainTextEdit>
 #include <QSettings>
 #include <QSplitter>
@@ -36,6 +38,7 @@ private slots:
     void corruptSettingsFallBackToDefaults_data();
     void corruptSettingsFallBackToDefaults();
     void aboutListsThirdPartyLicenses();
+    void noSharedShortcutsInWindow();
 
 private:
     std::unique_ptr<MainWindow> showWindow();
@@ -273,6 +276,28 @@ void tst_MainWindow::aboutListsThirdPartyLicenses()
     for (const char* expected : {"Inter (font)", "JetBrains Mono (font)", "Lucide (icons)",
                                  "SIL Open Font License", "ISC License"}) {
         QVERIFY2(text.contains(QLatin1StringView(expected)), expected);
+    }
+}
+
+// TC-UI-010 for the whole window: the toolbar's actions, the Format menu's
+// styles and inline formats (tasks 3.2, 3.4) and the menus' own actions never
+// share a shortcut.
+void tst_MainWindow::noSharedShortcutsInWindow()
+{
+    const auto window = showWindow();
+    QVERIFY(window);
+    QHash<QKeySequence, QString> owners;
+    for (const QAction* action : window->findChildren<QAction*>()) {
+        for (const QKeySequence& shortcut : action->shortcuts()) {
+            const QString owner = owners.value(shortcut);
+            QVERIFY2(owner.isEmpty() || owner == action->objectName(),
+                     qPrintable(QStringLiteral("%1: %2 and %3")
+                                    .arg(shortcut.toString(), owner, action->objectName())));
+            owners.insert(shortcut, action->objectName());
+        }
+    }
+    for (const char* shortcut : {"Ctrl+B", "Ctrl+I", "Ctrl+U", "Ctrl+Shift+X", "Ctrl+Shift+T"}) {
+        QVERIFY2(owners.contains(QKeySequence(QLatin1StringView(shortcut))), shortcut);
     }
 }
 

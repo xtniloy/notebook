@@ -79,6 +79,44 @@ void NoteTextEdit::setParagraphStyle(editor::ParagraphStyle style)
     setTextCursor(cursor);
 }
 
+bool NoteTextEdit::inlineStyle(editor::InlineStyle style) const
+{
+    return editor::StyleManager::hasInline(currentCharFormat(), style);
+}
+
+bool NoteTextEdit::canSetInlineStyle(editor::InlineStyle style) const
+{
+    if (style != editor::InlineStyle::Bold) {
+        return true;
+    }
+    // Bold if any selected paragraph isn't a heading (those are skipped).
+    const QTextCursor cursor = textCursor();
+    const QTextBlock last = document()->findBlock(cursor.selectionEnd());
+    for (QTextBlock block = document()->findBlock(cursor.selectionStart()); block.isValid();
+         block = block.next()) {
+        if (block.blockFormat().headingLevel() == 0) {
+            return true;
+        }
+        if (block == last) {
+            break;
+        }
+    }
+    return false;
+}
+
+void NoteTextEdit::setInlineStyle(editor::InlineStyle style, bool on)
+{
+    if (isReadOnly() || !canSetInlineStyle(style)) {
+        return;
+    }
+    QTextCursor cursor = textCursor();
+    if (cursor.hasSelection()) {
+        editor::StyleManager::setInline(cursor, style, on);
+    } else {
+        mergeCurrentCharFormat(editor::StyleManager::inlineFormat(style, on));
+    }
+}
+
 void NoteTextEdit::keyPressEvent(QKeyEvent* event)
 {
     const bool enter = event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter;

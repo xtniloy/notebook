@@ -34,6 +34,7 @@ class tst_NoteFormat : public QObject
 private slots:
     void roundTripIsExact();
     void roundTripKeepsEveryBlock();
+    void mixedInlineFormatsInOneParagraph();
     void keepsWhatQtHtmlLoses();
     void emptyDocument();
     void outputIsCompactAndStable();
@@ -80,6 +81,37 @@ void tst_NoteFormat::roundTripKeepsEveryBlock()
 }
 
 // The spike's findings (ADR 0006): Qt's HTML loses these; the format keeps them.
+// TC-EDT-010: overlapping inline formats in one paragraph, each run keeping
+// exactly its own set, and the paragraph's runs split only where they change.
+void tst_NoteFormat::mixedInlineFormatsInOneParagraph()
+{
+    QTextDocument document;
+    QTextCursor cursor(&document);
+    const auto run = [&](const QString& text, bool b, bool i, bool u, bool s) {
+        QTextCharFormat format;
+        format.setFontWeight(b ? QFont::Bold : QFont::Normal);
+        format.setFontItalic(i);
+        format.setFontUnderline(u);
+        format.setFontStrikeOut(s);
+        cursor.insertText(text, format);
+    };
+    run(QStringLiteral("plain "), false, false, false, false);
+    run(QStringLiteral("bold "), true, false, false, false);
+    run(QStringLiteral("bold italic "), true, true, false, false);
+    run(QStringLiteral("all four "), true, true, true, true);
+    run(QStringLiteral("underline strike "), false, false, true, true);
+    run(QStringLiteral("italic"), false, true, false, false);
+
+    const QString json = NoteFormat::serialize(document);
+    const auto reloaded = load(json);
+    QVERIFY(reloaded);
+    QCOMPARE(dumpDocument(*reloaded), dumpDocument(document));
+    QCOMPARE(reloaded->blockCount(), 1);
+    QCOMPARE(NoteFormat::serialize(*reloaded), json);
+    // Six runs: one per change, none merged across a difference.
+    QCOMPARE(json.count(QStringLiteral(R"("text")")), 6);
+}
+
 void tst_NoteFormat::keepsWhatQtHtmlLoses()
 {
     QTextDocument fixture;

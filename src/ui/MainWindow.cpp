@@ -193,6 +193,13 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     connect(m_formatMenu, &FormatMenu::styleChosen, this, [this](editor::ParagraphStyle style) {
         m_editor->textEdit()->setParagraphStyle(style);
     });
+    connect(m_formatMenu, &FormatMenu::inlineStyleToggled, this,
+            [this](editor::InlineStyle style, bool on) {
+                m_editor->textEdit()->setInlineStyle(style, on);
+                updateFormatMenu(); // the check mark follows what applied
+            });
+    connect(m_editor->textEdit(), &QTextEdit::currentCharFormatChanged, this,
+            &MainWindow::updateFormatMenu);
     connect(m_editor->textEdit(), &QTextEdit::cursorPositionChanged, this,
             &MainWindow::updateFormatMenu);
     connect(m_editor->textEdit(), &QTextEdit::textChanged, this, &MainWindow::updateFormatMenu);
@@ -353,6 +360,8 @@ void MainWindow::createMenus()
 
     QMenu* formatMenu = menuBar()->addMenu(tr("F&ormat"));
     formatMenu->addActions(m_formatMenu->styleActions());
+    formatMenu->addSeparator();
+    formatMenu->addActions(m_formatMenu->inlineActions());
     formatMenu->addSeparator();
     add(formatMenu, {ActionId::Checklist, ActionId::InsertTable, ActionId::Attachment});
     connect(formatMenu, &QMenu::aboutToShow, this, &MainWindow::updateFormatMenu);
@@ -756,6 +765,13 @@ void MainWindow::updateFormatMenu()
     m_actions->action(ActionId::Format)->setEnabled(editable);
     m_formatMenu->setStylesEnabled(editable);
     m_formatMenu->setCurrentStyle(edit->paragraphStyle());
+    using editor::InlineStyle;
+    for (const InlineStyle style : {InlineStyle::Bold, InlineStyle::Italic, InlineStyle::Underline,
+                                    InlineStyle::Strikethrough}) {
+        QAction* action = m_formatMenu->inlineAction(style);
+        action->setChecked(edit->inlineStyle(style));
+        action->setEnabled(editable && edit->canSetInlineStyle(style));
+    }
 }
 
 void MainWindow::paintEvent(QPaintEvent* /*event*/)

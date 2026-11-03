@@ -38,6 +38,15 @@ public:
     // step. Does nothing while read-only.
     void setParagraphStyle(editor::ParagraphStyle style);
 
+    // Whether the text at the cursor (what typing would produce) has `style`.
+    [[nodiscard]] bool inlineStyle(editor::InlineStyle style) const;
+    // Turns `style` on or off for the selection (one undo step), or, with
+    // nothing selected, for the text typed next. Bold can't be changed in a
+    // heading, which is bold by its style. Does nothing while read-only.
+    void setInlineStyle(editor::InlineStyle style, bool on);
+    // Whether `style` can be changed at the cursor (Bold: not in a heading).
+    [[nodiscard]] bool canSetInlineStyle(editor::InlineStyle style) const;
+
 protected:
     void changeEvent(QEvent* event) override;
     // Enter at the end of a heading starts a Body paragraph, as in macOS Notes;

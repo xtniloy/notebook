@@ -573,9 +573,9 @@ Record each in `docs/adr/`:
 
 ### 3.4 Inline formatting `S`
 
-- [ ] Bold `Ctrl+B`, Italic `Ctrl+I`, Underline `Ctrl+U`, Strikethrough `Ctrl+Shift+X`
-- [ ] Toolbar/menu toggle states follow the cursor position
-- [ ] Applying with no selection sets the format for the next typed text
+- [x] Bold `Ctrl+B`, Italic `Ctrl+I`, Underline `Ctrl+U`, Strikethrough `Ctrl+Shift+X` *(checkable actions in the Aa menu below the paragraph styles, and in the menu bar's Format menu. A selection across paragraphs is one undo step. Headings are bold by their style, which isn't stored as the user's bold (3.2): there Bold is shown on and disabled, and a selection across a heading changes only the other paragraphs. `tst_mainwindow` now checks that no two actions in the window share a shortcut)*
+- [x] Toolbar/menu toggle states follow the cursor position *(the check marks follow the text at the cursor, i.e. what typing would produce)*
+- [x] Applying with no selection sets the format for the next typed text
 
 **Tests**
 - `TC-EDT-008` (UI) Select word, `Ctrl+B` → bold; again → not bold.
