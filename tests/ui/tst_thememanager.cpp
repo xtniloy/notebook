@@ -106,6 +106,7 @@ private slots:
     void colorsAreReadable_data();
     void colorsAreReadable();
     void iconsFollowTheTheme();
+    void appIconHasRoundCorners();
     void switchFadesWithinLimit();
     void appearanceMenuSwitchesTheme();
 
@@ -330,6 +331,29 @@ void tst_ThemeManager::iconsFollowTheTheme()
              ThemeManager::colors(Theme::Dark).accentText);
     QCOMPARE(dominantColor(trash.pixmap(QSize(48, 48), QIcon::Disabled).toImage()),
              ThemeManager::colors(Theme::Dark).mutedText);
+}
+
+// The logo's pad has rounded corners. They must be shapes, not a clip-path:
+// Qt's SVG renderer ignores clip-path and drew the pad square.
+void tst_ThemeManager::appIconHasRoundCorners()
+{
+    constexpr int kSize = 128; // the pad spans 16..112 here, corner radius ~19
+    const QImage logo = notes::ui::appIcon()
+                            .pixmap(QSize(kSize, kSize))
+                            .toImage()
+                            .convertToFormat(QImage::Format_ARGB32);
+    QCOMPARE(logo.size(), QSize(kSize, kSize));
+    // Just inside the pad's square corners, outside its rounding: empty.
+    for (const QPoint corner :
+         {QPoint(17, 17), QPoint(110, 17), QPoint(17, 110), QPoint(110, 110)}) {
+        QVERIFY2(qAlpha(logo.pixel(corner)) == 0,
+                 qPrintable(QStringLiteral("corner %1,%2").arg(corner.x()).arg(corner.y())));
+    }
+    // The pad itself, along its edges: drawn.
+    for (const QPoint edge : {QPoint(64, 17), QPoint(17, 64), QPoint(110, 64), QPoint(64, 110)}) {
+        QVERIFY2(qAlpha(logo.pixel(edge)) == 255,
+                 qPrintable(QStringLiteral("edge %1,%2").arg(edge.x()).arg(edge.y())));
+    }
 }
 
 void tst_ThemeManager::switchFadesWithinLimit()

@@ -13,16 +13,13 @@
       <stop offset="0.35" stop-color="#F4F5F6"/>
       <stop offset="1" stop-color="#C2C5CA"/>
     </linearGradient>
-    <clipPath id="pad">
-      <rect x="128" y="128" width="768" height="768" rx="150"/>
-    </clipPath>
   </defs>
 
-  <!-- Pad -->
-  <g clip-path="url(#pad)">
-    <rect x="128" y="128" width="768" height="768" fill="url(#paper)"/>
-    <rect x="128" y="128" width="768" height="178" fill="url(#header)"/>
-  </g>
+  <!-- Pad: rounded shapes, not a clip-path (Qt's SVG renderer ignores
+       clip-path, which drew the pad with square corners) -->
+  <rect x="128" y="128" width="768" height="768" rx="150" fill="url(#paper)"/>
+  <path d="M128 306 V278 A150 150 0 0 1 278 128 H746 A150 150 0 0 1 896 278 V306 Z"
+        fill="url(#header)"/>
 
   <!-- Ring holes -->
   <g fill="#D29A14">
