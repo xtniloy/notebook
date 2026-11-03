@@ -16,3 +16,5 @@ notes_add_test(NAME tst_wiring SOURCES tst_wiring.cpp LABELS ui integration LIBS
 notes_add_test(NAME tst_dragdrop SOURCES tst_dragdrop.cpp LABELS ui LIBS notesapp_ui)
 # UI review: menus drawn by AppStyle (rounded, shadow, right-aligned shortcuts).
 notes_add_test(NAME tst_appstyle SOURCES tst_appstyle.cpp LABELS ui LIBS notesapp_ui)
+# TC-EDT-002, TC-EDT-003, TC-EDT-005: paragraph styles in the window (task 3.2).
+notes_add_test(NAME tst_paragraphstyles SOURCES tst_paragraphstyles.cpp LABELS ui LIBS notesapp_ui)

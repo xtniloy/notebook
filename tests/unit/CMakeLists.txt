@@ -27,3 +27,6 @@ notes_add_test(NAME tst_autosave_unit SOURCES tst_autosave_unit.cpp LABELS unit)
 
 # TC-EDT-001: the note body format's round-trip harness (task 3.1).
 notes_add_test(NAME tst_noteformat SOURCES tst_noteformat.cpp LABELS unit LIBS notesapp_ui)
+
+# TC-EDT-002, TC-EDT-004, TC-EDT-005 on the document: paragraph styles (task 3.2).
+notes_add_test(NAME tst_stylemanager SOURCES tst_stylemanager.cpp LABELS unit LIBS notesapp_ui)

@@ -1,5 +1,7 @@
 #include "editor/NoteFormat.h"
 
+#include "editor/StyleManager.h"
+
 #include <QColor>
 #include <QHash>
 #include <QJsonArray>
@@ -63,18 +65,6 @@ constexpr int kMaxHeading = 6;
 constexpr int kMaxIndent = 16;
 constexpr int kMaxTableSide = 1000;
 
-// Monospaced text: our own (JetBrains Mono, fixed pitch) or Qt's Markdown code
-// ("monospace" family, no fixed-pitch flag).
-bool isMonospaced(const QTextCharFormat& format)
-{
-    if (format.fontFixedPitch()) {
-        return true;
-    }
-    const QStringList families = format.fontFamilies().toStringList();
-    return families.contains(QStringLiteral("monospace")) ||
-           families.contains(QStringLiteral("JetBrains Mono"));
-}
-
 QString colorName(const QColor& color)
 {
     return color.alpha() == 255 ? color.name(QColor::HexRgb) : color.name(QColor::HexArgb);
@@ -82,10 +72,12 @@ QString colorName(const QColor& color)
 
 // ---- Serializing
 
-QJsonObject runFor(const QTextCharFormat& format, const QString& text)
+// `inHeading`: a heading's bold comes from its style (StyleManager), so it
+// isn't the user's bold and isn't stored.
+QJsonObject runFor(const QTextCharFormat& format, const QString& text, bool inHeading)
 {
     QJsonObject run{{QStringLiteral("text"), text}};
-    if (format.fontWeight() >= QFont::Bold) {
+    if (!inHeading && format.fontWeight() >= QFont::Bold) {
         run.insert(QStringLiteral("b"), true);
     }
     if (format.fontItalic()) {
@@ -97,7 +89,7 @@ QJsonObject runFor(const QTextCharFormat& format, const QString& text)
     if (format.fontStrikeOut()) {
         run.insert(QStringLiteral("s"), true);
     }
-    if (isMonospaced(format)) {
+    if (StyleManager::isMonospaced(format)) {
         run.insert(QStringLiteral("mono"), true);
     }
     if (format.background().style() != Qt::NoBrush) {
@@ -234,7 +226,8 @@ private:
                 }
                 continue;
             }
-            const QJsonObject run = runFor(format, fragment.text());
+            const QJsonObject run =
+                runFor(format, fragment.text(), block.blockFormat().headingLevel() > 0);
             // Fragments can differ in properties the format doesn't keep (a
             // font size): merge them, so a document has one serialization.
             if (!runs.isEmpty() && sameStyle(runs.last().toObject(), run)) {
@@ -480,6 +473,8 @@ std::optional<QString> NoteFormat::deserialize(const QString& json, QTextDocumen
             reader.paragraph(cursor, reuse, node);
         }
     }
+    // Fonts aren't stored: headings get theirs from their style.
+    StyleManager::styleHeadings(document);
     cursor.endEditBlock();
     document.setUndoRedoEnabled(undo);
     return std::nullopt;

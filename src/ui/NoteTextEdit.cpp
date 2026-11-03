@@ -3,7 +3,10 @@
 #include "editor/NoteFormat.h"
 
 #include <QEvent>
+#include <QKeyEvent>
 #include <QScrollBar>
+#include <QTextBlock>
+#include <QTextCursor>
 #include <QTextDocument>
 #include <QTextFrame>
 
@@ -46,6 +49,50 @@ void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText)
 QString NoteTextEdit::noteBody() const
 {
     return editor::NoteFormat::serialize(*document());
+}
+
+editor::ParagraphStyle NoteTextEdit::paragraphStyle() const
+{
+    const QTextCursor cursor = textCursor();
+    return editor::StyleManager::styleOf(document()->findBlock(cursor.selectionStart()));
+}
+
+void NoteTextEdit::setParagraphStyle(editor::ParagraphStyle style)
+{
+    if (isReadOnly()) {
+        return;
+    }
+    QTextCursor cursor = textCursor();
+    editor::StyleManager::apply(cursor, style);
+    setTextCursor(cursor);
+}
+
+void NoteTextEdit::keyPressEvent(QKeyEvent* event)
+{
+    const bool enter = event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter;
+    QTextCursor cursor = textCursor();
+    if (enter && !isReadOnly() && event->modifiers() == Qt::NoModifier &&
+        cursor.blockFormat().headingLevel() > 0) {
+        cursor.beginEditBlock();
+        cursor.removeSelectedText();
+        if (cursor.atBlockEnd()) {
+            // A new paragraph without the heading's level or font. Keeps what
+            // isn't the heading's own (indent, alignment).
+            QTextBlockFormat body = cursor.blockFormat();
+            body.setHeadingLevel(0);
+            body.clearProperty(editor::NoteFormat::kCollapsedProperty);
+            cursor.insertBlock(body, QTextCharFormat());
+        } else {
+            // Split: both halves stay headings. (Qt's own Enter drops the
+            // level but not the font, leaving Body that looks like a heading.)
+            cursor.insertBlock(cursor.blockFormat(), cursor.charFormat());
+        }
+        cursor.endEditBlock();
+        setTextCursor(cursor);
+        ensureCursorVisible();
+        return;
+    }
+    QTextEdit::keyPressEvent(event);
 }
 
 void NoteTextEdit::applyBottomPadding()

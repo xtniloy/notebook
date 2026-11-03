@@ -546,10 +546,10 @@ Record each in `docs/adr/`:
 
 ### 3.2 Paragraph styles `M`
 
-- [ ] `StyleManager` with Title, Heading, Subheading, Body, Monospaced (mapped to heading levels 1/2/3, none, and JetBrains Mono)
-- [ ] **Aa** Format popup menu (Plan §3.2) showing the current style checked
-- [ ] Shortcuts: `Ctrl+Shift+T` Title, `Ctrl+Shift+H` Heading, `Ctrl+Shift+J` Subheading, `Ctrl+Shift+B` Body *(mirrors macOS; check against Plan §3.2 table for conflicts)*
-- [ ] Each style change is one undo step (`beginEditBlock`/`endEditBlock`)
+- [x] `StyleManager` with Title, Heading, Subheading, Body, Monospaced (mapped to heading levels 1/2/3, none, and JetBrains Mono) *(`editor/StyleManager`. Fonts aren't stored (ADR 0006): headings get theirs from the style when a note loads: bold, at 1.75× / 1.4× / 1.15× the body size (19.25 / 15.4 / 12.65 pt under 11 pt). A heading's bold is the style's, so `NoteFormat` doesn't save it as the user's. Changing style takes back only what the old style added; the user's italic, colors and links stay. Levels 4–6 from pasted Markdown show as Subheading and keep their level. Enter at the end of a heading starts a Body paragraph, as in macOS Notes; elsewhere it splits the heading into two (Qt's own Enter dropped the level but kept the big font))*
+- [x] **Aa** Format popup menu (Plan §3.2) showing the current style checked *(`ui/FormatMenu`; the same actions head the menu bar's Format menu. Aa and the styles are disabled without an editable note: none selected, locked, or in Recently Deleted)*
+- [x] Shortcuts: `Ctrl+Shift+T` Title, `Ctrl+Shift+H` Heading, `Ctrl+Shift+J` Subheading, `Ctrl+Shift+B` Body *(mirrors macOS; check against Plan §3.2 table for conflicts)* *(no conflicts; also `Ctrl+Shift+M` Monospaced, as macOS)*
+- [x] Each style change is one undo step (`beginEditBlock`/`endEditBlock`) *(also across several selected paragraphs)*
 
 **Tests**
 - `TC-EDT-002` (UI) Apply each style → block has correct heading level / font.

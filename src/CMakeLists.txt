@@ -82,6 +82,8 @@ add_library(notesapp_ui STATIC
     app/Application.h
     editor/NoteFormat.cpp
     editor/NoteFormat.h
+    editor/StyleManager.cpp
+    editor/StyleManager.h
     ui/ActionRegistry.cpp
     ui/ActionRegistry.h
     ui/AppStyle.cpp
@@ -92,6 +94,8 @@ add_library(notesapp_ui STATIC
     ui/dialogs/AlertDialog.h
     ui/EditorView.cpp
     ui/EditorView.h
+    ui/FormatMenu.cpp
+    ui/FormatMenu.h
     ui/Fonts.cpp
     ui/Fonts.h
     ui/Icons.cpp

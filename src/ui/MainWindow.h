@@ -30,6 +30,7 @@ class ActionRegistry;
 class SearchField;
 class WindowChrome;
 class EditorView;
+class FormatMenu;
 class NoteListView;
 class Sidebar;
 class ThemeManager;
@@ -104,6 +105,9 @@ private:
     void restoreLayout();
     void saveLayout();
     void showAbout();
+    // The Format menu follows the editor: the current paragraph's style is
+    // checked, and styles can be chosen only while a note can be edited.
+    void updateFormatMenu();
 
     app::AppContext& m_context;
     // Before any child widget, so it sees them being added (task 1.9).
@@ -130,6 +134,9 @@ private:
     qint64 m_focusEditorFor = 0;
     storage::NoteSort m_sort = storage::NoteSort::DateEdited;
     SearchField* m_searchField = nullptr;
+    // Paragraph styles (task 3.2): the Aa button's popup; its actions also
+    // head the menu bar's Format menu.
+    FormatMenu* m_formatMenu;
 
     // Kept while the sidebar is hidden, so it comes back at the same width.
     int m_sidebarWidth = kSidebarDefaultWidth;

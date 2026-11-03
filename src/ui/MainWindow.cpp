@@ -14,6 +14,7 @@
 #include "services/NoteService.h"
 #include "ui/ActionRegistry.h"
 #include "ui/EditorView.h"
+#include "ui/FormatMenu.h"
 #include "ui/Icons.h"
 #include "ui/NoteListView.h"
 #include "ui/NoteTextEdit.h"
@@ -154,6 +155,7 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     , m_noteListModel(new models::NoteListModel(context.notes(), context.clock(), this))
     , m_autosave(new services::Autosave(context.notes(), this))
     , m_sort(sortFromSettings(context.settings().value(kSortKey).toString()))
+    , m_formatMenu(new FormatMenu(this))
 {
     setWindowTitle(QString::fromLatin1(config::kDisplayName));
     setMinimumSize(kMinimumWindowSize);
@@ -188,6 +190,13 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
             &MainWindow::deleteCurrentNote);
     connect(m_editor->textEdit(), &QTextEdit::textChanged, m_autosave,
             &services::Autosave::markChanged);
+    connect(m_formatMenu, &FormatMenu::styleChosen, this, [this](editor::ParagraphStyle style) {
+        m_editor->textEdit()->setParagraphStyle(style);
+    });
+    connect(m_editor->textEdit(), &QTextEdit::cursorPositionChanged, this,
+            &MainWindow::updateFormatMenu);
+    connect(m_editor->textEdit(), &QTextEdit::textChanged, this, &MainWindow::updateFormatMenu);
+    connect(m_formatMenu, &QMenu::aboutToShow, this, &MainWindow::updateFormatMenu);
     m_sidebar->setModel(m_sidebarModel);
     m_noteList->setModel(m_noteListModel);
     // Selected during setModel() without a signal, if the rows were there already.
@@ -203,6 +212,7 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     createToolBar();
     createMenus();
     restoreLayout();
+    updateFormatMenu();
 }
 
 MainWindow::~MainWindow()
@@ -282,6 +292,14 @@ void MainWindow::createToolBar()
     addSpacer();
     addGroup({ActionId::ShareExport});
 
+    // Aa opens the paragraph styles.
+    for (auto* button : toolBar->findChildren<QToolButton*>()) {
+        if (button->defaultAction() == m_actions->action(ActionId::Format)) {
+            button->setMenu(m_formatMenu);
+            button->setPopupMode(QToolButton::InstantPopup);
+        }
+    }
+
     m_searchField = new SearchField(toolBar);
     m_searchField->setObjectName(QStringLiteral("searchField"));
     m_searchField->setToolTip(m_actions->action(ActionId::SearchAllNotes)->toolTip());
@@ -333,8 +351,11 @@ void MainWindow::createMenus()
     editMenu->addSeparator();
     add(editMenu, {ActionId::FindInNote, ActionId::SearchAllNotes});
 
-    add(menuBar()->addMenu(tr("F&ormat")),
-        {ActionId::Format, ActionId::Checklist, ActionId::InsertTable, ActionId::Attachment});
+    QMenu* formatMenu = menuBar()->addMenu(tr("F&ormat"));
+    formatMenu->addActions(m_formatMenu->styleActions());
+    formatMenu->addSeparator();
+    add(formatMenu, {ActionId::Checklist, ActionId::InsertTable, ActionId::Attachment});
+    connect(formatMenu, &QMenu::aboutToShow, this, &MainWindow::updateFormatMenu);
 
     QMenu* viewMenu = menuBar()->addMenu(tr("&View"));
     add(viewMenu, {ActionId::ListView, ActionId::GalleryView});
@@ -410,11 +431,13 @@ void MainWindow::openNote(qint64 noteId)
             m_autosave->untrack();
             if (!note) {
                 m_editor->clear();
+                updateFormatMenu();
                 return;
             }
             const QDateTime modified = QDateTime::fromMSecsSinceEpoch(note.value().updatedAt);
             if (note.value().locked) {
                 m_editor->showLockedNote(modified);
+                updateFormatMenu();
                 return;
             }
             m_editor->showNoteBody(note.value().body, note.value().bodyText, modified);
@@ -425,6 +448,7 @@ void MainWindow::openNote(qint64 noteId)
             if (note.value().isTrashed()) {
                 // Read-only in Recently Deleted, as in macOS Notes: recover it to edit.
                 m_editor->textEdit()->setReadOnly(true);
+                updateFormatMenu();
                 return;
             }
             const NoteTextEdit* edit = m_editor->textEdit();
@@ -432,6 +456,7 @@ void MainWindow::openNote(qint64 noteId)
                 return services::Autosave::Content{.body = edit->noteBody(),
                                                    .text = edit->toPlainText()};
             });
+            updateFormatMenu();
         });
 }
 
@@ -721,6 +746,16 @@ void MainWindow::clearEditor()
     m_openingNote = 0;
     m_autosave->untrack();
     m_editor->clear();
+    updateFormatMenu();
+}
+
+void MainWindow::updateFormatMenu()
+{
+    const NoteTextEdit* edit = m_editor->textEdit();
+    const bool editable = m_editor->hasNote() && !edit->isReadOnly();
+    m_actions->action(ActionId::Format)->setEnabled(editable);
+    m_formatMenu->setStylesEnabled(editable);
+    m_formatMenu->setCurrentStyle(edit->paragraphStyle());
 }
 
 void MainWindow::paintEvent(QPaintEvent* /*event*/)

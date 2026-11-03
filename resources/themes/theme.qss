@@ -92,6 +92,12 @@ QFrame#toolGroup QToolButton[position="only"] {
     border-radius: 6px;
 }
 
+/* Aa opens the Format menu: no arrow, it would crowd the icon. */
+QFrame#toolGroup QToolButton::menu-indicator {
+    image: none;
+    width: 0;
+}
+
 QLineEdit#searchField {
     background: ${base};
     color: ${text};

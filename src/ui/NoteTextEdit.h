@@ -1,11 +1,13 @@
 #pragma once
 
+#include "editor/StyleManager.h"
+
 #include <QTextEdit>
 
 namespace notes::ui {
 
-// The note body editor. Plain text for now; paragraph styles, lists, tables and
-// images arrive in Phase 3 (Plan §3.5).
+// The note body editor (Plan §3.5): paragraph styles (task 3.2); lists, tables
+// and images arrive later in Phase 3.
 class NoteTextEdit : public QTextEdit
 {
     Q_OBJECT
@@ -30,8 +32,17 @@ public:
     // The document in the note format, for saving.
     [[nodiscard]] QString noteBody() const;
 
+    // The style of the paragraph at the cursor (the first one selected).
+    [[nodiscard]] editor::ParagraphStyle paragraphStyle() const;
+    // Gives the selected paragraphs `style` (StyleManager::apply()): one undo
+    // step. Does nothing while read-only.
+    void setParagraphStyle(editor::ParagraphStyle style);
+
 protected:
     void changeEvent(QEvent* event) override;
+    // Enter at the end of a heading starts a Body paragraph, as in macOS Notes;
+    // elsewhere in a heading it splits it into two headings.
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     void updateViewportMargins();
