@@ -26,7 +26,9 @@ Other weights fall back to the nearest bundled one.
 
 [Lucide 1.57.0](https://github.com/lucide-icons/lucide/releases/tag/1.57.0) (`lucide-icons-1.57.0.zip`), copied unmodified except as noted below.
 
-`minus.svg`, `square.svg` and `copy.svg` (window buttons, task 1.9) came from the npm package
+`minus.svg`, `square.svg` and `copy.svg` (window buttons, task 1.9), and `undo-2.svg`, `redo-2.svg`,
+`scissors.svg`, `clipboard-paste.svg`, `delete.svg`, `text-select.svg` and `link.svg` (text menus)
+came from the npm package
 [`lucide-static@1.57.0`](https://unpkg.com/lucide-static@1.57.0/icons/) instead; its files add a
 `<!-- @license -->` comment and a `class` attribute, which were removed so they match the zip's.
 

@@ -5,18 +5,23 @@
 
 #include "TestHelpers.h"
 #include "ui/AppStyle.h"
+#include "ui/Icons.h"
 #include "ui/ThemeManager.h"
 
 #include <QApplication>
 #include <QHoverEvent>
+#include <QLineEdit>
 #include <QMenu>
 #include <QRegularExpression>
 #include <QScrollBar>
 #include <QStyleOptionSlider>
 #include <QTest>
+#include <QTextEdit>
 
 #include <algorithm>
+#include <array>
 #include <memory>
+#include <utility>
 
 using notes::ui::AppStyle;
 
@@ -33,6 +38,7 @@ private slots:
     void menuIsRoundedWithShadow();
     void panelLandsWhereQtPlacesTheMenu();
     void shortcutsAreRightAlignedAndMuted();
+    void textMenusUseLineIcons();
     void scrollBarIsThinWithoutArrows();
     void scrollBarTrackShowsOnHover_data();
     void scrollBarTrackShowsOnHover();
@@ -271,6 +277,43 @@ void tst_AppStyle::scrollHandleWidensOnHover()
     bar.setAttribute(Qt::WA_UnderMouse, true);
     bar.repaint();
     QCOMPARE(edgePixel().rgb(), colors.scrollHandleHover.rgb()); // full width on hover
+}
+
+// Qt's text menus (the note editor's right-click menu, the search field's)
+// show the app's line icons, not the desktop theme's colorful ones.
+void tst_AppStyle::textMenusUseLineIcons()
+{
+    using notes::ui::Icon;
+    const auto sameIcon = [](const QIcon& shown, Icon expected) {
+        constexpr QSize kSize(16, 16);
+        return shown.pixmap(kSize).toImage() == notes::ui::icon(expected).pixmap(kSize).toImage();
+    };
+
+    QTextEdit edit;
+    QLineEdit line;
+    for (QWidget* widget : {static_cast<QWidget*>(&edit), static_cast<QWidget*>(&line)}) {
+        auto* textEdit = qobject_cast<QTextEdit*>(widget);
+        const std::unique_ptr<QMenu> menu(
+            textEdit != nullptr ? textEdit->createStandardContextMenu()
+                                : qobject_cast<QLineEdit*>(widget)->createStandardContextMenu());
+        menu->ensurePolished();
+        const std::array<std::pair<const char*, Icon>, 7> expected{{
+            {"edit-undo", Icon::Undo},
+            {"edit-redo", Icon::Redo},
+            {"edit-cut", Icon::Cut},
+            {"edit-copy", Icon::Copy},
+            {"edit-paste", Icon::Paste},
+            {"edit-delete", Icon::DeleteText},
+            {"select-all", Icon::SelectAll},
+        }};
+        for (const auto& [name, icon] : expected) {
+            const auto* action = menu->findChild<QAction*>(QLatin1StringView(name));
+            if (action == nullptr) {
+                QFAIL(name);
+            }
+            QVERIFY2(sameIcon(action->icon(), icon), name);
+        }
+    }
 }
 
 QTEST_MAIN(tst_AppStyle)

@@ -391,7 +391,7 @@ void WindowChrome::updateFrame()
     }
     if (m_maximizeButton != nullptr) {
         const bool maximized = m_window->isMaximized();
-        m_maximizeButton->setIcon(icon(maximized ? Icon::WindowRestore : Icon::WindowMaximize));
+        m_maximizeButton->setIcon(icon(maximized ? Icon::Copy : Icon::WindowMaximize));
         const QString label = maximized ? tr("Restore") : tr("Maximize");
         m_maximizeButton->setToolTip(label);
         m_maximizeButton->setAccessibleName(label);

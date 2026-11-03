@@ -33,10 +33,18 @@ enum class Icon : std::uint8_t {
     Cloud,
     Expand,
     Collapse,
-    // Window buttons (close uses Clear).
+    // Window buttons (close uses Clear, restore uses Copy).
     WindowMinimize,
     WindowMaximize,
-    WindowRestore,
+    // Text editing menus (AppStyle swaps them in for the system theme's icons).
+    Undo,
+    Redo,
+    Cut,
+    Copy,
+    Paste,
+    DeleteText,
+    SelectAll,
+    Link,
 
     Count // not an icon; keep last
 };

@@ -12,7 +12,8 @@ namespace notes::ui {
 // in the muted color, a chevron for submenus, a clean check mark, and
 // separators inset from the sides. Colors come from the palette, so both
 // themes work. Applies to every QMenu: menu bar, right-click menus and Qt's
-// own text field menus.
+// own text field menus. Qt's text menus (Undo, Copy, Paste, ...) get the
+// app's thin line icons instead of the desktop theme's colorful ones.
 //
 // Scroll bars, like other modern apps (UI review): a thin rounded handle with
 // no arrows and no visible track; while the mouse is over the bar (or drags

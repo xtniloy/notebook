@@ -68,8 +68,22 @@ const char* iconFileName(Icon icon)
         return "minus";
     case Icon::WindowMaximize:
         return "square";
-    case Icon::WindowRestore:
+    case Icon::Undo:
+        return "undo-2";
+    case Icon::Redo:
+        return "redo-2";
+    case Icon::Cut:
+        return "scissors";
+    case Icon::Copy:
         return "copy";
+    case Icon::Paste:
+        return "clipboard-paste";
+    case Icon::DeleteText:
+        return "delete";
+    case Icon::SelectAll:
+        return "text-select";
+    case Icon::Link:
+        return "link";
     case Icon::Count:
         break;
     }

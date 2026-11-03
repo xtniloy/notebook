@@ -4,6 +4,8 @@
 #include "ui/Shadow.h"
 #include "ui/ThemeManager.h"
 
+#include <QAction>
+#include <QActionEvent>
 #include <QEvent>
 #include <QMenu>
 #include <QPainter>
@@ -13,6 +15,7 @@
 #include <QStyleOptionSlider>
 
 #include <algorithm>
+#include <array>
 
 namespace notes::ui {
 
@@ -23,6 +26,35 @@ constexpr int kIconSize = 16;
 // Where a menu was last placed after shifting, so a menu shown again without
 // being repositioned isn't shifted twice.
 constexpr char kShiftedPosProperty[] = "notesMenuShiftedPos";
+
+// Qt's own text menus (QTextEdit, QLineEdit) name their actions after the
+// freedesktop icons they take from the desktop theme, which are colorful.
+// These get the app's line icons instead, tinted like the rest.
+void useLineIcon(QAction* action)
+{
+    struct Replacement
+    {
+        QLatin1StringView name;
+        Icon icon = Icon::Count;
+    };
+    static constexpr std::array kReplacements{
+        Replacement{.name = QLatin1StringView("edit-undo"), .icon = Icon::Undo},
+        Replacement{.name = QLatin1StringView("edit-redo"), .icon = Icon::Redo},
+        Replacement{.name = QLatin1StringView("edit-cut"), .icon = Icon::Cut},
+        Replacement{.name = QLatin1StringView("edit-copy"), .icon = Icon::Copy},
+        Replacement{.name = QLatin1StringView("edit-paste"), .icon = Icon::Paste},
+        Replacement{.name = QLatin1StringView("edit-delete"), .icon = Icon::DeleteText},
+        Replacement{.name = QLatin1StringView("select-all"), .icon = Icon::SelectAll},
+        Replacement{.name = QLatin1StringView("link-copy"), .icon = Icon::Link},
+    };
+    const QString name = action->objectName();
+    for (const Replacement& replacement : kReplacements) {
+        if (name == replacement.name) {
+            action->setIcon(icon(replacement.icon));
+            return;
+        }
+    }
+}
 
 // Whether the menu reserves a left column for icons or check marks.
 bool hasColumn(const QStyleOptionMenuItem& item)
@@ -68,6 +100,10 @@ void AppStyle::polish(QWidget* widget)
         menu->setAttribute(Qt::WA_TranslucentBackground);
         menu->setWindowFlag(Qt::NoDropShadowWindowHint); // ours, not a square one
         menu->installEventFilter(this);
+        // Actions added before the menu was polished; later ones: eventFilter.
+        for (QAction* action : menu->actions()) {
+            useLineIcon(action);
+        }
     }
 }
 
@@ -81,7 +117,11 @@ void AppStyle::unpolish(QWidget* widget)
 
 bool AppStyle::eventFilter(QObject* watched, QEvent* event)
 {
-    if (event->type() == QEvent::Show) {
+    if (event->type() == QEvent::ActionAdded) {
+        if (const auto* added = dynamic_cast<QActionEvent*>(event)) {
+            useLineIcon(added->action());
+        }
+    } else if (event->type() == QEvent::Show) {
         if (auto* menu = qobject_cast<QMenu*>(watched)) {
             // Qt placed the menu's window where the panel belongs; the panel
             // sits kShadowMargin inside it.
