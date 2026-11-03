@@ -31,7 +31,7 @@
 #include <QDateTime>
 #include <QFrame>
 #include <QHBoxLayout>
-#include <QInputDialog>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -633,24 +633,25 @@ void MainWindow::showFolderMenu(qint64 folderId, const QPoint& globalPosition)
     menu.exec(globalPosition);
 }
 
-std::optional<QString> MainWindow::askFolderName(const QString& title, const QString& initial)
+std::optional<QString> MainWindow::askFolderName(const QString& title, const QString& initial,
+                                                 const QString& acceptText)
 {
-    QInputDialog dialog(this);
+    AlertDialog dialog(title, tr("Enter a name for this folder."), this);
     dialog.setObjectName(QStringLiteral("folderNameDialog"));
-    dialog.setWindowTitle(title);
-    dialog.setLabelText(tr("Name:"));
-    dialog.setTextValue(initial);
+    const QLineEdit* field = dialog.addTextField(initial);
+    dialog.addButton(tr("Cancel"), AlertDialog::ButtonRole::Cancel);
+    dialog.addButton(acceptText, AlertDialog::ButtonRole::Accept); // the default
     if (dialog.exec() != QDialog::Accepted) {
         return std::nullopt;
     }
-    const QString name = dialog.textValue().trimmed();
+    const QString name = field->text().trimmed();
     return name.isEmpty() ? std::nullopt : std::optional<QString>(name);
 }
 
 void MainWindow::newFolder(std::optional<qint64> parentId)
 {
-    const std::optional<QString> name =
-        askFolderName(parentId ? tr("New Subfolder") : tr("New Folder"), tr("New Folder"));
+    const std::optional<QString> name = askFolderName(
+        parentId ? tr("New Subfolder") : tr("New Folder"), tr("New Folder"), tr("Create"));
     if (!name) {
         return;
     }
@@ -671,7 +672,8 @@ void MainWindow::renameFolder(qint64 folderId)
                                   ->match(m_sidebarModel->index(0, 0), models::kFolderIdRole,
                                           folderId, 1, Qt::MatchExactly | Qt::MatchRecursive)
                                   .value(0);
-    const std::optional<QString> name = askFolderName(tr("Rename Folder"), index.data().toString());
+    const std::optional<QString> name =
+        askFolderName(tr("Rename Folder"), index.data().toString(), tr("Rename"));
     if (!name) {
         return;
     }
@@ -690,17 +692,13 @@ void MainWindow::deleteFolder(qint64 folderId)
                                   ->match(m_sidebarModel->index(0, 0), models::kFolderIdRole,
                                           folderId, 1, Qt::MatchExactly | Qt::MatchRecursive)
                                   .value(0);
-    QMessageBox confirm(QMessageBox::Warning, tr("Delete Folder"),
-                        tr("Delete the folder \u201c%1\u201d?").arg(index.data().toString()),
-                        QMessageBox::NoButton, this);
+    AlertDialog confirm(
+        tr("Delete the folder \u201c%1\u201d?").arg(index.data().toString()),
+        tr("Its subfolders are deleted too, and all their notes move to Recently Deleted."), this);
     confirm.setObjectName(QStringLiteral("deleteFolderDialog"));
-    confirm.setInformativeText(
-        tr("Its subfolders are deleted too, and all their notes move to Recently Deleted."));
-    const QPushButton* remove = confirm.addButton(tr("Delete"), QMessageBox::DestructiveRole);
-    confirm.addButton(QMessageBox::Cancel);
-    confirm.setDefaultButton(QMessageBox::Cancel);
-    confirm.exec();
-    if (confirm.clickedButton() != remove) {
+    confirm.addButton(tr("Cancel"), AlertDialog::ButtonRole::Cancel); // the default
+    confirm.addButton(tr("Delete"), AlertDialog::ButtonRole::Accept);
+    if (confirm.exec() != QDialog::Accepted) {
         return;
     }
     m_autosave->flush();

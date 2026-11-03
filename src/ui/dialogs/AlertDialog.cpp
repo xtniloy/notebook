@@ -5,6 +5,7 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPainter>
 #include <QPushButton>
 #include <QVBoxLayout>
@@ -16,7 +17,8 @@ namespace {
 constexpr int kPadding = 24;       // panel edge to its content
 constexpr int kIconGap = 16;       // icon to title
 constexpr int kTextGap = 10;       // title to message
-constexpr int kButtonGap = 22;     // message to buttons
+constexpr int kButtonGap = 22;     // message (or text field) to buttons
+constexpr int kFieldGap = 16;      // message to text field
 constexpr int kButtonSpacing = 8;  // between buttons
 constexpr int kBorderAlpha = 28;   // as the main window's edge (WindowChrome)
 constexpr qreal kTitleScale = 1.2; // title font, relative to the body text
@@ -25,6 +27,7 @@ constexpr qreal kTitleScale = 1.2; // title font, relative to the body text
 
 AlertDialog::AlertDialog(const QString& title, const QString& message, QWidget* parent)
     : QDialog(parent)
+    , m_content(new QVBoxLayout(this))
     , m_buttons(new QHBoxLayout)
 {
     setWindowFlag(Qt::FramelessWindowHint);
@@ -52,19 +55,48 @@ AlertDialog::AlertDialog(const QString& title, const QString& message, QWidget* 
 
     m_buttons->setSpacing(kButtonSpacing);
 
-    auto* layout = new QVBoxLayout(this);
     constexpr int kOuter = kShadowSize + kPadding;
-    layout->setContentsMargins(kOuter, kOuter, kOuter, kOuter);
-    layout->setSpacing(0);
-    layout->addWidget(icon);
-    layout->addSpacing(kIconGap);
-    layout->addWidget(titleLabel);
-    layout->addSpacing(kTextGap);
-    layout->addWidget(messageLabel);
-    layout->addSpacing(kButtonGap);
-    layout->addLayout(m_buttons);
+    m_content->setContentsMargins(kOuter, kOuter, kOuter, kOuter);
+    m_content->setSpacing(0);
+    m_content->addWidget(icon);
+    m_content->addSpacing(kIconGap);
+    m_content->addWidget(titleLabel);
+    m_content->addSpacing(kTextGap);
+    m_content->addWidget(messageLabel);
+    m_content->addSpacing(kButtonGap);
+    m_content->addLayout(m_buttons);
 
     fitHeight();
+}
+
+QLineEdit* AlertDialog::addTextField(const QString& text)
+{
+    if (m_field != nullptr) { // one field per alert
+        m_field->setText(text);
+        return m_field;
+    }
+    auto* field = new QLineEdit(text, this);            // owned by the dialog
+    field->setObjectName(QStringLiteral("alertField")); // style: theme.qss
+    // Between the message and the buttons: before the gap above the buttons.
+    const int buttonGap = m_content->indexOf(m_buttons) - 1;
+    m_content->insertSpacing(buttonGap, kFieldGap);
+    m_content->insertWidget(buttonGap + 1, field);
+    field->selectAll();
+    field->setFocus();
+    connect(field, &QLineEdit::textChanged, this, &AlertDialog::updateAcceptButtons);
+    m_field = field;
+    fitHeight();
+    return field;
+}
+
+void AlertDialog::updateAcceptButtons()
+{
+    const bool hasText = m_field == nullptr || !m_field->text().trimmed().isEmpty();
+    for (QPushButton* button : findChildren<QPushButton*>()) {
+        if (button->property("alertRole").toString() == u"accept") {
+            button->setEnabled(hasText);
+        }
+    }
 }
 
 QPushButton* AlertDialog::addButton(const QString& text, ButtonRole role)
@@ -76,14 +108,18 @@ QPushButton* AlertDialog::addButton(const QString& text, ButtonRole role)
     button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     connect(button, &QPushButton::clicked, this, cancel ? &QDialog::reject : &QDialog::accept);
 
-    // The default: Cancel if there is one, else the first accept button.
+    // The default: with a text field the first accept button, otherwise
+    // Cancel if there is one, else the first accept button.
+    const bool preferCancel = m_field == nullptr;
     QPushButton* current = nullptr;
     for (QPushButton* other : findChildren<QPushButton*>()) {
         if (other != button && other->isDefault()) {
             current = other;
         }
     }
-    if (current == nullptr || (cancel && current->property("alertRole").toString() != u"cancel")) {
+    const bool currentIsCancel =
+        current != nullptr && current->property("alertRole").toString() == u"cancel";
+    if (current == nullptr || (cancel == preferCancel && currentIsCancel != preferCancel)) {
         if (current != nullptr) {
             current->setDefault(false);
         }
@@ -91,6 +127,7 @@ QPushButton* AlertDialog::addButton(const QString& text, ButtonRole role)
     }
 
     m_buttons->addWidget(button);
+    updateAcceptButtons();
     fitHeight();
     return button;
 }
@@ -128,6 +165,9 @@ void AlertDialog::showEvent(QShowEvent* event)
         move(window->mapToGlobal(window->rect().center()) - rect().center());
     }
     QDialog::showEvent(event);
+    if (m_field != nullptr) {
+        m_field->setFocus();
+    }
 }
 
 } // namespace notes::ui

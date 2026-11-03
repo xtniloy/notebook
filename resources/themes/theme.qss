@@ -106,7 +106,22 @@ QLineEdit#searchField:focus {
     border-color: ${accent};
 }
 
-/* Alerts (AlertDialog): full-width buttons, the confirming one in the accent. */
+/* Alerts (AlertDialog): an optional name field, full-width buttons, the
+   confirming one in the accent. */
+QLineEdit#alertField {
+    background: ${base};
+    color: ${text};
+    border: 1px solid ${separator};
+    border-radius: 7px;
+    padding: 5px 8px;
+    selection-background-color: ${accent};
+    selection-color: ${accentText};
+}
+
+QLineEdit#alertField:focus {
+    border-color: ${accent};
+}
+
 QPushButton[alertRole="accept"],
 QPushButton[alertRole="cancel"] {
     border: 1px solid transparent;

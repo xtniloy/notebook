@@ -88,9 +88,10 @@ private:
     void newFolder(std::optional<qint64> parentId);
     void renameFolder(qint64 folderId);
     void deleteFolder(qint64 folderId);
-    // Asks for a folder name; nullopt if cancelled or blank.
-    [[nodiscard]] std::optional<QString> askFolderName(const QString& title,
-                                                       const QString& initial);
+    // Asks for a folder name; nullopt if cancelled or blank. `acceptText`
+    // names the confirming button ("Create", "Rename").
+    [[nodiscard]] std::optional<QString> askFolderName(const QString& title, const QString& initial,
+                                                       const QString& acceptText);
     void showError(const QString& text, const QString& details);
     // Selects m_pendingNote / m_pendingFolder once their rows have arrived.
     void selectPendingNote();

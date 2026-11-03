@@ -15,13 +15,13 @@
 #include "ui/NoteListView.h"
 #include "ui/NoteTextEdit.h"
 #include "ui/Sidebar.h"
+#include "ui/dialogs/AlertDialog.h"
 
-#include <QAbstractButton>
 #include <QAction>
 #include <QApplication>
-#include <QInputDialog>
+#include <QLineEdit>
 #include <QMenu>
-#include <QMessageBox>
+#include <QPushButton>
 #include <QSettings>
 #include <QTest>
 #include <QTimer>
@@ -36,6 +36,7 @@ using namespace std::chrono_literals;
 using notes::models::Folder;
 using notes::models::Note;
 using notes::test::await;
+using notes::ui::AlertDialog;
 using notes::ui::EditorView;
 using notes::ui::MainWindow;
 using notes::ui::NoteListView;
@@ -88,23 +89,41 @@ void typeText(QWidget* widget, const QString& text)
     }
 }
 
-// Answers the next folder name dialog.
+// The alert's button with `role` ("accept" or "cancel").
+QPushButton* alertButton(const QWidget* dialog, const QString& role)
+{
+    for (QPushButton* button : dialog->findChildren<QPushButton*>()) {
+        if (button->property("alertRole").toString() == role) {
+            return button;
+        }
+    }
+    return nullptr;
+}
+
+// Answers the next folder name dialog: types `name`, then Enter.
 void answerName(const QString& name)
 {
-    whenOpen<QInputDialog>([name](QInputDialog* input) {
-        input->setTextValue(name);
-        input->accept();
+    whenOpen<AlertDialog>([name](AlertDialog* dialog) {
+        QCOMPARE(dialog->objectName(), QStringLiteral("folderNameDialog"));
+        auto* field = dialog->findChild<QLineEdit*>(QStringLiteral("alertField"));
+        if (field == nullptr) {
+            QFAIL("name field expected");
+        }
+        field->selectAll();
+        QTest::keyClicks(field, name);
+        QTest::keyClick(field, Qt::Key_Return);
     });
 }
 
+// Confirms the next alert (Delete Folder).
 void clickDestructive()
 {
-    whenOpen<QMessageBox>([](QMessageBox* box) {
-        for (QAbstractButton* button : box->buttons()) {
-            if (box->buttonRole(button) == QMessageBox::DestructiveRole) {
-                button->click();
-            }
+    whenOpen<AlertDialog>([](AlertDialog* dialog) {
+        QPushButton* accept = alertButton(dialog, QStringLiteral("accept"));
+        if (accept == nullptr) {
+            QFAIL("accept button expected");
         }
+        accept->click();
     });
 }
 
@@ -125,6 +144,7 @@ private slots:
     void duplicateCopiesBody();
     void pinAndMoveFromMenu();
     void folderActions();
+    void folderNameDialog();
     void defaultFolderCannotBeRenamedOrDeleted();
     void sortIsSavedInSettings();
     void restartKeepsEverything();
@@ -372,6 +392,36 @@ void tst_Wiring::folderActions()
     QTRY_COMPARE(m_sidebar->currentFolder(), std::optional<qint64>(m_notesFolder));
     QCOMPARE(await(m_context->folders().listTree()).value().size(), 1);
     QVERIFY(await(m_context->notes().get(inside.id)).value().isTrashed());
+}
+
+// New Folder asks in the alert style: "New Folder" preselected, Create the
+// default (Enter), disabled while the name is blank; Escape creates nothing.
+void tst_Wiring::folderNameDialog()
+{
+    openWindow();
+    whenOpen<AlertDialog>([](AlertDialog* dialog) {
+        QCOMPARE(dialog->objectName(), QStringLiteral("folderNameDialog"));
+        auto* field = dialog->findChild<QLineEdit*>(QStringLiteral("alertField"));
+        QPushButton* create = alertButton(dialog, QStringLiteral("accept"));
+        QPushButton* cancel = alertButton(dialog, QStringLiteral("cancel"));
+        if (field == nullptr || create == nullptr || cancel == nullptr) {
+            QFAIL("name field, Create and Cancel expected");
+        }
+        QCOMPARE(field->text(), QStringLiteral("New Folder"));
+        QCOMPARE(field->selectedText(), QStringLiteral("New Folder"));
+        QCOMPARE(create->text(), QStringLiteral("Create"));
+        QVERIFY(create->isDefault());
+        QVERIFY(cancel->x() < create->x());
+
+        field->setText(QStringLiteral("   "));
+        QVERIFY(!create->isEnabled());
+        field->setText(QStringLiteral("Ideas"));
+        QVERIFY(create->isEnabled());
+        QTest::keyClick(dialog, Qt::Key_Escape);
+    });
+    m_sidebar->findChild<QToolButton*>(QStringLiteral("newFolderButton"))->click();
+    QTest::qWait(50);
+    QCOMPARE(await(m_context->folders().listTree()).value().size(), 1); // only "Notes"
 }
 
 void tst_Wiring::defaultFolderCannotBeRenamedOrDeleted()
