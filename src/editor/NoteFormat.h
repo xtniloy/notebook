@@ -1,7 +1,5 @@
 #pragma once
 
-#include "models/Note.h"
-
 #include <QString>
 #include <QTextFormat>
 
@@ -22,16 +20,18 @@ namespace notes::editor {
 // Only meaning is stored: fonts and sizes come from the paragraph styles when
 // a note is shown (task 3.2), so changing a style changes every note.
 //
-// Not stored (yet): nested tables, merged table cells, images other than
-// attachment references. Unknown keys in stored JSON are ignored, so newer
-// versions can add some without breaking older readers.
+// Every note body is this JSON; there is no other stored format. Not stored
+// (yet): nested tables, merged table cells, images other than attachment
+// references. Unknown keys in stored JSON are ignored, so newer versions can
+// add some without breaking older readers. A change older readers would
+// misread instead raises kVersion, which the JSON carries as "v".
+
 class NoteFormat
 {
 public:
-    // notes.format_version values (models/Note.h).
-    static constexpr int kLegacyHtml = models::kBodyFormatLegacyHtml;
-    static constexpr int kJson = models::kBodyFormatJson; // this format
-    static constexpr int kCurrent = models::kBodyFormatCurrent;
+    // The format's version, "v" in the JSON (omitted while it is 1). Bodies
+    // from a newer version fail to load, and the note's plain text shows.
+    static constexpr int kVersion = 1;
 
     // Our own block properties, kept by the format (Qt's HTML drops these).
     static constexpr int kCollapsedProperty = QTextFormat::UserProperty + 1; // bool, headings
@@ -44,10 +44,10 @@ public:
     // crashes on bad input (stored data may be corrupt or from a newer app).
     static std::optional<QString> deserialize(const QString& json, QTextDocument& document);
 
-    // Loads a stored body of any format_version into `document`. An empty body
-    // falls back to `plainText` (notes created without a body, e.g. in tests).
-    static void load(const QString& body, int formatVersion, const QString& plainText,
-                     QTextDocument& document);
+    // Loads a stored body into `document`. An empty body (notes from before
+    // the format, notes created without one) or an unreadable one shows
+    // `plainText` instead.
+    static void load(const QString& body, const QString& plainText, QTextDocument& document);
 };
 
 } // namespace notes::editor

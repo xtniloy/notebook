@@ -93,8 +93,7 @@ QFuture<DbResult<Note>> NoteService::duplicate(qint64 id)
                                                                  : titleFormat.arg(note.title),
                                    .snippet = note.snippet,
                                    .body = note.body,
-                                   .bodyText = note.bodyText,
-                                   .formatVersion = note.formatVersion};
+                                   .bodyText = note.bodyText};
             return notes.create(note.folderId, copy);
         })
         .then(this, [this](DbResult<Note> result) {

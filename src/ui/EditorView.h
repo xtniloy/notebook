@@ -24,9 +24,9 @@ public:
     ~EditorView() override;
 
     void showNote(const QString& text, const QDateTime& modified);
-    // A stored note body of any format version (editor::NoteFormat).
-    void showNoteBody(const QString& body, int formatVersion, const QString& plainText,
-                      const QDateTime& modified);
+    // A stored note body (editor::NoteFormat); `plainText` shows when it is
+    // empty or unreadable.
+    void showNoteBody(const QString& body, const QString& plainText, const QDateTime& modified);
     // The date stays visible; the content never reaches the editor.
     void showLockedNote(const QDateTime& modified);
     // Empty state: "No note selected", read-only editor.

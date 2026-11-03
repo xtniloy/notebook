@@ -44,8 +44,8 @@ public:
     // A new note in `folderId`, the folder selected in the sidebar. With All
     // Notes selected it goes into the default "Notes" folder; Recently Deleted
     // can't take new notes.
-    // `body` is in the current format (models::kBodyFormatCurrent, from
-    // editor::NoteFormat); `bodyText` is its plain text.
+    // `body` is the note format's JSON (editor::NoteFormat); `bodyText` is its
+    // plain text.
     QFuture<storage::DbResult<models::Note>> create(qint64 folderId, const QString& body,
                                                     const QString& bodyText);
     // A new note in the same folder with the same body, titled "<title> copy"

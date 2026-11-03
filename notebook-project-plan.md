@@ -290,7 +290,9 @@ Priority: **P0** = MVP, **P1** = v1.0, **P2** = after v1.0
 
 ## 7. Database Design
 
-**Note body format:** store Qt's rich-text HTML (`QTextDocument::toHtml()`) plus a plain-text copy for search. Images and files are stored in the `attachments` table (inside the encrypted DB), not as loose files.
+**Note body format:** our own versioned JSON describing what the note means (blocks with their heading level, list, checklist state, indent and alignment; runs of text with their inline formats and links; image references; tables), written by `editor/NoteFormat` (task 3.1, [ADR 0006](docs/adr/0006-note-format.md)). Qt's HTML was tried first and rejected: it drops the app's own properties (collapsed headings, attachment ids) and isn't stable across saves. No fonts or sizes are stored; they come from the paragraph styles when a note is shown. The same document always serializes to the same text, so bodies can be compared byte by byte (round-trip tests, sync).
+
+Every body is this JSON; there is no other stored format. If the format ever changes in a way older versions would misread, the JSON carries a version (`"v"`). A plain-text copy (`body_text`) feeds the title, preview and search. Markdown stays at the edges: pasting it (task 3.8) and exporting to it (task 8.3). Images and files are stored in the `attachments` table (inside the encrypted DB), not as loose files.
 
 ```sql
 -- Folders (nested via parent_id)
@@ -314,7 +316,7 @@ CREATE TABLE notes (
     folder_id     INTEGER REFERENCES folders(id),
     title         TEXT NOT NULL DEFAULT '',
     snippet       TEXT,                   -- preview line (NULL if locked)
-    body_html     TEXT,                   -- NULL if locked
+    body          TEXT,                   -- note format JSON (NULL if locked)
     body_text     TEXT,                   -- for FTS (NULL if locked)
     is_pinned     INTEGER DEFAULT 0,
     is_locked     INTEGER DEFAULT 0,
@@ -419,7 +421,7 @@ CREATE INDEX idx_notes_sync    ON notes(sync_state);
 3. Each locked note gets a random note key; content encrypted with `crypto_aead_xchacha20poly1305_ietf_encrypt`.
 4. Note key wrapped by Lock Key and stored in `wrapped_key`.
 5. Store a verifier (encrypted known value) to check the password without storing it.
-6. When locked: `body_html`, `body_text`, `snippet` are NULL; FTS indexes title only.
+6. When locked: `body`, `body_text`, `snippet` are NULL; FTS indexes title only.
 7. Unlocked content kept in memory only, cleared with `sodium_memzero` on relock.
 8. Auto-relock after 5 minutes idle (configurable), on screen lock, and on app close.
 9. Failed attempts: exponential delay (1s, 2s, 4s…).

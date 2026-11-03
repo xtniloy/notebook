@@ -417,8 +417,7 @@ void MainWindow::openNote(qint64 noteId)
                 m_editor->showLockedNote(modified);
                 return;
             }
-            m_editor->showNoteBody(note.value().body, note.value().formatVersion,
-                                   note.value().bodyText, modified);
+            m_editor->showNoteBody(note.value().body, note.value().bodyText, modified);
             if (noteId == m_focusEditorFor) {
                 m_focusEditorFor = 0;
                 m_editor->textEdit()->setFocus(Qt::OtherFocusReason);

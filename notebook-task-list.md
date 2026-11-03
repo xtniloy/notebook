@@ -419,7 +419,7 @@ Record each in `docs/adr/`:
 
 **Tests**
 - `TC-STO-013` (U) Create → get returns identical fields.
-- `TC-STO-014` (U) `listForFolder` does not load `body_html` (assert via a query counter or column list).
+- `TC-STO-014` (U) `listForFolder` does not load `body` (assert via a query counter or column list).
 - `TC-STO-015` (U) Pinned notes come first in every sort mode.
 - `TC-STO-016` (U) Sort by title: "apple", "Banana", "Élan" ordered correctly.
 - `TC-STO-017` (U) `updateBody` bumps `version` and `updated_at`; `created_at` unchanged.
@@ -537,7 +537,7 @@ Record each in `docs/adr/`:
   - **A:** Qt HTML + a small post-processor that adds `data-*` attributes for lost properties *(preferred if the spike shows little is lost)*
   - **B:** Own versioned JSON format for the document tree *(more work, full control)*
   - *Not Markdown as storage: it can't hold underline, colors, highlight, image size or collapsed sections, and converting in and out on every save would change notes slightly each time. Markdown is supported at the edges instead: paste (3.8), export and copy (8.3)*
-- [x] Add `format_version` to the stored body so the format can change later *(migration 002: `notes.body_html` → `body`, plus `format_version` (1 = Phase 2 Qt HTML, 2 = JSON). The editor reads both and saves JSON; `editor/NoteFormat`)*
+- [x] Add `format_version` to the stored body so the format can change later *(migration 002: `notes.body_html` → `body`, plus `format_version` (1 = Phase 2 Qt HTML, 2 = JSON). Amended 2026-11-03: JSON only. Migration 003 drops the Phase 2 HTML bodies (plain-text demo notes; `body_text` keeps the text, shown until the next save writes JSON) and the `format_version` column; the version now lives in the JSON as `"v"`. No Qt HTML reader in the app)*
 
 **Tests**
 - `TC-EDT-001` (U) Round-trip harness: `serialize(deserialize(serialize(doc))) == serialize(doc)` for a fixture document. This harness is reused by every later editor task.
@@ -916,7 +916,7 @@ For beta testers who used Phase 2/3 builds.
 
 ### 6.3 Lock service `L` → broken down
 
-- [ ] **(M)** `lock(noteId)`: generate note key, encrypt `body_html` → `locked_blob`, wrap note key with Lock Key → `wrapped_key`, set `body_html`, `body_text`, `snippet` to NULL, update FTS (title only), all in one transaction
+- [ ] **(M)** `lock(noteId)`: generate note key, encrypt `body` → `locked_blob`, wrap note key with Lock Key → `wrapped_key`, set `body`, `body_text`, `snippet` to NULL, update FTS (title only), all in one transaction
 - [ ] **(M)** Encrypt the note's attachments with the note key
 - [ ] **(S)** Enable `PRAGMA secure_delete = ON` so old plaintext pages are overwritten, not just marked free
 - [ ] **(M)** `unlock(noteId)`: decrypt into memory only; editing an unlocked note re-encrypts on autosave (plaintext never written to disk)

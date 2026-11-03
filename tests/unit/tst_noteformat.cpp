@@ -1,6 +1,6 @@
 // The note body format (task 3.1, ADR 0006): TC-EDT-001 round-trip harness,
-// plus what the format keeps that Qt's HTML loses, bad input, and loading
-// bodies of every format_version.
+// plus what the format keeps that Qt's HTML loses, bad input, versions, and
+// loading stored bodies.
 
 #include "EditorFixture.h"
 #include "editor/NoteFormat.h"
@@ -41,7 +41,8 @@ private slots:
     void rejectsBadInput();
     void clampsOutOfRangeValues();
     void ignoresUnknownKeys();
-    void loadsEveryFormatVersion();
+    void newerVersionsAreRejected();
+    void loadFallsBackToPlainText();
     void aiAnswerFromMarkdownSurvives();
 };
 
@@ -171,25 +172,35 @@ void tst_NoteFormat::ignoresUnknownKeys()
     QCOMPARE(document->toPlainText(), QStringLiteral("hi"));
 }
 
-void tst_NoteFormat::loadsEveryFormatVersion()
+// Version 1 writes no "v" and reads with or without it; a body from a newer
+// version (or a garbled "v") is rejected rather than misread.
+void tst_NoteFormat::newerVersionsAreRejected()
 {
-    QTextDocument document;
-    // Phase 2 bodies: Qt HTML from the plain editor.
-    QTextDocument legacy;
-    legacy.setPlainText(QStringLiteral("Old note\nfrom Phase 2"));
-    NoteFormat::load(legacy.toHtml(), NoteFormat::kLegacyHtml, {}, document);
-    QCOMPARE(document.toPlainText(), QStringLiteral("Old note\nfrom Phase 2"));
-    // This format.
     QTextDocument fixture;
     buildFixture(fixture);
-    NoteFormat::load(NoteFormat::serialize(fixture), NoteFormat::kJson, {}, document);
+    QVERIFY(!NoteFormat::serialize(fixture).contains(QStringLiteral(R"("v")")));
+
+    QVERIFY(load(QStringLiteral(R"({"v":1,"blocks":[{"runs":[{"text":"hi"}]}]})")));
+    for (const char* json : {R"({"v":2,"blocks":[]})", R"({"v":"1","blocks":[]})",
+                             R"({"v":0,"blocks":[]})", R"({"v":1.5,"blocks":[]})"}) {
+        QTextDocument document;
+        QVERIFY2(NoteFormat::deserialize(QString::fromLatin1(json), document).has_value(), json);
+        QVERIFY(document.isEmpty());
+    }
+}
+
+void tst_NoteFormat::loadFallsBackToPlainText()
+{
+    QTextDocument document;
+    QTextDocument fixture;
+    buildFixture(fixture);
+    NoteFormat::load(NoteFormat::serialize(fixture), {}, document);
     QCOMPARE(dumpDocument(document), dumpDocument(fixture));
-    // No body yet: the plain text.
-    NoteFormat::load({}, NoteFormat::kJson, QStringLiteral("Just text"), document);
+    // No body (a note from before the format, migration 003): the plain text.
+    NoteFormat::load({}, QStringLiteral("Just text"), document);
     QCOMPARE(document.toPlainText(), QStringLiteral("Just text"));
     // Unreadable body: the plain text, rather than nothing.
-    NoteFormat::load(QStringLiteral("{corrupt"), NoteFormat::kJson, QStringLiteral("Saved text"),
-                     document);
+    NoteFormat::load(QStringLiteral("{corrupt"), QStringLiteral("Saved text"), document);
     QCOMPARE(document.toPlainText(), QStringLiteral("Saved text"));
 }
 

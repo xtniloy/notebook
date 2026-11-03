@@ -1,6 +1,5 @@
 #include "ui/EditorView.h"
 
-#include "models/Note.h"
 #include "ui/NoteListDelegate.h"
 #include "ui/NoteTextEdit.h"
 
@@ -73,15 +72,15 @@ EditorView::~EditorView() = default;
 
 void EditorView::showNote(const QString& text, const QDateTime& modified)
 {
-    showNoteBody({}, models::kBodyFormatCurrent, text, modified);
+    showNoteBody({}, text, modified);
 }
 
-void EditorView::showNoteBody(const QString& body, int formatVersion, const QString& plainText,
+void EditorView::showNoteBody(const QString& body, const QString& plainText,
                               const QDateTime& modified)
 {
     m_header->setText(headerText(modified));
     m_header->show();
-    m_textEdit->setNoteBody(body, formatVersion, plainText); // no undo history
+    m_textEdit->setNoteBody(body, plainText); // no undo history
     m_textEdit->setReadOnly(false);
     m_pages->setCurrentWidget(m_textEdit);
     m_hasNote = true;

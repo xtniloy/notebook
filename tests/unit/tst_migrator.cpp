@@ -65,7 +65,7 @@ private slots:
     void embeddedMigrationsAreNumbered();
     void emptyDatabaseReachesLatest();
     void dataSurvivesLaterMigrations();
-    void phase2BodiesKeepTheirFormat();
+    void phase2BodiesKeepTheirText();
     void failingMigrationRollsBack();
     void newerDatabaseIsLeftAlone();
     void secondRunIsNoOp();
@@ -163,9 +163,12 @@ void tst_Migrator::emptyDatabaseReachesLatest()
     for (const char* name :
          {"id", "uuid", "folder_id", "title", "snippet", "body", "body_text", "is_pinned",
           "is_locked", "locked_blob", "locked_nonce", "wrapped_key", "created_at", "updated_at",
-          "trashed_at", "deleted_at", "version", "sync_state", "format_version"}) {
+          "trashed_at", "deleted_at", "version", "sync_state"}) {
         QVERIFY2(noteColumns.contains(QLatin1StringView(name)), name);
     }
+    // Bodies are the note format's JSON only (migration 003).
+    QVERIFY(!noteColumns.contains(QStringLiteral("format_version")));
+    QVERIFY(!noteColumns.contains(QStringLiteral("body_html")));
 
     // Foreign keys are back on after migrating.
     QCOMPARE(scalar(*m_db, QStringLiteral("PRAGMA foreign_keys")), QStringLiteral("1"));
@@ -202,9 +205,10 @@ void tst_Migrator::dataSurvivesLaterMigrations()
     QCOMPARE(Migrator::currentVersion(*m_db).value(), 2);
 }
 
-// Migration 002 (task 3.1, ADR 0006): bodies saved by the Phase 2 editor keep
-// their HTML, now in `body`, marked as format 1 so the editor still reads them.
-void tst_Migrator::phase2BodiesKeepTheirFormat()
+// Migrations 002 and 003 (ADR 0006): bodies saved by the Phase 2 editor as Qt
+// HTML are dropped, since the notes were plain text and body_text keeps it;
+// the editor shows that text, and the next save writes JSON.
+void tst_Migrator::phase2BodiesKeepTheirText()
 {
     QVERIFY(Migrator(migrationDir()).migrate(*m_db)); // schema 1 only
     QVERIFY(m_db->exec(QStringLiteral(
@@ -216,9 +220,9 @@ void tst_Migrator::phase2BodiesKeepTheirFormat()
 
     const DbResult<Migrator::Result> result = Migrator().migrate(*m_db); // the real ones
     QVERIFY2(result, qPrintable(result.error().message));
-    QVERIFY(result.value().toVersion >= 2);
-    QCOMPARE(scalar(*m_db, QStringLiteral("SELECT body || '|' || format_version FROM notes")),
-             QStringLiteral("<p>Old note</p>|1"));
+    QVERIFY(result.value().toVersion >= 3);
+    QCOMPARE(scalar(*m_db, QStringLiteral("SELECT typeof(body) || '|' || body_text FROM notes")),
+             QStringLiteral("null|Old note"));
 }
 
 // TC-MIG-003

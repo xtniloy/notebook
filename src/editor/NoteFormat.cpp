@@ -21,9 +21,10 @@ namespace notes::editor {
 
 namespace {
 
-// JSON shape (version 2 in notes.format_version):
+// JSON shape (NoteFormat::kVersion 1; "v" is written from version 2 on):
 //
-//   { "lists":  [ { "style": "disc", "indent": 1 }, ... ],
+//   { "v": <version>,
+//     "lists":  [ { "style": "disc", "indent": 1 }, ... ],
 //     "blocks": [ <paragraph> | { "table": { "rows": 2, "cols": 2,
 //                                            "cells": [ [<paragraph>...], ... ] } } ] }
 //
@@ -453,6 +454,11 @@ std::optional<QString> NoteFormat::deserialize(const QString& json, QTextDocumen
         return QStringLiteral("not a note body");
     }
     const QJsonObject body = parsed.object();
+    if (const QJsonValue version = body.value(QStringLiteral("v"));
+        !version.isUndefined() && version.toInt(-1) != kVersion) {
+        return QStringLiteral("note format version %1 is not supported")
+            .arg(version.toVariant().toString());
+    }
     Reader reader(body.value(QStringLiteral("lists")).toArray());
     // Loading isn't an edit: without undo recording it's much faster, and a
     // freshly opened note has no history anyway.
@@ -479,15 +485,10 @@ std::optional<QString> NoteFormat::deserialize(const QString& json, QTextDocumen
     return std::nullopt;
 }
 
-void NoteFormat::load(const QString& body, int formatVersion, const QString& plainText,
-                      QTextDocument& document)
+void NoteFormat::load(const QString& body, const QString& plainText, QTextDocument& document)
 {
     if (body.isEmpty()) {
         document.setPlainText(plainText);
-        return;
-    }
-    if (formatVersion == kLegacyHtml) {
-        document.setHtml(body);
         return;
     }
     if (deserialize(body, document)) {

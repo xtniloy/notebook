@@ -119,7 +119,6 @@ void tst_Autosave::typingSavesOnceAfterDelay()
     const Note saved = reload(m_second);
     QCOMPARE(saved.bodyText, QStringLiteral("Second abcdefghi"));
     // Saved in the note format (task 3.1), which reads back to the same text.
-    QCOMPARE(saved.formatVersion, notes::models::kBodyFormatJson);
     QTextDocument stored;
     QVERIFY(!notes::editor::NoteFormat::deserialize(saved.body, stored).has_value());
     QCOMPARE(stored.toPlainText(), saved.bodyText);

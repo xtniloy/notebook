@@ -72,7 +72,6 @@ private slots:
     void dateSorts();
     void updateBodyBumpsVersionAndTime();
     void oneMegabyteBodyRoundTrips();
-    void formatVersionIsStored();
     void metadataChangesKeepEditTime();
     void moveToFolder();
     void trashAndRestore();
@@ -300,20 +299,6 @@ void tst_NoteRepository::oneMegabyteBodyRoundTrips()
 }
 
 // Only content changes move a note in "date edited" order; every change is synced.
-// Task 3.1: the body's format travels with it (ADR 0006).
-void tst_NoteRepository::formatVersionIsStored()
-{
-    NoteContent legacy = content(QStringLiteral("Old"));
-    legacy.formatVersion = notes::models::kBodyFormatLegacyHtml;
-    const Note created = m_notes->create(m_work, legacy).value();
-    QCOMPARE(created.formatVersion, notes::models::kBodyFormatLegacyHtml);
-    QCOMPARE(m_notes->get(created.id).value().formatVersion, notes::models::kBodyFormatLegacyHtml);
-
-    // Saving rewrites the body in the format given: the current one by default.
-    const Note saved = m_notes->updateBody(created.id, content(QStringLiteral("New"))).value();
-    QCOMPARE(saved.formatVersion, notes::models::kBodyFormatCurrent);
-}
-
 void tst_NoteRepository::metadataChangesKeepEditTime()
 {
     const Note note = create(QStringLiteral("Note"));

@@ -35,9 +35,9 @@ int NoteTextEdit::rightInset() const
     return m_rightPadding + verticalScrollBar()->sizeHint().width();
 }
 
-void NoteTextEdit::setNoteBody(const QString& body, int formatVersion, const QString& plainText)
+void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText)
 {
-    editor::NoteFormat::load(body, formatVersion, plainText, *document());
+    editor::NoteFormat::load(body, plainText, *document());
     // Loading isn't an edit: start the note with no undo history.
     document()->clearUndoRedoStacks();
     applyBottomPadding();

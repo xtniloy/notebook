@@ -24,10 +24,10 @@ public:
     // From the text to the widget's right edge: the padding plus the scroll bar.
     [[nodiscard]] int rightInset() const;
 
-    // A stored body of any format version (editor::NoteFormat::load()), keeping
-    // the bottom padding. No undo history.
-    void setNoteBody(const QString& body, int formatVersion, const QString& plainText);
-    // The document in the current note format, for saving.
+    // A stored body (editor::NoteFormat::load()), keeping the bottom padding.
+    // No undo history.
+    void setNoteBody(const QString& body, const QString& plainText);
+    // The document in the note format, for saving.
     [[nodiscard]] QString noteBody() const;
 
 protected:

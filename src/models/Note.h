@@ -8,12 +8,6 @@
 
 namespace notes::models {
 
-// notes.format_version: how `Note::body` is encoded (ADR 0006). The codec is
-// editor/NoteFormat, in the UI library; the core only stores and passes on.
-inline constexpr int kBodyFormatLegacyHtml = 1; // Qt HTML from the Phase 2 plain editor
-inline constexpr int kBodyFormatJson = 2;       // the note format
-inline constexpr int kBodyFormatCurrent = kBodyFormatJson;
-
 // A row of the `notes` table (Plan §7). Plain value type: copied between the DB
 // thread and the UI (ADR 0003). Times are UTC ms (ADR 0004); `id` and `folderId`
 // are local only, `uuid` is the identity across devices (ADR 0005).
@@ -28,8 +22,10 @@ struct Note
     qint64 folderId = 0;
     QString title;
     QString snippet; // list preview; empty for locked notes
-    QString body;    // in `formatVersion`'s encoding; empty for locked notes (TC-STO-014)
-    int formatVersion = kBodyFormatCurrent;
+    // The note format's JSON (editor/NoteFormat, ADR 0006; the core only
+    // stores and passes it on). Empty for locked notes (TC-STO-014), and for
+    // notes from before the format, which show `bodyText`.
+    QString body;
     QString bodyText; // plain text for search; empty for locked notes
     bool pinned = false;
     bool locked = false;

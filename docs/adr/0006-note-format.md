@@ -105,14 +105,23 @@ Saving runs on autosave, off the UI thread's critical path (task 2.9).
   the same formats are merged: **every document has exactly one
   serialization**, which TC-EDT-001 checks.
 - Readers **ignore unknown keys**, so later versions can add properties that
-  older apps skip. Values out of range are clamped, references to missing
+  older apps skip. A change older apps would misread raises the format's
+  version, carried in the JSON as `"v"` (absent while it is 1); readers reject
+  versions they don't know, and the note's plain text shows instead. Values out of range are clamped, references to missing
   lists are ignored, and malformed JSON fails cleanly (the document stays
   empty and the caller shows the note's plain text instead).
-- Stored in `notes.body` (renamed from `body_html` by migration 002), with
-  **`notes.format_version`**: 1 = Qt HTML from the Phase 2 editor (every
-  existing row), 2 = this JSON. The editor reads both and writes 2; an old
-  note is converted the next time it is saved. `body_text` stays the plain
-  text for the title, preview and search.
+- Stored in `notes.body` (renamed from `body_html` by migration 002).
+  **JSON is the only stored format**: the app has no Qt HTML reader. Phase 2
+  bodies (Qt HTML of plain-text demo notes) are dropped by migration 003; their
+  text is in `body_text`, which the editor shows when a note has no body, and
+  the next save writes JSON. `body_text` stays the plain text for the title,
+  preview and search.
+
+  *Amended 2026-11-03:* migration 002 had added a `notes.format_version`
+  column (1 = Qt HTML, 2 = JSON) and the editor read both. Before release,
+  with only demo data stored, one format and one code path were simpler and
+  lighter, so migration 003 removed the column and the HTML path; future
+  versions use `"v"` in the JSON.
 - **Markdown stays at the edges**: pasted Markdown (task 3.8) and Qt's
   Markdown import both produce a `QTextDocument`, which this format stores like
   any other; a pasted AI answer with headings, emphasis, nested lists, a
@@ -138,10 +147,11 @@ Saving runs on autosave, off the UI thread's critical path (task 2.9).
 - `tst_noteformat`: TC-EDT-001 (exact round trip, also over repeated saves),
   block-by-block equality with the fixture, what Qt HTML loses is kept, bad
   input of many kinds is rejected without crashing, out-of-range values are
-  clamped, unknown keys are ignored, every `format_version` loads, and an AI
-  answer pasted as Markdown survives.
-- `tst_migrator`: Phase 2 bodies keep their HTML and get `format_version` 1.
-- `tst_noterepository`: `format_version` is stored and read back.
+  clamped, unknown keys are ignored, newer versions (`"v"`) are rejected, an
+  empty or unreadable body shows the plain text, and an AI answer pasted as
+  Markdown survives.
+- `tst_migrator`: Phase 2 HTML bodies are dropped and their text kept; no
+  `format_version` or `body_html` column remains.
 - `tst_autosave`: typing saves a JSON body that reads back to the typed text.
 - `bench_noteformat`: the table above; prose notes up to 100 KB, and the dense
   5 KB note, must open in < 50 ms.
