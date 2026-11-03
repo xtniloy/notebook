@@ -1,8 +1,9 @@
-#include "ui/dialogs/TrashNoticeDialog.h"
+#include "ui/dialogs/AlertDialog.h"
 
 #include "ui/Icons.h"
 #include "ui/Shadow.h"
 
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
 #include <QPushButton>
@@ -15,45 +16,41 @@ namespace {
 constexpr int kPadding = 24;       // panel edge to its content
 constexpr int kIconGap = 16;       // icon to title
 constexpr int kTextGap = 10;       // title to message
-constexpr int kButtonGap = 22;     // message to button
+constexpr int kButtonGap = 22;     // message to buttons
+constexpr int kButtonSpacing = 8;  // between buttons
 constexpr int kBorderAlpha = 28;   // as the main window's edge (WindowChrome)
 constexpr qreal kTitleScale = 1.2; // title font, relative to the body text
 
 } // namespace
 
-TrashNoticeDialog::TrashNoticeDialog(QWidget* parent)
+AlertDialog::AlertDialog(const QString& title, const QString& message, QWidget* parent)
     : QDialog(parent)
+    , m_buttons(new QHBoxLayout)
 {
-    setObjectName(QStringLiteral("trashNoticeDialog"));
     setWindowFlag(Qt::FramelessWindowHint);
     setAttribute(Qt::WA_TranslucentBackground);
     setModal(true);
-    setWindowTitle(tr("Recently Deleted"));
+    setWindowTitle(title);
 
     auto* icon = new QLabel(this);
     icon->setPixmap(appIcon().pixmap(QSize(kIconSize, kIconSize), devicePixelRatioF()));
     icon->setAlignment(Qt::AlignHCenter);
 
-    auto* title = new QLabel(tr("Deleted notes are moved to the Recently Deleted folder."), this);
-    title->setObjectName(QStringLiteral("trashNoticeTitle"));
-    QFont titleFont = title->font();
+    auto* titleLabel = new QLabel(title, this);
+    titleLabel->setObjectName(QStringLiteral("alertTitle"));
+    QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
     titleFont.setPointSizeF(titleFont.pointSizeF() * kTitleScale);
-    title->setFont(titleFont);
+    titleLabel->setFont(titleFont);
 
-    auto* message = new QLabel(
-        tr("You can recover or remove notes from Recently Deleted within 30 days."), this);
-    message->setObjectName(QStringLiteral("trashNoticeMessage"));
-    for (QLabel* label : {title, message}) {
+    auto* messageLabel = new QLabel(message, this);
+    messageLabel->setObjectName(QStringLiteral("alertMessage"));
+    for (QLabel* label : {titleLabel, messageLabel}) {
         label->setWordWrap(true);
         label->setAlignment(Qt::AlignHCenter);
     }
 
-    auto* ok = new QPushButton(tr("OK"), this);
-    ok->setObjectName(QStringLiteral("trashNoticeOk")); // accent colors: theme.qss
-    ok->setDefault(true);
-    ok->setCursor(Qt::PointingHandCursor);
-    connect(ok, &QPushButton::clicked, this, &QDialog::accept);
+    m_buttons->setSpacing(kButtonSpacing);
 
     auto* layout = new QVBoxLayout(this);
     constexpr int kOuter = kShadowSize + kPadding;
@@ -61,19 +58,52 @@ TrashNoticeDialog::TrashNoticeDialog(QWidget* parent)
     layout->setSpacing(0);
     layout->addWidget(icon);
     layout->addSpacing(kIconGap);
-    layout->addWidget(title);
+    layout->addWidget(titleLabel);
     layout->addSpacing(kTextGap);
-    layout->addWidget(message);
+    layout->addWidget(messageLabel);
     layout->addSpacing(kButtonGap);
-    layout->addWidget(ok);
+    layout->addLayout(m_buttons);
 
-    // The wrapped text decides the height.
-    const int fullWidth = kWidth + (2 * kShadowSize);
-    setFixedSize(fullWidth, layout->hasHeightForWidth() ? layout->heightForWidth(fullWidth)
-                                                        : layout->sizeHint().height());
+    fitHeight();
 }
 
-void TrashNoticeDialog::paintEvent(QPaintEvent* /*event*/)
+QPushButton* AlertDialog::addButton(const QString& text, ButtonRole role)
+{
+    auto* button = new QPushButton(text, this);
+    const bool cancel = role == ButtonRole::Cancel;
+    button->setProperty("alertRole", cancel ? QStringLiteral("cancel") : QStringLiteral("accept"));
+    button->setCursor(Qt::PointingHandCursor);
+    button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    connect(button, &QPushButton::clicked, this, cancel ? &QDialog::reject : &QDialog::accept);
+
+    // The default: Cancel if there is one, else the first accept button.
+    QPushButton* current = nullptr;
+    for (QPushButton* other : findChildren<QPushButton*>()) {
+        if (other != button && other->isDefault()) {
+            current = other;
+        }
+    }
+    if (current == nullptr || (cancel && current->property("alertRole").toString() != u"cancel")) {
+        if (current != nullptr) {
+            current->setDefault(false);
+        }
+        button->setDefault(true);
+    }
+
+    m_buttons->addWidget(button);
+    fitHeight();
+    return button;
+}
+
+void AlertDialog::fitHeight()
+{
+    const int fullWidth = kWidth + (2 * kShadowSize);
+    const QLayout* content = layout();
+    setFixedSize(fullWidth, content->hasHeightForWidth() ? content->heightForWidth(fullWidth)
+                                                         : content->sizeHint().height());
+}
+
+void AlertDialog::paintEvent(QPaintEvent* /*event*/)
 {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
@@ -89,7 +119,7 @@ void TrashNoticeDialog::paintEvent(QPaintEvent* /*event*/)
     painter.drawRoundedRect(panel.adjusted(0.5, 0.5, -0.5, -0.5), kRadius, kRadius);
 }
 
-void TrashNoticeDialog::showEvent(QShowEvent* event)
+void AlertDialog::showEvent(QShowEvent* event)
 {
     // Over the middle of the window it belongs to (where the platform lets
     // windows place themselves; on Wayland the compositor centers modals).

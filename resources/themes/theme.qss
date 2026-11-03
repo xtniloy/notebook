@@ -106,18 +106,33 @@ QLineEdit#searchField:focus {
     border-color: ${accent};
 }
 
-/* The first-delete notice (TrashNoticeDialog): a full-width accent button. */
-QPushButton#trashNoticeOk {
-    background: ${accent};
-    color: ${accentText};
-    border: none;
+/* Alerts (AlertDialog): full-width buttons, the confirming one in the accent. */
+QPushButton[alertRole="accept"],
+QPushButton[alertRole="cancel"] {
+    border: 1px solid transparent;
     border-radius: 7px;
-    padding: 7px 12px;
+    padding: 6px 12px;
 }
 
-QPushButton#trashNoticeOk:hover,
-QPushButton#trashNoticeOk:focus {
-    border: 1px solid ${accentText};
+QPushButton[alertRole="accept"] {
+    background: ${accent};
+    color: ${accentText};
+}
+
+QPushButton[alertRole="cancel"] {
+    background: ${base};
+    color: ${text};
+    border-color: ${separator};
+}
+
+QPushButton[alertRole="accept"]:hover,
+QPushButton[alertRole="accept"]:focus {
+    border-color: ${accentText};
+}
+
+QPushButton[alertRole="cancel"]:hover,
+QPushButton[alertRole="cancel"]:focus {
+    border-color: ${mutedText};
 }
 
 /* Panes. */

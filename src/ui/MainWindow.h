@@ -52,7 +52,7 @@ public:
     // menu) and the three panes at their minimum widths, tall enough for a
     // usable note list and editor.
     static constexpr QSize kMinimumWindowSize{760, 480};
-    // Set once the first-delete notice has been accepted (TrashNoticeDialog).
+    // Set once the first-delete notice has been accepted (AlertDialog).
     static constexpr QLatin1StringView kTrashNoticeShownKey{"notes/trashNoticeShown"};
 
     explicit MainWindow(app::AppContext& context, QWidget* parent = nullptr);

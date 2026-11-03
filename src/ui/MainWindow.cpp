@@ -22,7 +22,7 @@
 #include "ui/ThemeManager.h"
 #include "ui/WindowChrome.h"
 #include "ui/dialogs/AboutDialog.h"
-#include "ui/dialogs/TrashNoticeDialog.h"
+#include "ui/dialogs/AlertDialog.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -450,7 +450,12 @@ void MainWindow::deleteCurrentNote()
     // deletes nothing, and the notice comes again next time.
     QSettings& settings = m_context.settings();
     if (!settings.value(kTrashNoticeShownKey, false).toBool()) {
-        TrashNoticeDialog notice(this);
+        AlertDialog notice(tr("Deleted notes are moved to the Recently Deleted folder."),
+                           tr("You can recover or remove notes from Recently Deleted within "
+                              "30 days."),
+                           this);
+        notice.setObjectName(QStringLiteral("trashNoticeDialog"));
+        notice.addButton(tr("OK"), AlertDialog::ButtonRole::Accept);
         if (notice.exec() != QDialog::Accepted) {
             return;
         }
@@ -467,15 +472,12 @@ void MainWindow::recoverNote(qint64 noteId)
 
 void MainWindow::deletePermanently(qint64 noteId)
 {
-    QMessageBox confirm(QMessageBox::Warning, tr("Delete Permanently"),
-                        tr("Delete this note permanently?"), QMessageBox::NoButton, this);
+    AlertDialog confirm(tr("Delete this note permanently?"), tr("You can't undo this action."),
+                        this);
     confirm.setObjectName(QStringLiteral("deletePermanentlyDialog"));
-    confirm.setInformativeText(tr("You can't undo this action."));
-    const QPushButton* remove = confirm.addButton(tr("Delete"), QMessageBox::DestructiveRole);
-    confirm.addButton(QMessageBox::Cancel);
-    confirm.setDefaultButton(QMessageBox::Cancel);
-    confirm.exec();
-    if (confirm.clickedButton() == remove) {
+    confirm.addButton(tr("Cancel"), AlertDialog::ButtonRole::Cancel); // the default
+    confirm.addButton(tr("Delete"), AlertDialog::ButtonRole::Accept);
+    if (confirm.exec() == QDialog::Accepted) {
         (void)m_context.notes().purge(noteId);
     }
 }

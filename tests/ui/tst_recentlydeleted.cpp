@@ -12,13 +12,11 @@
 #include "ui/NoteListView.h"
 #include "ui/NoteTextEdit.h"
 #include "ui/Sidebar.h"
-#include "ui/dialogs/TrashNoticeDialog.h"
+#include "ui/dialogs/AlertDialog.h"
 
-#include <QAbstractButton>
 #include <QAction>
 #include <QApplication>
 #include <QMenu>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QSettings>
 #include <QTest>
@@ -162,7 +160,7 @@ void tst_RecentlyDeleted::firstDeleteShowsNoticeOnce()
 
     // Escape deletes nothing, and the notice comes again.
     whenModalOpens([](QWidget* dialog) {
-        QVERIFY(qobject_cast<notes::ui::TrashNoticeDialog*>(dialog));
+        QCOMPARE(dialog->objectName(), QStringLiteral("trashNoticeDialog"));
         QTest::keyClick(dialog, Qt::Key_Escape);
     });
     remove->trigger();
@@ -172,11 +170,12 @@ void tst_RecentlyDeleted::firstDeleteShowsNoticeOnce()
 
     // OK moves the note.
     whenModalOpens([](QWidget* dialog) {
-        QVERIFY(qobject_cast<notes::ui::TrashNoticeDialog*>(dialog));
-        auto* ok = dialog->findChild<QPushButton*>(QStringLiteral("trashNoticeOk"));
-        QVERIFY(ok);
-        QCOMPARE(ok->text(), QStringLiteral("OK"));
-        ok->click();
+        QCOMPARE(dialog->objectName(), QStringLiteral("trashNoticeDialog"));
+        QVERIFY(qobject_cast<notes::ui::AlertDialog*>(dialog));
+        const auto buttons = dialog->findChildren<QPushButton*>();
+        QCOMPARE(buttons.size(), 1);
+        QCOMPARE(buttons.first()->text(), QStringLiteral("OK"));
+        buttons.first()->click();
     });
     remove->trigger();
     QTRY_COMPARE(listedTitles(), QStringList{QStringLiteral("Keep")});
@@ -223,12 +222,30 @@ void tst_RecentlyDeleted::deletePermanentlyAsksFirst()
     QTRY_COMPARE(m_list->currentNote(), std::optional<qint64>(m_gone.id));
     auto* remove = m_window->findChild<QAction*>(QStringLiteral("deleteNoteAction"));
 
+    // The same alert as the first-delete notice: Cancel (the default, so
+    // Enter is safe), then Delete.
+    const auto buttonOf = [](QWidget* dialog, const QString& role) -> QPushButton* {
+        for (QPushButton* button : dialog->findChildren<QPushButton*>()) {
+            if (button->property("alertRole").toString() == role) {
+                return button;
+            }
+        }
+        return nullptr;
+    };
+
     // Cancel keeps it.
-    whenModalOpens([](QWidget* dialog) {
+    whenModalOpens([&](QWidget* dialog) {
         QCOMPARE(dialog->objectName(), QStringLiteral("deletePermanentlyDialog"));
-        auto* box = qobject_cast<QMessageBox*>(dialog);
-        QVERIFY(box);
-        box->button(QMessageBox::Cancel)->click();
+        QVERIFY(qobject_cast<notes::ui::AlertDialog*>(dialog));
+        QPushButton* cancel = buttonOf(dialog, QStringLiteral("cancel"));
+        QPushButton* accept = buttonOf(dialog, QStringLiteral("accept"));
+        if (cancel == nullptr || accept == nullptr) {
+            QFAIL("Cancel and Delete buttons expected");
+        }
+        QCOMPARE(accept->text(), QStringLiteral("Delete"));
+        QVERIFY(cancel->isDefault());
+        QVERIFY(cancel->x() < accept->x());
+        cancel->click();
     });
     remove->trigger();
     QTest::qWait(50);
@@ -236,14 +253,12 @@ void tst_RecentlyDeleted::deletePermanentlyAsksFirst()
     QVERIFY(!await(m_context->notes().get(m_gone.id)).value().deletedAt);
 
     // Delete purges it.
-    whenModalOpens([](QWidget* dialog) {
-        auto* box = qobject_cast<QMessageBox*>(dialog);
-        QVERIFY(box);
-        for (QAbstractButton* button : box->buttons()) {
-            if (box->buttonRole(button) == QMessageBox::DestructiveRole) {
-                button->click();
-            }
+    whenModalOpens([&](QWidget* dialog) {
+        QPushButton* accept = buttonOf(dialog, QStringLiteral("accept"));
+        if (accept == nullptr) {
+            QFAIL("Delete button expected");
         }
+        accept->click();
     });
     remove->trigger();
     QTRY_VERIFY(listedTitles().isEmpty());
