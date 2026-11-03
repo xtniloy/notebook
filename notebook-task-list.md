@@ -321,6 +321,7 @@ Keep exercises in a throwaway `sandbox/` folder (git-ignored or a separate repo)
 - [x] Bug fix (seen at 125 % display scale): thin light line under the window and at the corners, and a shadow that looked heavy. The shadow is now nested translucent rounded shapes (no seams, no unshaded strip under the window, lighter); the window edge is a faint translucent line instead of light grey; content widgets overhang the rounded edge by 1 px and the overlay trims them, so no background strip shows at fractional scales
 - [x] Toolbar buttons in joined, rounded groups as in macOS Notes: sidebar · list/gallery · delete/new note · format/checklist/table/attachment/lock · share; editing tools centred
 - [x] Search placeholder (magnifier + "Search") centred until the box is focused or has text
+- [x] Fourth UI review: New Note moved out of the delete/new note group to just left of the editing tools, apart from Delete, so reaching for one can't hit the other (as macOS Notes: trash over the note list, compose at the start of the editor tools). The first delete shows a notice, as macOS Notes: "Deleted notes are moved to the Recently Deleted folder", OK moves the note, Escape keeps it; shown once *(`TrashNoticeDialog`, remembered in QSettings `notes/trashNoticeShown`. The editing tools shift right by half the New Note button: a balancing spacer to keep them in place didn't fit the 760 px minimum window)*
 
 **Tests**
 - `TC-UI-040` (UI) Window is frameless and translucent, with rounded corners; header row has the five menus and the window buttons on the right.

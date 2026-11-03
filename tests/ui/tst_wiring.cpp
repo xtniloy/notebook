@@ -158,6 +158,8 @@ void tst_Wiring::init()
     m_dir = std::make_unique<notes::test::TempDb>();
     m_context = notes::test::makeTestContext(m_dir->dirPath());
     m_notesFolder = await(m_context->folders().ensureDefaultFolder()).value().id;
+    // Past the first-delete notice (tst_recentlydeleted covers it).
+    m_context->settings().setValue(MainWindow::kTrashNoticeShownKey, true);
 }
 
 void tst_Wiring::cleanup()

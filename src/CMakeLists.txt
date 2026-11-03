@@ -88,6 +88,8 @@ add_library(notesapp_ui STATIC
     ui/AppStyle.h
     ui/dialogs/AboutDialog.cpp
     ui/dialogs/AboutDialog.h
+    ui/dialogs/TrashNoticeDialog.cpp
+    ui/dialogs/TrashNoticeDialog.h
     ui/EditorView.cpp
     ui/EditorView.h
     ui/Fonts.cpp

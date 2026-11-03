@@ -70,7 +70,7 @@ The window draws its own frame (rounded corners, soft shadow) with no system tit
 ```
 ╭────────────────────────────────────────────────────────────────────────────────╮
 │ File  Edit  Format  View  Help                                    [–] [□] [×]  │ ← Header (menus + window buttons)
-│ [▤] [☰|▦] [🗑|✎]          [Aa|☑|⊞|📎|🔒]           [⇪] [ 🔍 Search          ] │ ← Toolbar
+│ [▤] [☰|▦] [🗑]         [✎] [Aa|☑|⊞|📎|🔒]          [⇪] [ 🔍 Search          ] │ ← Toolbar
 ├────────────────┬──────────────────────────┬────────────────────────────────────┤
 │ On My Computer │ Pinned                   │   October 28, 2026 at 9:41 PM      │ ← Date (centered, gray)
 │  All Notes  12 │   Shopping List       📌 │                                    │
@@ -94,7 +94,7 @@ The window draws its own frame (rounded corners, soft shadow) with no system tit
 
 **Header:** menus on the left (File, Edit, Format, View, Help); minimize, maximize and close on the right, as in GNOME.
 
-**Toolbar:** joined button groups with 18 px icons, the search field (200 px wide) as tall as the buttons; see §3.2 for the actions. Groups: sidebar toggle · list/gallery · delete/new note on the left; text tools in the middle; share and search on the right.
+**Toolbar:** joined button groups with 18 px icons, the search field (200 px wide) as tall as the buttons; see §3.2 for the actions. Groups: sidebar toggle · list/gallery · delete on the left; new note beside the text tools in the middle (apart from delete, so reaching for one can't hit the other); share and search on the right.
 
 **Sidebar:** "On My Computer" holds **All Notes**, the default **Notes** folder and user folders (nested, expandable), each with a note count; **Recently Deleted** sits below it. **New Folder** is at the bottom. See §3.3.
 
@@ -110,7 +110,7 @@ The window draws its own frame (rounded corners, soft shadow) with no system tit
 |---|---|---|
 | Sidebar toggle | Show/hide folder sidebar | `Ctrl+Alt+S` |
 | List / Gallery | Switch note-list view | `Ctrl+1` / `Ctrl+2` |
-| Delete | Move note to Recently Deleted | `Delete` |
+| Delete | Move note to Recently Deleted (the first time, a notice says so) | `Delete` |
 | New Note | Create note in current folder | `Ctrl+N` |
 | **Aa** Format | Title / Heading / Subheading / Body / Monospaced / Lists | — |
 | Checklist | Insert/toggle checklist | `Ctrl+Shift+L` |

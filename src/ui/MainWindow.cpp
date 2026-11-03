@@ -22,6 +22,7 @@
 #include "ui/ThemeManager.h"
 #include "ui/WindowChrome.h"
 #include "ui/dialogs/AboutDialog.h"
+#include "ui/dialogs/TrashNoticeDialog.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -230,8 +231,9 @@ void MainWindow::createToolBar()
     toolBar->setIconSize(QSize(kToolBarIconSize, kToolBarIconSize));
 
     // macOS-style groups of joined buttons (Plan §3.1): layout, view mode and
-    // note actions on the left, editing tools in the middle, share and search on
-    // the right. Order within and across groups is Plan §3.2's.
+    // delete on the left; new note beside the editing tools in the middle, apart
+    // from delete so a slip can't hit the wrong one; share and search on the
+    // right. Order within and across groups is Plan §3.2's.
     const auto addGroup = [&](std::initializer_list<ActionId> ids) {
         auto* group = new QFrame(toolBar);
         group->setObjectName(QStringLiteral("toolGroup"));
@@ -272,8 +274,9 @@ void MainWindow::createToolBar()
     addEdgeSpacer();
     addGroup({ActionId::ToggleSidebar});
     addGroup({ActionId::ListView, ActionId::GalleryView});
-    addGroup({ActionId::DeleteNote, ActionId::NewNote});
+    addGroup({ActionId::DeleteNote});
     addSpacer();
+    addGroup({ActionId::NewNote});
     addGroup({ActionId::Format, ActionId::Checklist, ActionId::InsertTable, ActionId::Attachment,
               ActionId::LockNote});
     addSpacer();
@@ -442,6 +445,16 @@ void MainWindow::deleteCurrentNote()
     if (m_noteListModel->folderId() == models::kRecentlyDeletedFolderId) {
         deletePermanently(*note);
         return;
+    }
+    // The first time, say where deleted notes go (macOS Notes). Escape there
+    // deletes nothing, and the notice comes again next time.
+    QSettings& settings = m_context.settings();
+    if (!settings.value(kTrashNoticeShownKey, false).toBool()) {
+        TrashNoticeDialog notice(this);
+        if (notice.exec() != QDialog::Accepted) {
+            return;
+        }
+        settings.setValue(kTrashNoticeShownKey, true);
     }
     m_autosave->flush(); // the last keystrokes go with it
     (void)m_context.notes().trash(*note);

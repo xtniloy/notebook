@@ -106,6 +106,20 @@ QLineEdit#searchField:focus {
     border-color: ${accent};
 }
 
+/* The first-delete notice (TrashNoticeDialog): a full-width accent button. */
+QPushButton#trashNoticeOk {
+    background: ${accent};
+    color: ${accentText};
+    border: none;
+    border-radius: 7px;
+    padding: 7px 12px;
+}
+
+QPushButton#trashNoticeOk:hover,
+QPushButton#trashNoticeOk:focus {
+    border: 1px solid ${accentText};
+}
+
 /* Panes. */
 #sidebarPane {
     background: ${sidebar};

@@ -1,6 +1,6 @@
-// Recently Deleted in the window (task 2.10): deleting moves a note there,
-// it counts down and is read-only, Recover brings it back, Delete
-// Permanently asks first, and old notes are purged at startup.
+// Recently Deleted in the window (task 2.10): deleting moves a note there
+// (the first time after a notice saying so), it counts down and is read-only, Recover brings it
+// back, Delete Permanently asks first, and old notes are purged at startup.
 
 #include "TestHelpers.h"
 #include "models/Note.h"
@@ -12,12 +12,15 @@
 #include "ui/NoteListView.h"
 #include "ui/NoteTextEdit.h"
 #include "ui/Sidebar.h"
+#include "ui/dialogs/TrashNoticeDialog.h"
 
 #include <QAbstractButton>
 #include <QAction>
 #include <QApplication>
 #include <QMenu>
 #include <QMessageBox>
+#include <QPushButton>
+#include <QSettings>
 #include <QTest>
 #include <QTimer>
 
@@ -60,6 +63,7 @@ private slots:
     void cleanup();
 
     void deleteMovesNoteToRecentlyDeleted();
+    void firstDeleteShowsNoticeOnce();
     void recoverFromMenu();
     void deletePermanentlyAsksFirst();
     void oldNotesPurgedAtStartup();
@@ -88,6 +92,8 @@ void tst_RecentlyDeleted::init()
     notes::test::fakeClockOf(*m_context).advance(1min);
     m_gone = await(m_context->notes().create(roles::kAllNotesFolderId, {}, QStringLiteral("Gone")))
                  .value();
+    // Past the first-delete notice, except where a test clears this.
+    m_context->settings().setValue(MainWindow::kTrashNoticeShownKey, true);
 }
 
 void tst_RecentlyDeleted::cleanup()
@@ -143,6 +149,45 @@ void tst_RecentlyDeleted::deleteMovesNoteToRecentlyDeleted()
     // Shown, but read-only until recovered.
     QTRY_COMPARE(m_editor->textEdit()->toPlainText(), QStringLiteral("Gone"));
     QVERIFY(m_editor->textEdit()->isReadOnly());
+}
+
+// As in macOS Notes: the first delete says where deleted notes go.
+void tst_RecentlyDeleted::firstDeleteShowsNoticeOnce()
+{
+    QSettings& settings = m_context->settings();
+    settings.remove(MainWindow::kTrashNoticeShownKey);
+    openWindow();
+    QTRY_COMPARE(m_list->currentNote(), std::optional<qint64>(m_gone.id));
+    auto* remove = m_window->findChild<QAction*>(QStringLiteral("deleteNoteAction"));
+
+    // Escape deletes nothing, and the notice comes again.
+    whenModalOpens([](QWidget* dialog) {
+        QVERIFY(qobject_cast<notes::ui::TrashNoticeDialog*>(dialog));
+        QTest::keyClick(dialog, Qt::Key_Escape);
+    });
+    remove->trigger();
+    QTest::qWait(50);
+    QCOMPARE(listedTitles(), (QStringList{QStringLiteral("Gone"), QStringLiteral("Keep")}));
+    QVERIFY(!settings.value(MainWindow::kTrashNoticeShownKey).toBool());
+
+    // OK moves the note.
+    whenModalOpens([](QWidget* dialog) {
+        QVERIFY(qobject_cast<notes::ui::TrashNoticeDialog*>(dialog));
+        auto* ok = dialog->findChild<QPushButton*>(QStringLiteral("trashNoticeOk"));
+        QVERIFY(ok);
+        QCOMPARE(ok->text(), QStringLiteral("OK"));
+        ok->click();
+    });
+    remove->trigger();
+    QTRY_COMPARE(listedTitles(), QStringList{QStringLiteral("Keep")});
+    QVERIFY(await(m_context->notes().get(m_gone.id)).value().isTrashed());
+    QVERIFY(settings.value(MainWindow::kTrashNoticeShownKey).toBool());
+
+    // Never again: the next delete happens at once.
+    QTRY_COMPARE(m_list->currentNote(), std::optional<qint64>(m_keep.id));
+    remove->trigger();
+    QCOMPARE(QApplication::activeModalWidget(), nullptr);
+    QTRY_VERIFY(listedTitles().isEmpty());
 }
 
 void tst_RecentlyDeleted::recoverFromMenu()

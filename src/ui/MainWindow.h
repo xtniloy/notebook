@@ -4,6 +4,7 @@
 
 #include <QMainWindow>
 #include <QSize>
+#include <QString>
 
 #include <optional>
 
@@ -51,6 +52,8 @@ public:
     // menu) and the three panes at their minimum widths, tall enough for a
     // usable note list and editor.
     static constexpr QSize kMinimumWindowSize{760, 480};
+    // Set once the first-delete notice has been accepted (TrashNoticeDialog).
+    static constexpr QLatin1StringView kTrashNoticeShownKey{"notes/trashNoticeShown"};
 
     explicit MainWindow(app::AppContext& context, QWidget* parent = nullptr);
     ~MainWindow() override;
@@ -71,6 +74,7 @@ private:
     // Saves what's pending, then shows the empty state.
     void clearEditor();
     // Delete action: to Recently Deleted, or, there, permanently (task 2.10).
+    // The first time, a notice says where deleted notes go.
     void deleteCurrentNote();
     void recoverNote(qint64 noteId);
     // After a confirmation; cannot be undone.

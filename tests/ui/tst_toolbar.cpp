@@ -32,6 +32,7 @@ private slots:
 
     void actionOrderMatchesPlan();
     void buttonsAreGrouped();
+    void newNoteIsApartFromDelete();
     void searchFieldIsOnTheRight();
     void searchPlaceholderCentredUntilUsed();
     void searchFieldMatchesGroupHeight();
@@ -162,7 +163,7 @@ void tst_Toolbar::buttonsAreGrouped()
     }
     QCOMPARE(groups,
              (QStringList{QStringLiteral("toggleSidebar"), QStringLiteral("listView|galleryView"),
-                          QStringLiteral("deleteNote|newNote"),
+                          QStringLiteral("deleteNote"), QStringLiteral("newNote"),
                           QStringLiteral("format|checklist|insertTable|attachment|lockNote"),
                           QStringLiteral("shareExport")}));
     // The style sheet rounds the outer ends and divides the inner buttons.
@@ -176,6 +177,29 @@ void tst_Toolbar::buttonsAreGrouped()
     QCOMPARE(
         buttonFor(*toolBar, QStringLiteral("shareExportAction"))->property("position").toString(),
         QStringLiteral("only"));
+}
+
+// New Note sits apart from Delete, beside the editing tools, so reaching for
+// one can't hit the other. It's as far from them as Share is from Search.
+void tst_Toolbar::newNoteIsApartFromDelete()
+{
+    const auto window = showActiveWindow();
+    QVERIFY(window);
+    const QToolBar* toolBar = toolBarOf(*window);
+    const auto frameOf = [&](const QString& action) {
+        const QWidget* group = buttonFor(*toolBar, action)->parentWidget();
+        return group->geometry();
+    };
+    const QRect remove = frameOf(QStringLiteral("deleteNoteAction"));
+    const QRect create = frameOf(QStringLiteral("newNoteAction"));
+    const QRect tools = frameOf(QStringLiteral("formatAction"));
+    const QRect share = frameOf(QStringLiteral("shareExportAction"));
+    const auto* search = window->findChild<QLineEdit*>(QStringLiteral("searchField"));
+    QVERIFY(search);
+
+    const int toolsGap = tools.left() - create.right();
+    QCOMPARE(toolsGap, search->geometry().left() - share.right());
+    QVERIFY(create.left() - remove.right() > 4 * toolsGap);
 }
 
 void tst_Toolbar::searchFieldIsOnTheRight()
