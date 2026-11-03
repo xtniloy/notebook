@@ -107,8 +107,8 @@ void tst_NoteListView::rowHeights()
     QCOMPARE(m_view->visualRect(m_model->index(1)).width(), m_view->viewport()->width());
 }
 
-// UI review: titles are Bold (700); the time and preview are 0.1 pt smaller
-// (10.9 pt under the usual 11 pt system font), same family, regular weight.
+// UI review: titles are Bold (700); the time and preview are 0.15 pt smaller
+// (10.85 pt under the usual 11 pt system font), same family, regular weight.
 void tst_NoteListView::titleAndDetailFonts()
 {
     QFont base(QStringLiteral("Inter"));
@@ -119,7 +119,7 @@ void tst_NoteListView::titleAndDetailFonts()
     QCOMPARE(title.pointSizeF(), 11.0);
 
     const QFont detail = notes::ui::NoteListDelegate::detailFont(base);
-    QCOMPARE(detail.pointSizeF(), 10.9);
+    QCOMPARE(detail.pointSizeF(), 10.85);
     QCOMPARE(detail.families(), base.families());
     QCOMPARE(detail.weight(), base.weight());
 }

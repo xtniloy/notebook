@@ -1,6 +1,7 @@
 #include "ui/EditorView.h"
 
 #include "models/Note.h"
+#include "ui/NoteListDelegate.h"
 #include "ui/NoteTextEdit.h"
 
 #include <QDateTime>
@@ -42,6 +43,9 @@ EditorView::EditorView(QWidget* parent)
     setBackgroundRole(QPalette::Base);
     setAutoFillBackground(true);
     setAttribute(Qt::WA_StyledBackground);
+
+    // The date line matches the time under each title in the note list.
+    m_header->setFont(NoteListDelegate::detailFont(m_header->font()));
 
     m_textEdit->setObjectName(QStringLiteral("noteTextEdit"));
     m_pages->addWidget(m_textEdit);

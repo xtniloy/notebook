@@ -9,6 +9,7 @@
 #include "services/NoteService.h"
 #include "ui/EditorView.h"
 #include "ui/MainWindow.h"
+#include "ui/NoteListDelegate.h"
 #include "ui/NoteListView.h"
 #include "ui/NoteTextEdit.h"
 
@@ -145,6 +146,9 @@ void tst_EditorView::showNoteDisplaysTextAndDate()
     QVERIFY(headerOf(*m_view)->isVisible());
     QCOMPARE(headerOf(*m_view)->text(), EditorView::headerText(modifiedTime()));
     QCOMPARE(headerOf(*m_view)->alignment() & Qt::AlignHCenter, Qt::AlignHCenter);
+    // The same size as the time in the note list (10.85 pt under 11 pt).
+    QCOMPARE(headerOf(*m_view)->font().pointSizeF(),
+             notes::ui::NoteListDelegate::detailFont(m_view->font()).pointSizeF());
     // A new note starts with a clean undo history.
     QVERIFY(!m_view->textEdit()->document()->isUndoAvailable());
 }

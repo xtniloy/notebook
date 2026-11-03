@@ -27,7 +27,7 @@ constexpr int kHeaderTopPadding = 12;
 constexpr int kHeaderBottomPadding = 4;
 constexpr int kHighlightInset = 6;
 // The time and preview line is this much smaller than the title (detailFont()).
-constexpr qreal kDetailSizeReduction = 0.1;
+constexpr qreal kDetailSizeReduction = 0.15;
 
 QFont boldFont(const QFont& base, qreal scale = 1.0, QFont::Weight weight = QFont::DemiBold)
 {

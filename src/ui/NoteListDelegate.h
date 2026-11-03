@@ -31,8 +31,9 @@ public:
 
     // A note's title: Bold (700), so it clearly leads the line below.
     [[nodiscard]] static QFont titleFont(const QFont& base);
-    // The time and preview line: 0.1 pt smaller than `base`, the title's size
-    // (10.9 pt under an 11 pt system font), regular weight.
+    // The time and preview line: 0.15 pt smaller than `base`, the title's size
+    // (10.85 pt under an 11 pt system font), regular weight. The editor's date
+    // line uses it too.
     [[nodiscard]] static QFont detailFont(const QFont& base);
     // The preview's muted color on a selected row: the selection's text color
     // at 70% over the accent, so the preview stays secondary there too while
