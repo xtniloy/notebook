@@ -18,6 +18,7 @@ constexpr int kVerticalPadding = 13; // roomy rows, as macOS Notes
 constexpr int kLineGap = 5;
 constexpr int kIconSize = 14;
 constexpr int kIconGap = 4;
+constexpr int kTimeGap = 8; // between the time and the preview
 constexpr qreal kHighlightRadius = 6.0;
 constexpr qreal kThumbnailRadius = 4.0;
 constexpr qreal kHeaderScale = 1.1;
@@ -147,20 +148,28 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
 
     painter->setFont(titleFont);
     painter->setPen(textColor);
-    painter->drawText(
-        titleLine, Qt::AlignLeft | Qt::AlignVCenter,
-        titleMetrics.elidedText(index.data().toString(), Qt::ElideRight, titleLine.width()));
+    painter->drawText(titleLine, Qt::AlignLeft | Qt::AlignVCenter,
+                      painter->fontMetrics().elidedText(index.data().toString(), Qt::ElideRight,
+                                                        titleLine.width()));
 
     painter->setFont(smallFont);
     const QString time = index.data(models::kTimeTextRole).toString();
-    painter->drawText(detailLine, Qt::AlignLeft | Qt::AlignVCenter, time);
-    detailLine.setLeft(detailLine.left() + smallMetrics.horizontalAdvance(time) + (2 * kIconGap));
+    // The preview starts after the time as drawn, not as measured apart from
+    // the painter: on a desktop whose font DPI differs from the screen's
+    // (GNOME at 125 %: Xft.dpi 192), QFontMetrics(font) measured the time
+    // narrower than it was drawn and the preview touched it ("Yesterdaynot").
+    QRect drawnTime;
+    painter->drawText(detailLine, Qt::AlignLeft | Qt::AlignVCenter, time, &drawnTime);
+    if (!time.isEmpty()) {
+        detailLine.setLeft(drawnTime.right() + 1 + kTimeGap);
+    }
 
     const QString preview =
         locked ? NoteListDelegate::tr("Locked") : index.data(models::kPreviewRole).toString();
     painter->setPen(mutedColor);
-    painter->drawText(detailLine, Qt::AlignLeft | Qt::AlignVCenter,
-                      smallMetrics.elidedText(preview, Qt::ElideRight, detailLine.width()));
+    painter->drawText(
+        detailLine, Qt::AlignLeft | Qt::AlignVCenter,
+        painter->fontMetrics().elidedText(preview, Qt::ElideRight, detailLine.width()));
 }
 
 QColor NoteListDelegate::selectedMutedColor(const QPalette& palette)
