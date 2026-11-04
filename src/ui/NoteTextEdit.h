@@ -94,6 +94,13 @@ private:
     void paintCheckbox(QPainter& painter, const QRectF& box, bool checked) const;
     // Checked items' text is grayed: drawn so, not stored (extra selections).
     void updateCheckedText();
+    // Updates the gray text after the current change, from the event loop.
+    // Never from inside the document's signals: QTextDocument::clear() emits
+    // contentsChanged() while it holds its cursor list aside, and replacing
+    // the extra selections there freed cursors it then put back (heap
+    // corruption, the app aborted when switching from a note with checked
+    // items).
+    void scheduleCheckedText();
 
     void updateViewportMargins();
     void applyBottomPadding();
@@ -102,6 +109,7 @@ private:
     int m_bottomPadding = 0;
     bool m_moveCheckedToBottom = false;
     bool m_overCheckbox = false; // the pointer shows a hand there
+    bool m_checkedTextPending = false;
     // The checkbox a left button press went to: the click is ours from press
     // to release (Qt sees none of it), and toggles if released on it too.
     QTextBlock m_pressedCheckbox;

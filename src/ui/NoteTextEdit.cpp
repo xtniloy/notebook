@@ -31,7 +31,7 @@ NoteTextEdit::NoteTextEdit(QWidget* parent)
     setFrameShape(QFrame::NoFrame);
     setTabChangesFocus(false);
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    connect(document(), &QTextDocument::contentsChanged, this, &NoteTextEdit::updateCheckedText);
+    connect(document(), &QTextDocument::contentsChanged, this, &NoteTextEdit::scheduleCheckedText);
 }
 
 NoteTextEdit::~NoteTextEdit() = default;
@@ -52,6 +52,8 @@ int NoteTextEdit::rightInset() const
 void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText)
 {
     m_pressedCheckbox = QTextBlock(); // a click doesn't carry over to another note
+    // No cursors of ours in the document while it's cleared and refilled.
+    setExtraSelections({});
     editor::NoteFormat::load(body, plainText, *document());
     if (document()->isEmpty()) {
         // A new (empty) note starts with its title, as in macOS Notes (task
@@ -68,6 +70,7 @@ void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText)
     // only line was left without a layout, and Qt draws no caret there: a new
     // note showed no caret until the first key. Lay it all out again.
     document()->markContentsDirty(0, document()->characterCount());
+    updateCheckedText(); // grayed from the start, not a moment later
 }
 
 QString NoteTextEdit::noteBody() const
@@ -468,6 +471,21 @@ void NoteTextEdit::mouseMoveEvent(QMouseEvent* event)
         m_overCheckbox = over;
         viewport()->setCursor(over ? Qt::PointingHandCursor : Qt::IBeamCursor);
     }
+}
+
+void NoteTextEdit::scheduleCheckedText()
+{
+    if (m_checkedTextPending) {
+        return;
+    }
+    m_checkedTextPending = true;
+    QMetaObject::invokeMethod(
+        this,
+        [this] {
+            m_checkedTextPending = false;
+            updateCheckedText();
+        },
+        Qt::QueuedConnection);
 }
 
 void NoteTextEdit::updateCheckedText()

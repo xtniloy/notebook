@@ -13,6 +13,7 @@
 #include "ui/EditorView.h"
 #include "ui/FormatMenu.h"
 #include "ui/MainWindow.h"
+#include "ui/NoteListView.h"
 #include "ui/NoteTextEdit.h"
 
 #include <QAbstractTextDocumentLayout>
@@ -24,6 +25,7 @@
 #include <QTextLayout>
 #include <QTextList>
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 
@@ -59,6 +61,8 @@ private slots:
     void enterOnEmptyItemLeavesTheChecklist();
     void checkedTextIsGrayed();
     void toggleIsSaved();
+    void grayIsNotUpdatedInsideDocumentSignals();
+    void switchingFromCheckedItemsIsSafe();
     void checkedItemMovesToBottom();
     void moveSettingIsRemembered();
 
@@ -357,8 +361,9 @@ void tst_Checklists::checkedTextIsGrayed()
     makeChecklist();
     QVERIFY(m_edit->extraSelections().isEmpty());
     QTest::mouseClick(m_edit->viewport(), Qt::LeftButton, Qt::NoModifier, checkboxOf(2));
+    // Updated from the event loop, not inside the document's signals.
+    QTRY_COMPARE(m_edit->extraSelections().size(), 1);
     const QList<QTextEdit::ExtraSelection> grayed = m_edit->extraSelections();
-    QCOMPARE(grayed.size(), 1);
     QCOMPARE(grayed.first().cursor.selectedText(), QStringLiteral("Eggs"));
     QCOMPARE(grayed.first().format.foreground().color(),
              m_edit->palette().color(QPalette::PlaceholderText));
@@ -376,6 +381,56 @@ void tst_Checklists::toggleIsSaved()
                                  .value()
                                  .body.contains(QStringLiteral("\"check\":true")),
                              5000);
+}
+
+// The gray text's extra selections are cursors in the document: replacing
+// them inside its signals freed cursors QTextDocument::clear() was holding
+// aside, and the app aborted on the next note (heap corruption).
+void tst_Checklists::grayIsNotUpdatedInsideDocumentSignals()
+{
+    openWindow();
+    makeChecklist();
+    QList<qsizetype> seen; // the selections while the document signals
+    connect(m_edit->document(), &QTextDocument::contentsChanged, this,
+            [&] { seen.append(m_edit->extraSelections().size()); });
+    QTest::mouseClick(m_edit->viewport(), Qt::LeftButton, Qt::NoModifier, checkboxOf(1));
+    QVERIFY(!seen.isEmpty());
+    QVERIFY(std::ranges::all_of(seen, [](qsizetype size) { return size == 0; }));
+    QTRY_COMPARE(m_edit->extraSelections().size(), 1); // afterwards
+
+    m_edit->setNoteBody(QString(), QStringLiteral("Other")); // as opening a note does
+    QVERIFY(m_edit->extraSelections().isEmpty());
+}
+
+// The reported crash: open a note with checked items, then another one, and
+// type there.
+void tst_Checklists::switchingFromCheckedItemsIsSafe()
+{
+    const Note other = await(m_context->notes().create(roles::kAllNotesFolderId, {},
+                                                       QStringLiteral("asd\nmore text")))
+                           .value();
+    m_window = std::make_unique<MainWindow>(*m_context); // "asd" is newer: it opens first
+    m_window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(m_window.get()));
+    m_edit = m_window->findChild<EditorView*>(QStringLiteral("editorPane"))->textEdit();
+    auto* list = m_window->findChild<notes::ui::NoteListView*>(QStringLiteral("noteListPane"));
+    QTRY_VERIFY(list->selectNote(m_note.id));
+    QTRY_COMPARE(m_edit->toPlainText(), QStringLiteral("Groceries\nMilk\nEggs\nTea"));
+    makeChecklist();
+    for (const int item : {1, 2, 3}) {
+        QTest::mouseClick(m_edit->viewport(), Qt::LeftButton, Qt::NoModifier, checkboxOf(item));
+    }
+    QTRY_COMPARE(m_edit->extraSelections().size(), 3);
+
+    for (int round = 0; round < 3; ++round) {
+        QVERIFY(list->selectNote(other.id));
+        QTRY_VERIFY(m_edit->toPlainText().startsWith(QStringLiteral("asd")));
+        m_edit->moveCursor(QTextCursor::End);
+        QTest::keyClicks(m_edit, QStringLiteral(" x"));
+        QVERIFY(list->selectNote(m_note.id));
+        QTRY_VERIFY(m_edit->toPlainText().startsWith(QStringLiteral("Groceries")));
+        QTRY_COMPARE(m_edit->extraSelections().size(), 3); // grayed again at once
+    }
 }
 
 // TC-EDT-018
