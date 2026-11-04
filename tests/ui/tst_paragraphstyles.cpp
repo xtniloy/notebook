@@ -23,10 +23,12 @@
 #include <QClipboard>
 #include <QMenuBar>
 #include <QSettings>
+#include <QStyleOptionMenuItem>
 #include <QTest>
 #include <QTextBlock>
 #include <QToolBar>
 #include <QToolButton>
+#include <QWidgetAction>
 
 #include <chrono>
 #include <memory>
@@ -57,6 +59,8 @@ private slots:
     void shortcutsApplyStyles();
     void menuShowsCurrentStyle();
     void aaButtonOpensStyles();
+    void aaMenuLooksLikeMacNotes();
+    void aaMenuButtonsSetInlineFormats();
     void undoRestoresStyleInOneStep();
     void enterAfterHeadingContinuesInBody();
     void enterOnEmptyLineAddsALine();
@@ -234,6 +238,118 @@ void tst_ParagraphStyles::aaButtonOpensStyles()
 }
 
 // TC-EDT-005
+namespace {
+
+// FormatMenu's look for one action, as it draws the item.
+class ProbeMenu : public FormatMenu
+{
+public:
+    QStyleOptionMenuItem optionFor(const QAction* action) const
+    {
+        QStyleOptionMenuItem option;
+        initStyleOption(&option, action);
+        return option;
+    }
+};
+
+} // namespace
+
+// As in macOS Notes: the inline formats as a row of buttons on top, then
+// each style in its own look and the lists with their markers; no shortcuts
+// or access keys there. The menu bar's Format menu stays plain.
+void tst_ParagraphStyles::aaMenuLooksLikeMacNotes()
+{
+    openWindow();
+    const QList<QAction*> items = formatMenu()->actions();
+    QVERIFY(qobject_cast<QWidgetAction*>(items.first()) != nullptr); // the button row
+    QVERIFY(items.at(1)->isSeparator());
+    for (const QString& name :
+         {QStringLiteral("boldButton"), QStringLiteral("italicButton"),
+          QStringLiteral("underlineButton"), QStringLiteral("strikethroughButton")}) {
+        QVERIFY2(formatMenu()->findChild<QToolButton*>(name) != nullptr, qPrintable(name));
+    }
+    for (QAction* action : formatMenu()->inlineActions()) {
+        QVERIFY(!items.contains(action)); // buttons instead
+    }
+    QCOMPARE(items.mid(2), formatMenu()->styleActions()); // no separator before the lists
+
+    const ProbeMenu probe;
+    const auto option = [&](ParagraphStyle style) {
+        return probe.optionFor(probe.styleAction(style));
+    };
+    const QFont body = option(ParagraphStyle::Body).font;
+    QCOMPARE(option(ParagraphStyle::Body).text, QStringLiteral("Body"));
+    QVERIFY(option(ParagraphStyle::Title).font.bold());
+    QVERIFY(option(ParagraphStyle::Title).font.pointSizeF() >
+            option(ParagraphStyle::Heading).font.pointSizeF());
+    QVERIFY(option(ParagraphStyle::Heading).font.pointSizeF() >
+            option(ParagraphStyle::Subheading).font.pointSizeF());
+    QVERIFY(option(ParagraphStyle::Subheading).font.pointSizeF() > body.pointSizeF());
+    QVERIFY(!body.bold());
+    QVERIFY(option(ParagraphStyle::Monospaced)
+                .font.families()
+                .contains(QStringLiteral("JetBrains Mono")));
+    QCOMPARE(option(ParagraphStyle::BulletedList).text, QStringLiteral("\u2022 Bulleted List"));
+    QCOMPARE(option(ParagraphStyle::DashedList).text, QStringLiteral("\u2013 Dashed List"));
+    QCOMPARE(option(ParagraphStyle::NumberedList).text, QStringLiteral("1. Numbered List"));
+    QCOMPARE(option(ParagraphStyle::Title).reservedShortcutWidth, 0);
+    // No room kept for the hidden shortcuts: only as wide as the styles.
+    for (const QAction* action : formatMenu()->styleActions()) {
+        QVERIFY(!action->isShortcutVisibleInContextMenu());
+        QVERIFY(!action->shortcut().isEmpty()); // still there, for the menu bar
+    }
+
+    // The menu bar's Format menu: the same actions, plain, with shortcuts.
+    QMenu* menuBarFormat = nullptr;
+    for (QAction* top : m_window->menuBar()->actions()) {
+        if (top->menu() != nullptr && top->menu() != formatMenu() &&
+            top->menu()->actions().contains(formatMenu()->styleAction(ParagraphStyle::Title))) {
+            menuBarFormat = top->menu();
+        }
+    }
+    if (menuBarFormat == nullptr) {
+        QFAIL("no Format menu in the menu bar");
+    }
+    for (QAction* action : formatMenu()->inlineActions()) {
+        QVERIFY(menuBarFormat->actions().contains(action)); // their shortcuts live here
+    }
+    // A little more room between the lines than in other menus.
+    QAction* bodyAction = formatMenu()->styleAction(ParagraphStyle::Body);
+    QCOMPARE(formatMenu()->actionGeometry(bodyAction).height(),
+             menuBarFormat->actionGeometry(bodyAction).height() + 6);
+}
+
+void tst_ParagraphStyles::aaMenuButtonsSetInlineFormats()
+{
+    openWindow();
+    auto* bold = formatMenu()->findChild<QToolButton*>(QStringLiteral("boldButton"));
+    auto* italic = formatMenu()->findChild<QToolButton*>(QStringLiteral("italicButton"));
+    if (bold == nullptr || italic == nullptr) {
+        QFAIL("no buttons");
+    }
+    QTextCursor packing(m_edit->document()->findBlockByNumber(1));
+    packing.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+    m_edit->setTextCursor(packing);
+    QVERIFY(bold->isEnabled());
+    QVERIFY(!bold->isChecked());
+
+    bold->click();
+    QVERIFY(StyleManager::hasInline(packing.charFormat(), notes::editor::InlineStyle::Bold));
+    QVERIFY(bold->isChecked()); // follows the selection
+    QVERIFY(!italic->isChecked());
+    bold->click();
+    QVERIFY(!StyleManager::hasInline(m_edit->textCursor().charFormat(),
+                                     notes::editor::InlineStyle::Bold));
+    QVERIFY(!bold->isChecked());
+
+    // In a heading, Bold is its style's: shown pressed, can't be changed.
+    moveToParagraph(0);
+    QTest::keyClick(m_edit, Qt::Key_T, Qt::ControlModifier | Qt::ShiftModifier);
+    QVERIFY(bold->isChecked());
+    QVERIFY(!bold->isEnabled());
+    QVERIFY(italic->isEnabled());
+}
+
 void tst_ParagraphStyles::undoRestoresStyleInOneStep()
 {
     openWindow();

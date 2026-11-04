@@ -7,15 +7,17 @@
 #include <array>
 
 class QActionGroup;
+class QToolButton;
 
 namespace notes::ui {
 
-// The paragraph styles (Plan §3.2 "Aa", task 3.2): Title, Heading,
-// Subheading, Body and Monospaced, then the lists (task 3.5): Bulleted,
-// Dashed and Numbered, the current one checked; then the inline
-// formats (task 3.4): Bold, Italic, Underline and Strikethrough, checked when
-// the text at the cursor has them. Pops up from the toolbar's Aa button; the
-// same actions, with their shortcuts, are in the menu bar's Format menu.
+// The toolbar's Aa menu (Plan §3.2), as in macOS Notes: a row of buttons for
+// the inline formats (task 3.4), Bold, Italic, Underline and Strikethrough,
+// pressed when the selection has them; then the paragraph styles (task 3.2),
+// Title, Heading, Subheading, Body and Monospaced, and the lists (task 3.5),
+// Bulleted, Dashed and Numbered, each shown in its own look, the current one
+// checked. The same actions, with their shortcuts, are in the menu bar's
+// Format menu, plain.
 class FormatMenu : public QMenu
 {
     Q_OBJECT
@@ -39,15 +41,22 @@ public:
     // While no note can be edited, no style or inline format can be chosen.
     void setStylesEnabled(bool enabled);
 
+protected:
+    // The styles' look: their font and list marker, without shortcuts.
+    void initStyleOption(QStyleOptionMenuItem* option, const QAction* action) const override;
+
 signals:
     void styleChosen(notes::editor::ParagraphStyle style);
     void inlineStyleToggled(notes::editor::InlineStyle style, bool on);
 
 private:
+    // Extra room above and below each item (AppStyle::kExtraItemPaddingProperty).
+    static constexpr int kExtraItemPadding = 3;
     static constexpr std::size_t kStyleCount = 8;
     static constexpr std::size_t kInlineCount = 4;
     std::array<QAction*, kStyleCount> m_actions{};
     std::array<QAction*, kInlineCount> m_inlineActions{};
+    std::array<QToolButton*, kInlineCount> m_inlineButtons{};
     QActionGroup* m_group;
 };
 

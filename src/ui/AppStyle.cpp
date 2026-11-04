@@ -278,8 +278,17 @@ QSize AppStyle::sizeFromContents(ContentsType type, const QStyleOption* option,
         return {contentsSize.width(), kSeparatorHeight};
     }
     // `contentsSize` is the label alone; QMenu adds the widest shortcut after.
-    const int height = std::max(item->fontMetrics.height(), kIconSize) + (2 * kVerticalPadding);
-    int width = contentsSize.width() + (2 * kItemInset) + (2 * kTextPadding) + kShortcutGap;
+    // A menu may draw a label of its own in a font of its own (FormatMenu's
+    // styles): room for that too.
+    const QString label = item->text.left(item->text.indexOf(QLatin1Char('\t')));
+    const int labelWidth =
+        item->fontMetrics.boundingRect(QRect(), Qt::TextSingleLine | Qt::TextShowMnemonic, label)
+            .width();
+    const int extra = widget != nullptr ? widget->property(kExtraItemPaddingProperty).toInt() : 0;
+    const int height =
+        std::max(item->fontMetrics.height(), kIconSize) + (2 * (kVerticalPadding + extra));
+    int width = std::max(contentsSize.width(), labelWidth) + (2 * kItemInset) + (2 * kTextPadding) +
+                kShortcutGap;
     if (hasColumn(*item)) {
         width += kColumnWidth;
     }

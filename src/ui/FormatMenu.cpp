@@ -1,8 +1,16 @@
 #include "ui/FormatMenu.h"
 
+#include "ui/AppStyle.h"
+
 #include <QAction>
 #include <QActionGroup>
+#include <QHBoxLayout>
 #include <QKeySequence>
+#include <QStyleOptionMenuItem>
+#include <QToolButton>
+#include <QWidgetAction>
+
+#include <algorithm>
 
 namespace notes::ui {
 
@@ -73,6 +81,8 @@ struct InlineSpec
     const char* objectName = nullptr;
     const char* text = nullptr;
     QKeyCombination shortcut;
+    const char* buttonName = nullptr;
+    char glyph = 0; // the button's letter, drawn in the format
 };
 
 // The usual shortcuts; Strikethrough as macOS (Shift+Cmd+X).
@@ -80,19 +90,27 @@ constexpr std::array<InlineSpec, 4> kInlineStyles{{
     {.style = InlineStyle::Bold,
      .objectName = "boldAction",
      .text = QT_TRANSLATE_NOOP("notes::ui::FormatMenu", "B&old"),
-     .shortcut = Qt::CTRL | Qt::Key_B},
+     .shortcut = Qt::CTRL | Qt::Key_B,
+     .buttonName = "boldButton",
+     .glyph = 'B'},
     {.style = InlineStyle::Italic,
      .objectName = "italicAction",
      .text = QT_TRANSLATE_NOOP("notes::ui::FormatMenu", "&Italic"),
-     .shortcut = Qt::CTRL | Qt::Key_I},
+     .shortcut = Qt::CTRL | Qt::Key_I,
+     .buttonName = "italicButton",
+     .glyph = 'I'},
     {.style = InlineStyle::Underline,
      .objectName = "underlineAction",
      .text = QT_TRANSLATE_NOOP("notes::ui::FormatMenu", "&Underline"),
-     .shortcut = Qt::CTRL | Qt::Key_U},
+     .shortcut = Qt::CTRL | Qt::Key_U,
+     .buttonName = "underlineButton",
+     .glyph = 'U'},
     {.style = InlineStyle::Strikethrough,
      .objectName = "strikethroughAction",
      .text = QT_TRANSLATE_NOOP("notes::ui::FormatMenu", "Stri&kethrough"),
-     .shortcut = Qt::CTRL | Qt::SHIFT | Qt::Key_X},
+     .shortcut = Qt::CTRL | Qt::SHIFT | Qt::Key_X,
+     .buttonName = "strikethroughButton",
+     .glyph = 'S'},
 }};
 
 constexpr bool inInlineOrder()
@@ -106,6 +124,68 @@ constexpr bool inInlineOrder()
 }
 static_assert(inInlineOrder(), "kInlineStyles must follow InlineStyle's order");
 
+// The letter on an inline format's button, drawn in that format.
+QFont glyphFont(QFont font, InlineStyle style)
+{
+    font.setPointSizeF(font.pointSizeF() * 1.25);
+    switch (style) {
+    case InlineStyle::Bold:
+        font.setBold(true);
+        break;
+    case InlineStyle::Italic:
+        font.setItalic(true);
+        break;
+    case InlineStyle::Underline:
+        font.setUnderline(true);
+        break;
+    case InlineStyle::Strikethrough:
+        font.setStrikeOut(true);
+        break;
+    }
+    return font;
+}
+
+// A paragraph style's look in the menu: its font, relative to the menu's.
+QFont previewFont(QFont font, ParagraphStyle style)
+{
+    switch (style) {
+    case ParagraphStyle::Title:
+        font.setPointSizeF(font.pointSizeF() * editor::StyleManager::kTitleScale);
+        font.setBold(true);
+        break;
+    case ParagraphStyle::Heading:
+        font.setPointSizeF(font.pointSizeF() * editor::StyleManager::kHeadingScale);
+        font.setBold(true);
+        break;
+    case ParagraphStyle::Subheading:
+        font.setPointSizeF(font.pointSizeF() * editor::StyleManager::kSubheadingScale);
+        font.setBold(true);
+        break;
+    case ParagraphStyle::Monospaced:
+        font.setFamilies({QStringLiteral("JetBrains Mono")});
+        font.setFixedPitch(true);
+        break;
+    default:
+        break;
+    }
+    return font;
+}
+
+// A list's marker before its name, as the list draws it.
+QString listMarker(ParagraphStyle style)
+{
+    switch (style) {
+    case ParagraphStyle::BulletedList:
+        return QStringLiteral("\u2022 ");
+    case ParagraphStyle::DashedList:
+        return QStringLiteral("\u2013 ");
+    case ParagraphStyle::NumberedList:
+        return QStringLiteral("1. ");
+    default:
+        return {};
+    }
+}
+
 } // namespace
 
 FormatMenu::FormatMenu(QWidget* parent)
@@ -113,16 +193,31 @@ FormatMenu::FormatMenu(QWidget* parent)
     , m_group(new QActionGroup(this))
 {
     setObjectName(QStringLiteral("formatMenu"));
+    // A little more room between the styles than in other menus.
+    setProperty(AppStyle::kExtraItemPaddingProperty, kExtraItemPadding);
+
+    // The inline formats: a row of buttons, as in macOS Notes.
+    auto* row = new QWidget(this);
+    row->setObjectName(QStringLiteral("formatInlineRow"));
+    auto* rowLayout = new QHBoxLayout(row);
+    rowLayout->setContentsMargins(12, 4, 12, 4);
+    rowLayout->setSpacing(6);
+    rowLayout->addStretch();
+    auto* rowAction = new QWidgetAction(this);
+    rowAction->setDefaultWidget(row);
+    addAction(rowAction);
+    addSeparator();
+
     // Optional: in a checklist, which has no style here, none is checked.
     m_group->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
     for (std::size_t i = 0; i < kStyles.size(); ++i) {
         const StyleSpec& spec = kStyles.at(i);
-        if (spec.style == ParagraphStyle::BulletedList) {
-            addSeparator(); // the lists, as macOS Notes
-        }
         auto* action = new QAction(tr(spec.text), this);
         action->setObjectName(QLatin1StringView(spec.objectName));
         action->setShortcut(QKeySequence(spec.shortcut));
+        // Not in this pop-up (no room kept for it either, so the menu is only
+        // as wide as its styles); the menu bar's Format menu still shows it.
+        action->setShortcutVisibleInContextMenu(false);
         action->setCheckable(true);
         m_group->addAction(action);
         addAction(action);
@@ -130,23 +225,62 @@ FormatMenu::FormatMenu(QWidget* parent)
                 [this, style = spec.style] { emit styleChosen(style); });
         m_actions.at(i) = action;
     }
-    addSeparator();
     for (std::size_t i = 0; i < kInlineStyles.size(); ++i) {
         const InlineSpec& spec = kInlineStyles.at(i);
+        // Not items here (the buttons are); the menu bar's Format menu lists
+        // them, which keeps their shortcuts working.
         auto* action = new QAction(tr(spec.text), this);
         action->setObjectName(QLatin1StringView(spec.objectName));
         action->setShortcut(QKeySequence(spec.shortcut));
         action->setCheckable(true);
-        addAction(action);
         connect(action, &QAction::triggered, this,
                 [this, style = spec.style](bool on) { emit inlineStyleToggled(style, on); });
         m_inlineActions.at(i) = action;
+
+        auto* button = new QToolButton(row);
+        button->setObjectName(QLatin1StringView(spec.buttonName));
+        button->setText(QString(QLatin1Char(spec.glyph)));
+        button->setFont(glyphFont(button->font(), spec.style));
+        button->setCheckable(true);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setToolTip(
+            QStringLiteral("%1 (%2)").arg(action->text().remove(QLatin1Char('&')),
+                                          action->shortcut().toString(QKeySequence::NativeText)));
+        // The menu stays open: more than one format can be set at once.
+        connect(button, &QToolButton::clicked, action, [action] { action->trigger(); });
+        connect(action, &QAction::changed, button, [button, action] {
+            button->setChecked(action->isChecked());
+            button->setEnabled(action->isEnabled());
+        });
+        rowLayout->addWidget(button);
+        m_inlineButtons.at(i) = button;
     }
+    rowLayout->addStretch();
     setCurrentStyle(ParagraphStyle::Body);
     setStylesEnabled(false);
 }
 
 FormatMenu::~FormatMenu() = default;
+
+void FormatMenu::initStyleOption(QStyleOptionMenuItem* option, const QAction* action) const
+{
+    QMenu::initStyleOption(option, action);
+    const auto* found = std::ranges::find(m_actions, action);
+    if (found == m_actions.end()) {
+        return;
+    }
+    const auto style = static_cast<ParagraphStyle>(std::distance(m_actions.begin(), found));
+    option->font = previewFont(option->font, style);
+    option->fontMetrics = QFontMetrics(option->font);
+    // The look explains the style; the menu bar's Format menu has the
+    // shortcuts and the underlined access keys.
+    QString text = action->text();
+    text.replace(QStringLiteral("&&"), QStringLiteral("\x01"));
+    text.remove(QLatin1Char('&'));
+    text.replace(QLatin1Char('\x01'), QStringLiteral("&&"));
+    option->text = listMarker(style) + text;
+    option->reservedShortcutWidth = 0;
+}
 
 QList<QAction*> FormatMenu::styleActions() const
 {

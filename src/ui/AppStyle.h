@@ -46,6 +46,9 @@ public:
     static constexpr int kArrowWidth = 14;  // submenu chevron
     static constexpr int kVerticalPadding = 5;
     static constexpr int kSeparatorHeight = 9;
+    // An int property a menu can set: more room above and below each of its
+    // items than kVerticalPadding (FormatMenu's styles, as in macOS Notes).
+    static constexpr const char* kExtraItemPaddingProperty = "extraItemPadding";
 
     // Scroll bars.
     static constexpr int kScrollBarExtent = 12;  // thickness

@@ -92,6 +92,26 @@ QFrame#toolGroup QToolButton[position="only"] {
     border-radius: 6px;
 }
 
+/* The Aa menu's row of inline formats (B I U S). */
+#formatInlineRow QToolButton {
+    color: ${text};
+    border: none;
+    border-radius: 6px;
+    padding: 2px;
+    min-width: 30px;
+    min-height: 28px;
+    background: transparent;
+}
+
+#formatInlineRow QToolButton:hover,
+#formatInlineRow QToolButton:checked {
+    background: ${hover};
+}
+
+#formatInlineRow QToolButton:disabled {
+    color: ${mutedText};
+}
+
 /* Aa opens the Format menu: no arrow, it would crowd the icon. */
 QFrame#toolGroup QToolButton::menu-indicator {
     image: none;
