@@ -55,6 +55,8 @@ public:
     static constexpr QSize kMinimumWindowSize{760, 480};
     // Set once the first-delete notice has been accepted (AlertDialog).
     static constexpr QLatin1StringView kTrashNoticeShownKey{"notes/trashNoticeShown"};
+    // Checking a checklist item moves it to the bottom (task 3.6); off by default.
+    static constexpr QLatin1StringView kMoveCheckedToBottomKey{"editor/moveCheckedToBottom"};
 
     explicit MainWindow(app::AppContext& context, QWidget* parent = nullptr);
     ~MainWindow() override;

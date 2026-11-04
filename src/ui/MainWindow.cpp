@@ -192,7 +192,14 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
             &services::Autosave::markChanged);
     connect(m_formatMenu, &FormatMenu::styleChosen, this, [this](editor::ParagraphStyle style) {
         m_editor->textEdit()->setParagraphStyle(style);
+        updateFormatMenu(); // choosing the checked style again keeps it checked
     });
+    connect(m_actions->action(ActionId::Checklist), &QAction::triggered, this, [this] {
+        m_editor->textEdit()->toggleChecklist();
+        updateFormatMenu();
+    });
+    m_editor->textEdit()->setMoveCheckedToBottom(
+        context.settings().value(kMoveCheckedToBottomKey, false).toBool());
     connect(m_formatMenu, &FormatMenu::inlineStyleToggled, this,
             [this](editor::InlineStyle style, bool on) {
                 m_editor->textEdit()->setInlineStyle(style, on);
@@ -367,7 +374,17 @@ void MainWindow::createMenus()
     formatMenu->addSeparator();
     formatMenu->addActions(m_formatMenu->inlineActions());
     formatMenu->addSeparator();
-    add(formatMenu, {ActionId::Checklist, ActionId::InsertTable, ActionId::Attachment});
+    add(formatMenu, {ActionId::Checklist});
+    // The "Move checked items to bottom" setting (Plan §3.5), kept in QSettings.
+    QAction* moveChecked = formatMenu->addAction(tr("&Move Checked Items to Bottom"));
+    moveChecked->setObjectName(QStringLiteral("moveCheckedToBottomAction"));
+    moveChecked->setCheckable(true);
+    moveChecked->setChecked(m_editor->textEdit()->moveCheckedToBottom());
+    connect(moveChecked, &QAction::toggled, this, [this](bool move) {
+        m_editor->textEdit()->setMoveCheckedToBottom(move);
+        m_context.settings().setValue(kMoveCheckedToBottomKey, move);
+    });
+    add(formatMenu, {ActionId::InsertTable, ActionId::Attachment});
     connect(formatMenu, &QMenu::aboutToShow, this, &MainWindow::updateFormatMenu);
 
     QMenu* viewMenu = menuBar()->addMenu(tr("&View"));
@@ -767,6 +784,7 @@ void MainWindow::updateFormatMenu()
     const NoteTextEdit* edit = m_editor->textEdit();
     const bool editable = m_editor->hasNote() && !edit->isReadOnly();
     m_actions->action(ActionId::Format)->setEnabled(editable);
+    m_actions->action(ActionId::Checklist)->setEnabled(editable);
     m_formatMenu->setStylesEnabled(editable);
     m_formatMenu->setCurrentStyle(edit->paragraphStyle());
     using editor::InlineStyle;

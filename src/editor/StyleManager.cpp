@@ -155,6 +155,23 @@ void leaveList(const QTextBlock& block)
     QTextCursor(block).setBlockFormat(format);
 }
 
+// A checklist's items have a checkbox (Qt's block marker), unchecked when
+// new; other paragraphs have none.
+void fitMarker(const QTextBlock& block)
+{
+    const bool checklist = StyleManager::isChecklistItem(block);
+    QTextBlockFormat format = block.blockFormat();
+    if (checklist == (format.marker() != QTextBlockFormat::MarkerType::NoMarker)) {
+        return;
+    }
+    if (checklist) {
+        format.setMarker(QTextBlockFormat::MarkerType::Unchecked);
+    } else {
+        format.clearProperty(QTextFormat::BlockMarker);
+    }
+    QTextCursor(block).setBlockFormat(format);
+}
+
 // Puts `block` into a list of `style` at `indent`: the nearest list above at
 // that level when it is the same kind (so its numbering continues), else a
 // new one. `block` must not be in a list.
@@ -173,6 +190,87 @@ void joinList(const QTextBlock& block, ParagraphStyle style, int indent)
         }
     }
     QTextCursor(block).createList(StyleManager::listFormat(style, indent));
+}
+
+// The last of `item` and the list items nested under it.
+QTextBlock lastNestedUnder(const QTextBlock& item)
+{
+    const int level = item.textList()->format().indent();
+    QTextBlock last = item;
+    for (QTextBlock next = item.next();
+         next.isValid() && next.textList() != nullptr && next.textList()->format().indent() > level;
+         next = next.next()) {
+        last = next;
+    }
+    return last;
+}
+
+// The last paragraph of the run of `item`'s list: its items from `item` on
+// and the items nested under them.
+QTextBlock endOfList(const QTextBlock& item)
+{
+    const QTextList* list = item.textList();
+    const int level = list->format().indent();
+    QTextBlock last = item;
+    for (QTextBlock next = item.next(); next.isValid(); next = next.next()) {
+        const QTextList* nextList = next.textList();
+        if (nextList != list && (nextList == nullptr || nextList->format().indent() <= level)) {
+            break;
+        }
+        last = next;
+    }
+    return last;
+}
+
+// Adds a copy of `block` (its formats, text and images) as a new paragraph
+// after `at`'s, leaving `at` at its end.
+void copyBlock(QTextCursor& at, const QTextBlock& block)
+{
+    at.insertBlock(block.blockFormat(), block.charFormat());
+    for (QTextBlock::iterator it = block.begin(); !it.atEnd(); ++it) {
+        const QTextFragment fragment = it.fragment();
+        const QTextCharFormat format = fragment.charFormat();
+        if (format.isImageFormat()) {
+            for (int i = 0; i < fragment.length(); ++i) {
+                at.insertImage(format.toImageFormat());
+            }
+        } else {
+            at.insertText(fragment.text(), format);
+        }
+    }
+}
+
+// Moves `first` to `last` (whole paragraphs) to after `after`, which comes
+// later in the document.
+void moveBlocks(const QTextBlock& first, const QTextBlock& last, const QTextBlock& after)
+{
+    QTextCursor at(after);
+    at.movePosition(QTextCursor::EndOfBlock);
+    for (QTextBlock block = first;; block = block.next()) {
+        copyBlock(at, block);
+        if (block == last) {
+            break;
+        }
+    }
+    QTextCursor remove(first);
+    if (const QTextBlock before = first.previous(); before.isValid()) {
+        // From the end of the paragraph before: what follows keeps its format.
+        remove.setPosition(first.position() - 1);
+        remove.setPosition(last.position() + last.length() - 1, QTextCursor::KeepAnchor);
+        remove.removeSelectedText();
+        return;
+    }
+    // The document's first paragraph: the one after takes its place (and
+    // would take its format), so it gets its own back. Both are in the same
+    // list: the paragraph after is an item of the run moved past.
+    const QTextBlock next = last.next();
+    const QTextBlockFormat format = next.blockFormat();
+    const QTextCharFormat charFormat = next.charFormat();
+    remove.setPosition(first.position());
+    remove.setPosition(next.position(), QTextCursor::KeepAnchor);
+    remove.removeSelectedText();
+    remove.setBlockFormat(format);
+    remove.setBlockCharFormat(charFormat);
 }
 
 // The selected paragraphs, first to last.
@@ -207,6 +305,7 @@ int StyleManager::headingLevel(ParagraphStyle style)
     case ParagraphStyle::BulletedList:
     case ParagraphStyle::DashedList:
     case ParagraphStyle::NumberedList:
+    case ParagraphStyle::Checklist:
         break;
     }
     return 0;
@@ -215,7 +314,7 @@ int StyleManager::headingLevel(ParagraphStyle style)
 bool StyleManager::isList(ParagraphStyle style)
 {
     return style == ParagraphStyle::BulletedList || style == ParagraphStyle::DashedList ||
-           style == ParagraphStyle::NumberedList;
+           style == ParagraphStyle::NumberedList || style == ParagraphStyle::Checklist;
 }
 
 ParagraphStyle StyleManager::styleOf(const QTextBlock& block)
@@ -231,6 +330,9 @@ ParagraphStyle StyleManager::listStyleOf(const QTextList& list)
     const QTextListFormat format = list.format();
     if (format.boolProperty(NoteFormat::kDashedListProperty)) {
         return ParagraphStyle::DashedList;
+    }
+    if (format.boolProperty(NoteFormat::kChecklistProperty)) {
+        return ParagraphStyle::Checklist;
     }
     switch (format.style()) {
     case QTextListFormat::ListDecimal:
@@ -257,6 +359,11 @@ QTextListFormat StyleManager::listFormat(ParagraphStyle style, int indent)
         break;
     case ParagraphStyle::NumberedList:
         format.setStyle(QTextListFormat::ListDecimal);
+        break;
+    case ParagraphStyle::Checklist:
+        // No style either: NoteTextEdit draws the checkboxes.
+        format.setStyle(QTextListFormat::ListStyleUndefined);
+        format.setProperty(NoteFormat::kChecklistProperty, true);
         break;
     default:
         format.setStyle(QTextListFormat::ListDisc);
@@ -298,6 +405,9 @@ void StyleManager::apply(QTextCursor& cursor, ParagraphStyle style)
             // Already a list item: the whole list changes kind.
             if (listStyleOf(*list) != style) {
                 list->setFormat(listFormat(style, list->format().indent()));
+                for (int i = 0; i < list->count(); ++i) {
+                    fitMarker(list->item(i));
+                }
             }
         } else if (joined != nullptr) {
             joined->add(block);
@@ -305,6 +415,7 @@ void StyleManager::apply(QTextCursor& cursor, ParagraphStyle style)
             joinList(block, style, 1);
             joined = block.textList();
         }
+        fitMarker(block);
     }
     cursor.endEditBlock();
 }
@@ -329,6 +440,7 @@ bool StyleManager::indentList(QTextCursor& cursor, int levels)
         if (to >= 1) {
             joinList(block, style, to);
         }
+        fitMarker(block); // a checked item stays checked
     }
     cursor.endEditBlock();
     return true;
@@ -339,6 +451,39 @@ void StyleManager::removeFromList(QTextCursor& cursor)
     cursor.beginEditBlock();
     for (const QTextBlock& block : selectedBlocks(cursor)) {
         leaveList(block);
+        fitMarker(block);
+    }
+    cursor.endEditBlock();
+}
+
+bool StyleManager::isChecklistItem(const QTextBlock& block)
+{
+    const QTextList* list = block.textList();
+    return list != nullptr && listStyleOf(*list) == ParagraphStyle::Checklist;
+}
+
+bool StyleManager::isChecked(const QTextBlock& block)
+{
+    return isChecklistItem(block) &&
+           block.blockFormat().marker() == QTextBlockFormat::MarkerType::Checked;
+}
+
+void StyleManager::setChecked(const QTextBlock& block, bool checked, bool toBottom)
+{
+    if (!isChecklistItem(block) || isChecked(block) == checked) {
+        return;
+    }
+    QTextCursor cursor(block);
+    cursor.beginEditBlock();
+    QTextBlockFormat format = block.blockFormat();
+    format.setMarker(checked ? QTextBlockFormat::MarkerType::Checked
+                             : QTextBlockFormat::MarkerType::Unchecked);
+    cursor.setBlockFormat(format);
+    if (checked && toBottom) {
+        const QTextBlock last = lastNestedUnder(block);
+        if (const QTextBlock end = endOfList(block); end != last) {
+            moveBlocks(block, last, end);
+        }
     }
     cursor.endEditBlock();
 }

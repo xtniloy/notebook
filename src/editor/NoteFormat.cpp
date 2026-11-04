@@ -26,7 +26,7 @@ namespace {
 // JSON shape (NoteFormat::kVersion 1; "v" is written from version 2 on):
 //
 //   { "v": <version>,
-//     "lists":  [ { "style": "disc", "indent": 1 }, ... ],   // "dash": a dashed list
+//     "lists":  [ { "style": "disc", "indent": 1 }, ... ],   // "dash", "check": ours
 //     "blocks": [ <paragraph> | { "table": { "rows": 2, "cols": 2,
 //                                            "cells": [ [<paragraph>...], ... ] } } ] }
 //
@@ -196,6 +196,8 @@ private:
         QJsonObject entry{{QStringLiteral("indent"), format.indent()}};
         if (format.boolProperty(NoteFormat::kDashedListProperty)) {
             entry.insert(QStringLiteral("style"), QStringLiteral("dash"));
+        } else if (format.boolProperty(NoteFormat::kChecklistProperty)) {
+            entry.insert(QStringLiteral("style"), QStringLiteral("check"));
         }
         for (const auto& [style, name] : kListStyles) {
             if (!entry.contains(QStringLiteral("style")) && format.style() == style) {
@@ -323,6 +325,9 @@ QTextListFormat listFormatFor(const QJsonObject& entry)
         // property, and the editor draws the dash.
         format.setStyle(QTextListFormat::ListStyleUndefined);
         format.setProperty(NoteFormat::kDashedListProperty, true);
+    } else if (style == u"check") {
+        format.setStyle(QTextListFormat::ListStyleUndefined);
+        format.setProperty(NoteFormat::kChecklistProperty, true);
     }
     for (const auto& [listStyle, name] : kListStyles) {
         if (style == QLatin1StringView(name)) {

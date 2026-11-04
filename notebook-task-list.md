@@ -602,11 +602,11 @@ Record each in `docs/adr/`:
 
 ### 3.6 Checklists `L` → broken down
 
-- [ ] **(M)** Insert/toggle checklist with `Ctrl+Shift+L`; Enter creates a new unchecked item
-- [ ] **(M)** Click on the checkbox toggles it (hit-test in `mousePressEvent`; clicking the text must not toggle)
-- [ ] **(S)** Checked items rendered with a filled box and grayed text
-- [ ] **(S)** Toggle is one undo step and triggers autosave
-- [ ] **(M)** Setting "Move checked items to bottom" (Plan §3.5)
+- [x] **(M)** Insert/toggle checklist with `Ctrl+Shift+L`; Enter creates a new unchecked item
+- [x] **(M)** Click on the checkbox toggles it (hit-test in `mousePressEvent`; clicking the text must not toggle)
+- [x] **(S)** Checked items rendered with a filled box and grayed text
+- [x] **(S)** Toggle is one undo step and triggers autosave
+- [x] **(M)** Setting "Move checked items to bottom" (Plan §3.5)
 
 **Tests**
 - `TC-EDT-015` (UI) `Ctrl+Shift+L` on a paragraph → unchecked checklist item.
@@ -616,6 +616,8 @@ Record each in `docs/adr/`:
 - `TC-EDT-019` (U) Round-trip preserves checked/unchecked state (this is the case the Phase 3.1 spike must solve).
 
 **Done when:** checklists work like Plan §3.1 mockup.
+
+_Notes:_ a checklist is a list with our `kChecklistProperty` (stored as list style `"check"`) and no Qt marker style; each item's state is Qt's block marker (`"check": true/false`). `NoteTextEdit` draws the circles (filled in the accent when checked) and grays checked text with extra selections, so the gray isn't stored. The setting is the checkable Format ▸ Move Checked Items to Bottom (`editor/moveCheckedToBottom`, off by default); a checked item moves with the items nested under it.
 
 ### 3.7 Images `L` → broken down
 

@@ -113,7 +113,8 @@ FormatMenu::FormatMenu(QWidget* parent)
     , m_group(new QActionGroup(this))
 {
     setObjectName(QStringLiteral("formatMenu"));
-    m_group->setExclusive(true);
+    // Optional: in a checklist, which has no style here, none is checked.
+    m_group->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
     for (std::size_t i = 0; i < kStyles.size(); ++i) {
         const StyleSpec& spec = kStyles.at(i);
         if (spec.style == ParagraphStyle::BulletedList) {
@@ -154,7 +155,8 @@ QList<QAction*> FormatMenu::styleActions() const
 
 QAction* FormatMenu::styleAction(ParagraphStyle style) const
 {
-    return m_actions.at(static_cast<std::size_t>(style));
+    const auto index = static_cast<std::size_t>(style);
+    return index < m_actions.size() ? m_actions.at(index) : nullptr;
 }
 
 QList<QAction*> FormatMenu::inlineActions() const
@@ -169,7 +171,11 @@ QAction* FormatMenu::inlineAction(InlineStyle style) const
 
 void FormatMenu::setCurrentStyle(ParagraphStyle style) const
 {
-    styleAction(style)->setChecked(true);
+    if (QAction* action = styleAction(style)) {
+        action->setChecked(true);
+    } else if (QAction* checked = m_group->checkedAction()) {
+        checked->setChecked(false);
+    }
 }
 
 void FormatMenu::setStylesEnabled(bool enabled)

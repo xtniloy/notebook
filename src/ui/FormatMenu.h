@@ -27,13 +27,14 @@ public:
 
     // In the Format menu's order (editor::ParagraphStyle's).
     [[nodiscard]] QList<QAction*> styleActions() const;
+    // Null for Checklist, which isn't here (it has its own action).
     [[nodiscard]] QAction* styleAction(editor::ParagraphStyle style) const;
 
     // In the Format menu's order (editor::InlineStyle's).
     [[nodiscard]] QList<QAction*> inlineActions() const;
     [[nodiscard]] QAction* inlineAction(editor::InlineStyle style) const;
 
-    // Checks `style`'s action.
+    // Checks `style`'s action; none for Checklist.
     void setCurrentStyle(editor::ParagraphStyle style) const;
     // While no note can be edited, no style or inline format can be chosen.
     void setStylesEnabled(bool enabled);

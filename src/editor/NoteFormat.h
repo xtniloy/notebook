@@ -39,6 +39,9 @@ public:
     // marker, so such a list has no style (Qt draws no marker) and
     // NoteTextEdit draws the dash.
     static constexpr int kDashedListProperty = QTextFormat::UserProperty + 2;
+    // bool, on a QTextListFormat: a checklist ("check"), also without a style;
+    // its items' checkboxes are Qt's block markers, and NoteTextEdit draws them.
+    static constexpr int kChecklistProperty = QTextFormat::UserProperty + 3;
 
     // The document as compact JSON.
     [[nodiscard]] static QString serialize(const QTextDocument& document);

@@ -6,6 +6,7 @@
 #include <QEvent>
 #include <QFontMetricsF>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QScrollBar>
 #include <QTextBlock>
@@ -14,6 +15,10 @@
 #include <QTextFrame>
 #include <QTextLayout>
 #include <QTextList>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
 
 namespace notes::ui {
 
@@ -26,6 +31,7 @@ NoteTextEdit::NoteTextEdit(QWidget* parent)
     setFrameShape(QFrame::NoFrame);
     setTabChangesFocus(false);
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    connect(document(), &QTextDocument::contentsChanged, this, &NoteTextEdit::updateCheckedText);
 }
 
 NoteTextEdit::~NoteTextEdit() = default;
@@ -122,6 +128,31 @@ void NoteTextEdit::setInlineStyle(editor::InlineStyle style, bool on)
     }
 }
 
+void NoteTextEdit::toggleChecklist()
+{
+    if (isReadOnly()) {
+        return;
+    }
+    QTextCursor cursor = textCursor();
+    bool allItems = true;
+    const QTextBlock last = document()->findBlock(cursor.selectionEnd());
+    for (QTextBlock block = document()->findBlock(cursor.selectionStart()); block.isValid();
+         block = block.next()) {
+        allItems = allItems && editor::StyleManager::isChecklistItem(block);
+        if (block == last) {
+            break;
+        }
+    }
+    editor::StyleManager::apply(cursor, allItems ? editor::ParagraphStyle::Body
+                                                 : editor::ParagraphStyle::Checklist);
+    setTextCursor(cursor);
+}
+
+void NoteTextEdit::setMoveCheckedToBottom(bool move)
+{
+    m_moveCheckedToBottom = move;
+}
+
 void NoteTextEdit::insertFromMimeData(const QMimeData* source)
 {
     const int start = textCursor().selectionStart();
@@ -207,6 +238,19 @@ bool NoteTextEdit::listKey(const QKeyEvent* event)
         return editor::StyleManager::indentList(cursor, -1);
     case Qt::Key_Return:
     case Qt::Key_Enter:
+        if (modifiers == Qt::NoModifier && editor::StyleManager::isChecklistItem(cursor.block()) &&
+            !cursor.block().text().isEmpty()) {
+            // The next checklist item starts unchecked, even after a checked
+            // one (Qt's Enter would copy the checkbox).
+            cursor.beginEditBlock();
+            cursor.removeSelectedText();
+            QTextBlockFormat item = cursor.blockFormat();
+            item.setMarker(QTextBlockFormat::MarkerType::Unchecked);
+            cursor.insertBlock(item, cursor.charFormat());
+            cursor.endEditBlock();
+            setTextCursor(cursor);
+            return true;
+        }
         // Enter on an empty item: up a level, or out of the list from the top.
         if (modifiers != Qt::NoModifier || cursor.hasSelection() ||
             cursor.currentList() == nullptr || !cursor.block().text().isEmpty()) {
@@ -258,14 +302,43 @@ std::optional<editor::ParagraphStyle> NoteTextEdit::listMarker(const QKeyEvent* 
 void NoteTextEdit::paintEvent(QPaintEvent* event)
 {
     QTextEdit::paintEvent(event);
-    paintDashes();
+    paintMarkers();
 }
 
-void NoteTextEdit::paintDashes()
+namespace {
+
+// The font a list item's marker is drawn in: its paragraph's.
+QFont markerFont(const QTextBlock& block, const QTextDocument& document)
 {
-    // Qt draws no marker for a dashed list (it has no dash style): draw an en
-    // dash where Qt draws a bullet, right-aligned before the text.
+    return block.charFormat().font().resolve(document.defaultFont());
+}
+
+} // namespace
+
+QRectF NoteTextEdit::checkboxRect(const QTextBlock& block) const
+{
+    if (!editor::StyleManager::isChecklistItem(block) || block.layout() == nullptr ||
+        block.layout()->lineCount() == 0) {
+        return {};
+    }
+    const QTextLine line = block.layout()->lineAt(0);
+    const QPointF offset(-horizontalScrollBar()->value(), -verticalScrollBar()->value());
+    const QRectF bounds = document()->documentLayout()->blockBoundingRect(block).translated(offset);
+    const QFontMetricsF metrics(markerFont(block, *document()), viewport());
+    // A circle a little taller than the capitals, centered on them, a space
+    // before the text (in the room Qt leaves for a list's marker).
+    const qreal size = std::round(metrics.height() * 0.82);
+    const qreal centerY = bounds.top() + line.y() + line.ascent() - (metrics.capHeight() / 2);
+    const qreal right = bounds.left() + line.x() - metrics.horizontalAdvance(u' ');
+    return {right - size, centerY - (size / 2), size, size};
+}
+
+void NoteTextEdit::paintMarkers()
+{
+    // Qt draws no marker for a dashed list (it has no dash style) or a
+    // checklist (ours has none either, to draw the checkboxes ourselves).
     QPainter painter(viewport());
+    painter.setRenderHint(QPainter::Antialiasing);
     const QPoint offset(-horizontalScrollBar()->value(), -verticalScrollBar()->value());
     const QAbstractTextDocumentLayout* layout = document()->documentLayout();
     const QRect visible = viewport()->rect();
@@ -276,13 +349,19 @@ void NoteTextEdit::paintDashes()
             break;
         }
         const QTextList* list = block.textList();
-        if (list == nullptr ||
-            !list->format().boolProperty(editor::NoteFormat::kDashedListProperty) ||
-            block.layout() == nullptr || block.layout()->lineCount() == 0) {
+        if (list == nullptr || block.layout() == nullptr || block.layout()->lineCount() == 0) {
             continue;
         }
+        if (editor::StyleManager::isChecklistItem(block)) {
+            paintCheckbox(painter, checkboxRect(block), editor::StyleManager::isChecked(block));
+            continue;
+        }
+        if (!list->format().boolProperty(editor::NoteFormat::kDashedListProperty)) {
+            continue;
+        }
+        // An en dash where Qt draws a bullet, right-aligned before the text.
         const QTextLine line = block.layout()->lineAt(0);
-        const QFont font = block.charFormat().font().resolve(document()->defaultFont());
+        const QFont font = markerFont(block, *document());
         const QFontMetricsF metrics(font, viewport());
         const QString dash(QChar(0x2013));
         const qreal right = bounds.left() + line.x() - metrics.horizontalAdvance(u' ');
@@ -292,6 +371,101 @@ void NoteTextEdit::paintDashes()
                                  bounds.top() + line.y() + line.ascent()),
                          dash);
     }
+}
+
+void NoteTextEdit::paintCheckbox(QPainter& painter, const QRectF& box, bool checked) const
+{
+    const qreal size = box.width();
+    if (!checked) {
+        // An empty circle, as in macOS Notes.
+        const qreal width = std::max(1.0, size / 12);
+        painter.setPen(QPen(palette().color(QPalette::PlaceholderText), width));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawEllipse(box.adjusted(width / 2, width / 2, -width / 2, -width / 2));
+        return;
+    }
+    // Filled in the accent, with a check mark.
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(palette().color(QPalette::Accent));
+    painter.drawEllipse(box);
+    QPen mark(palette().color(QPalette::HighlightedText), std::max(1.5, size / 9));
+    mark.setCapStyle(Qt::RoundCap);
+    mark.setJoinStyle(Qt::RoundJoin);
+    painter.setPen(mark);
+    painter.setBrush(Qt::NoBrush);
+    const auto at = [&](qreal x, qreal y) {
+        return QPointF(box.left() + (x * size), box.top() + (y * size));
+    };
+    const std::array points{at(0.29, 0.52), at(0.44, 0.67), at(0.72, 0.36)};
+    painter.drawPolyline(points.data(), static_cast<int>(points.size()));
+}
+
+QTextBlock NoteTextEdit::checkboxAt(QPointF position) const
+{
+    const QTextBlock block = cursorForPosition(position.toPoint()).block();
+    // A little larger than drawn, to be easy to hit, but short of the text.
+    constexpr qreal kSlop = 2;
+    if (checkboxRect(block).adjusted(-kSlop, -kSlop, kSlop, kSlop).contains(position)) {
+        return block;
+    }
+    return {};
+}
+
+bool NoteTextEdit::toggleCheckboxAt(QPointF position)
+{
+    const QTextBlock block = checkboxAt(position);
+    if (isReadOnly() || !block.isValid()) {
+        return false;
+    }
+    editor::StyleManager::setChecked(block, !editor::StyleManager::isChecked(block),
+                                     m_moveCheckedToBottom);
+    return true;
+}
+
+void NoteTextEdit::mousePressEvent(QMouseEvent* event)
+{
+    // The caret stays where it was, as in macOS Notes.
+    if (event->button() == Qt::LeftButton && toggleCheckboxAt(event->position())) {
+        event->accept();
+        return;
+    }
+    QTextEdit::mousePressEvent(event);
+}
+
+void NoteTextEdit::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    // The second click's press has toggled again already: no word selected.
+    if (event->button() == Qt::LeftButton && checkboxAt(event->position()).isValid()) {
+        event->accept();
+        return;
+    }
+    QTextEdit::mouseDoubleClickEvent(event);
+}
+
+void NoteTextEdit::mouseMoveEvent(QMouseEvent* event)
+{
+    QTextEdit::mouseMoveEvent(event);
+    const bool over = event->buttons() == Qt::NoButton && !isReadOnly() &&
+                      checkboxAt(event->position()).isValid();
+    if (over != m_overCheckbox) {
+        m_overCheckbox = over;
+        viewport()->setCursor(over ? Qt::PointingHandCursor : Qt::IBeamCursor);
+    }
+}
+
+void NoteTextEdit::updateCheckedText()
+{
+    QTextCharFormat gray;
+    gray.setForeground(palette().color(QPalette::PlaceholderText));
+    QList<ExtraSelection> selections;
+    for (QTextBlock block = document()->begin(); block.isValid(); block = block.next()) {
+        if (block.length() > 1 && editor::StyleManager::isChecked(block)) {
+            QTextCursor text(block);
+            text.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+            selections.append({.cursor = text, .format = gray});
+        }
+    }
+    setExtraSelections(selections);
 }
 
 void NoteTextEdit::applyBottomPadding()
@@ -315,6 +489,9 @@ void NoteTextEdit::changeEvent(QEvent* event)
     QTextEdit::changeEvent(event);
     if (event->type() == QEvent::StyleChange) {
         updateViewportMargins(); // the scroll bar's width may have changed
+    }
+    if (event->type() == QEvent::PaletteChange) {
+        updateCheckedText(); // the theme's gray
     }
 }
 

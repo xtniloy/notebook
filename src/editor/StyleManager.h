@@ -24,6 +24,9 @@ enum class ParagraphStyle : std::uint8_t {
     BulletedList,
     DashedList,
     NumberedList,
+    // A checklist (task 3.6): items with a checkbox. Not in the Aa menu; the
+    // Checklist action (Ctrl+Shift+L) turns it on and off.
+    Checklist,
 };
 
 // Inline formats (task 3.4), in the Format menu's order.
@@ -63,7 +66,7 @@ public:
     // Markdown, count as Subheading), else Monospaced when all its text is,
     // else Body.
     [[nodiscard]] static ParagraphStyle styleOf(const QTextBlock& block);
-    // The kind of list: BulletedList, DashedList or NumberedList.
+    // The kind of list: BulletedList, DashedList, NumberedList or Checklist.
     [[nodiscard]] static ParagraphStyle listStyleOf(const QTextList& list);
     // A list of `style` (a list style) at nesting level `indent` (1 = top).
     [[nodiscard]] static QTextListFormat listFormat(ParagraphStyle style, int indent);
@@ -74,7 +77,8 @@ public:
     //
     // A list style makes the paragraphs list items: they join the list just
     // above when it is the same kind, and a list they are already in changes
-    // kind as a whole. Any other style takes them out of their list.
+    // kind as a whole. Any other style takes them out of their list. Items
+    // that become checklist items start unchecked; others lose their checkbox.
     static void apply(QTextCursor& cursor, ParagraphStyle style);
 
     // Moves the selected list items `levels` deeper (Tab: 1) or shallower
@@ -86,6 +90,15 @@ public:
     // Takes the selected paragraphs out of their lists, as one undo step;
     // their text and style stay.
     static void removeFromList(QTextCursor& cursor);
+
+    // Checklists (task 3.6). A checklist item's checkbox is Qt's block marker
+    // (Checked or Unchecked), which NoteTextEdit draws.
+    [[nodiscard]] static bool isChecklistItem(const QTextBlock& block);
+    [[nodiscard]] static bool isChecked(const QTextBlock& block);
+    // Checks or unchecks the checklist item `block`, as one undo step. With
+    // `toBottom`, a checked item, with the items nested under it, then moves
+    // below the last item of its checklist.
+    static void setChecked(const QTextBlock& block, bool checked, bool toBottom);
 
     // Heading fonts for every heading in `document`, after loading (not an
     // edit: the caller decides about undo).

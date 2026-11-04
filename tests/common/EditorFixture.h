@@ -125,8 +125,15 @@ inline void buildFixture(QTextDocument& document)
     image.setHeight(120);
     cursor.insertImage(image);
 
-    list(QTextListFormat::ListDisc, 1, {QStringLiteral("Tickets"), QStringLiteral("Visa")},
+    list(QTextListFormat::ListStyleUndefined, 1,
+         {QStringLiteral("Tickets"), QStringLiteral("Visa")},
          /*checklist=*/true);
+    {
+        // A checklist is our property too; its items' markers are the boxes (task 3.6).
+        QTextListFormat checklist = cursor.currentList()->format();
+        checklist.setProperty(editor::NoteFormat::kChecklistProperty, true);
+        cursor.currentList()->setFormat(checklist);
+    }
 
     cursor.insertBlock(QTextBlockFormat(), QTextCharFormat());
     QTextTable* table = cursor.insertTable(2, 2);
@@ -157,13 +164,17 @@ inline QStringList dumpDocument(const QTextDocument& document)
             if (!lists.contains(list)) {
                 lists.append(list);
             }
+            QString kind; // our own list kinds, which have no Qt style
+            if (list->format().boolProperty(editor::NoteFormat::kDashedListProperty)) {
+                kind = QStringLiteral(", dash");
+            } else if (list->format().boolProperty(editor::NoteFormat::kChecklistProperty)) {
+                kind = QStringLiteral(", check");
+            }
             line += QStringLiteral(" list#%1(style %2, indent %3%4)")
                         .arg(lists.indexOf(list))
                         .arg(static_cast<int>(list->format().style()))
                         .arg(list->format().indent())
-                        .arg(list->format().boolProperty(editor::NoteFormat::kDashedListProperty)
-                                 ? QStringLiteral(", dash")
-                                 : QString());
+                        .arg(kind);
         }
         if (format.marker() != QTextBlockFormat::MarkerType::NoMarker) {
             line += format.marker() == QTextBlockFormat::MarkerType::Checked

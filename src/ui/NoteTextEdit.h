@@ -2,14 +2,18 @@
 
 #include "editor/StyleManager.h"
 
+#include <QTextBlock>
 #include <QTextEdit>
 
 #include <optional>
 
+class QPainter;
+
 namespace notes::ui {
 
-// The note body editor (Plan §3.5): paragraph styles (task 3.2); lists, tables
-// and images arrive later in Phase 3.
+// The note body editor (Plan §3.5): paragraph styles (task 3.2), inline
+// formats (3.4), lists (3.5) and checklists (3.6); tables and images arrive
+// later in Phase 3.
 class NoteTextEdit : public QTextEdit
 {
     Q_OBJECT
@@ -49,11 +53,26 @@ public:
     // Whether `style` can be changed at the cursor (Bold: not in a heading).
     [[nodiscard]] bool canSetInlineStyle(editor::InlineStyle style) const;
 
+    // Ctrl+Shift+L (task 3.6): the selected paragraphs become unchecked
+    // checklist items, or Body again when they all are checklist items
+    // already. One undo step; does nothing while read-only.
+    void toggleChecklist();
+    // Whether checking an item moves it below the last item of its checklist
+    // (the "Move checked items to bottom" setting, Plan §3.5). Off by default.
+    void setMoveCheckedToBottom(bool move);
+    [[nodiscard]] bool moveCheckedToBottom() const { return m_moveCheckedToBottom; }
+    // Where the checkbox of `block` is drawn, in viewport coordinates; empty
+    // when `block` isn't a checklist item or isn't laid out.
+    [[nodiscard]] QRectF checkboxRect(const QTextBlock& block) const;
+
 protected:
     void changeEvent(QEvent* event) override;
     void insertFromMimeData(const QMimeData* source) override;
     void keyPressEvent(QKeyEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
 
 private:
     // Enter in a heading: at its end a Body paragraph follows, as in macOS
@@ -66,14 +85,25 @@ private:
     // The list a Space would start: "- " dashed, "* " bulleted, "1. "
     // numbered, typed at the start of a Body paragraph.
     [[nodiscard]] std::optional<editor::ParagraphStyle> listMarker(const QKeyEvent* event) const;
-    // The dashes of dashed lists, which Qt can't draw.
-    void paintDashes();
+    // The markers Qt can't draw: the dashes of dashed lists and checkboxes.
+    void paintMarkers();
+    // The checklist item whose checkbox is at `position` (viewport
+    // coordinates), if any.
+    [[nodiscard]] QTextBlock checkboxAt(QPointF position) const;
+    void paintCheckbox(QPainter& painter, const QRectF& box, bool checked) const;
+    // A click on a checkbox toggles it (one undo step), and a double click
+    // twice. True if it was one.
+    bool toggleCheckboxAt(QPointF position);
+    // Checked items' text is grayed: drawn so, not stored (extra selections).
+    void updateCheckedText();
 
     void updateViewportMargins();
     void applyBottomPadding();
 
     int m_rightPadding = 0;
     int m_bottomPadding = 0;
+    bool m_moveCheckedToBottom = false;
+    bool m_overCheckbox = false; // the pointer shows a hand there
 };
 
 } // namespace notes::ui

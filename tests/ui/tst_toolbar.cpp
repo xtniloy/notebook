@@ -356,13 +356,13 @@ void tst_Toolbar::disabledActionIgnoresShortcut()
 {
     const auto window = showActiveWindow();
     QVERIFY(window);
-    // Checklists wait for Phase 3.
-    QAction* checklist = window->actions().action(ActionId::Checklist);
-    QVERIFY(!checklist->isEnabled());
-    QVERIFY(!checklist->shortcut().isEmpty());
+    // Tables wait for a later Phase 3 task.
+    QAction* table = window->actions().action(ActionId::InsertTable);
+    QVERIFY(!table->isEnabled());
+    QVERIFY(!table->shortcut().isEmpty());
 
-    const QSignalSpy spy(checklist, &QAction::triggered);
-    QTest::keySequence(window.get(), checklist->shortcut());
+    const QSignalSpy spy(table, &QAction::triggered);
+    QTest::keySequence(window.get(), table->shortcut());
     QCOMPARE(spy.count(), 0);
 }
 

@@ -4,9 +4,13 @@
 
 #include "EditorFixture.h"
 #include "editor/NoteFormat.h"
+#include "editor/StyleManager.h"
 
 #include <QTest>
+#include <QTextBlock>
+#include <QTextCursor>
 #include <QTextDocument>
+#include <QTextList>
 
 using notes::editor::NoteFormat;
 using notes::test::buildFixture;
@@ -45,6 +49,7 @@ private slots:
     void newerVersionsAreRejected();
     void loadFallsBackToPlainText();
     void aiAnswerFromMarkdownSurvives();
+    void checklistStateSurvives();
 };
 
 // TC-EDT-001: serialize(deserialize(serialize(doc))) == serialize(doc).
@@ -123,7 +128,7 @@ void tst_NoteFormat::keepsWhatQtHtmlLoses()
     QVERIFY(dump.contains(QStringLiteral("\"Packing\" h2 collapsed")));
     QVERIFY(dump.contains(QStringLiteral("\"let total = 3 * 4;\" nobreak")));
     QVERIFY(dump.contains(QStringLiteral("\"Tickets\" list#")) &&
-            dump.contains(QStringLiteral("[x]")));
+            dump.contains(QStringLiteral(", check)")) && dump.contains(QStringLiteral("[x]")));
     QVERIFY(dump.contains(QStringLiteral("\"Visa\"")) && dump.contains(QStringLiteral("[ ]")));
     QVERIFY(dump.contains(
         QStringLiteral("image %1 240x120").arg(QLatin1StringView(notes::test::kFixtureImage))));
@@ -267,6 +272,30 @@ void tst_NoteFormat::aiAnswerFromMarkdownSurvives()
     QVERIFY2(
         dump.contains(QStringLiteral("nobreak code(python) {print(\"have a good trip\"): mono}")),
         qPrintable(dump));
+}
+
+// TC-EDT-019: a checklist and each item's state survive a round trip.
+void tst_NoteFormat::checklistStateSurvives()
+{
+    QTextDocument document;
+    QTextCursor cursor(&document);
+    cursor.insertText(QStringLiteral("Milk"));
+    cursor.insertBlock();
+    cursor.insertText(QStringLiteral("Eggs"));
+    cursor.select(QTextCursor::Document);
+    notes::editor::StyleManager::apply(cursor, notes::editor::ParagraphStyle::Checklist);
+    notes::editor::StyleManager::setChecked(document.lastBlock(), true, false);
+
+    const QString json = NoteFormat::serialize(document);
+    QVERIFY(json.contains(QStringLiteral("\"style\":\"check\"")));
+    const auto reloaded = load(json);
+    QVERIFY(reloaded);
+    using notes::editor::StyleManager;
+    QVERIFY(StyleManager::isChecklistItem(reloaded->firstBlock()));
+    QVERIFY(!StyleManager::isChecked(reloaded->firstBlock()));
+    QVERIFY(StyleManager::isChecked(reloaded->lastBlock()));
+    QCOMPARE(reloaded->firstBlock().textList(), reloaded->lastBlock().textList());
+    QCOMPARE(NoteFormat::serialize(*reloaded), json);
 }
 
 QTEST_MAIN(tst_NoteFormat)

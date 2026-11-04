@@ -67,6 +67,16 @@ private slots:
     void outdentFromTopLeavesTheList();
     void listChangesAreOneUndoStep();
     void roundTripKeepsListKindsAndNesting();
+
+    // Checklists (task 3.6).
+    void checklistItemsStartUnchecked();
+    void leavingAChecklistDropsTheCheckbox();
+    void nestingKeepsTheCheck();
+    void checkingIsOneUndoStep();
+    void checkedItemMovesToTheBottom();
+    void movingTakesNestedItemsAlong();
+    void firstParagraphMovesToo();
+    void lastItemStaysWhereItIs();
 };
 
 // TC-EDT-002, on the document: level, weight, size and family per style.
@@ -444,6 +454,167 @@ void tst_StyleManager::roundTripKeepsListKindsAndNesting()
     }
     QCOMPARE(indentOf(loaded, 5), 3);
     QCOMPARE(NoteFormat::serialize(loaded), saved);
+}
+
+namespace {
+
+// "Groceries" (Body) then one checklist item per entry of `items`.
+void checklistOf(QTextDocument& document, const QStringList& items)
+{
+    QTextCursor cursor(&document);
+    cursor.insertText(QStringLiteral("Groceries"));
+    for (const QString& item : items) {
+        cursor.insertBlock();
+        cursor.insertText(item);
+    }
+    cursor.setPosition(blockAt(document, 1).position());
+    cursor.setPosition(document.lastBlock().position(), QTextCursor::KeepAnchor);
+    StyleManager::apply(cursor, ParagraphStyle::Checklist);
+}
+
+// The paragraphs' text, "[x] " / "[ ] " before checklist items.
+QStringList itemsOf(const QTextDocument& document)
+{
+    QStringList items;
+    for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
+        QString prefix;
+        if (StyleManager::isChecklistItem(block)) {
+            prefix =
+                StyleManager::isChecked(block) ? QStringLiteral("[x] ") : QStringLiteral("[ ] ");
+        }
+        items.append(prefix + block.text());
+    }
+    return items;
+}
+
+} // namespace
+
+void tst_StyleManager::checklistItemsStartUnchecked()
+{
+    QTextDocument document;
+    checklistOf(document, {QStringLiteral("Milk"), QStringLiteral("Eggs")});
+    QCOMPARE(itemsOf(document),
+             (QStringList{QStringLiteral("Groceries"), QStringLiteral("[ ] Milk"),
+                          QStringLiteral("[ ] Eggs")}));
+    QCOMPARE(StyleManager::styleOf(blockAt(document, 1)), ParagraphStyle::Checklist);
+    QCOMPARE(blockAt(document, 1).textList(), blockAt(document, 2).textList());
+    // Qt draws no marker: the editor draws the checkboxes.
+    QCOMPARE(blockAt(document, 1).textList()->format().style(),
+             QTextListFormat::ListStyleUndefined);
+}
+
+void tst_StyleManager::leavingAChecklistDropsTheCheckbox()
+{
+    QTextDocument document;
+    checklistOf(document, {QStringLiteral("Milk"), QStringLiteral("Eggs")});
+    StyleManager::setChecked(blockAt(document, 1), true, false);
+
+    applyTo(document, 1, ParagraphStyle::BulletedList); // the whole list changes kind
+    QCOMPARE(blockAt(document, 1).blockFormat().marker(), QTextBlockFormat::MarkerType::NoMarker);
+    QCOMPARE(blockAt(document, 2).blockFormat().marker(), QTextBlockFormat::MarkerType::NoMarker);
+
+    applyTo(document, 1, ParagraphStyle::Checklist);
+    QCOMPARE(itemsOf(document).at(1), QStringLiteral("[ ] Milk"));
+    QCOMPARE(itemsOf(document).at(2), QStringLiteral("[ ] Eggs"));
+
+    applyTo(document, 2, ParagraphStyle::Body);
+    QVERIFY(!blockAt(document, 2).blockFormat().hasProperty(QTextFormat::BlockMarker));
+
+    QTextCursor cursor(blockAt(document, 1));
+    StyleManager::removeFromList(cursor); // Backspace at the start
+    QVERIFY(!blockAt(document, 1).blockFormat().hasProperty(QTextFormat::BlockMarker));
+}
+
+void tst_StyleManager::nestingKeepsTheCheck()
+{
+    QTextDocument document;
+    checklistOf(document, {QStringLiteral("Milk"), QStringLiteral("Oat milk")});
+    StyleManager::setChecked(blockAt(document, 2), true, false);
+    QTextCursor cursor(blockAt(document, 2));
+    QVERIFY(StyleManager::indentList(cursor, 1));
+    QCOMPARE(blockAt(document, 2).textList()->format().indent(), 2);
+    QCOMPARE(itemsOf(document).at(2), QStringLiteral("[x] Oat milk"));
+    QVERIFY(StyleManager::indentList(cursor, -1));
+    QCOMPARE(itemsOf(document).at(2), QStringLiteral("[x] Oat milk"));
+}
+
+// TC-EDT-017, on the document.
+void tst_StyleManager::checkingIsOneUndoStep()
+{
+    QTextDocument document;
+    checklistOf(document, {QStringLiteral("Milk"), QStringLiteral("Eggs"), QStringLiteral("Tea")});
+    const QStringList before = itemsOf(document);
+    StyleManager::setChecked(blockAt(document, 1), true, true); // checks and moves
+    QCOMPARE(itemsOf(document).last(), QStringLiteral("[x] Milk"));
+    document.undo();
+    QCOMPARE(itemsOf(document), before);
+}
+
+// TC-EDT-018, on the document.
+void tst_StyleManager::checkedItemMovesToTheBottom()
+{
+    QTextDocument document;
+    checklistOf(document, {QStringLiteral("Milk"), QStringLiteral("Eggs"), QStringLiteral("Tea")});
+    QTextCursor after(&document);
+    after.movePosition(QTextCursor::End);
+    after.insertBlock();
+    after.insertText(QStringLiteral("Done"));
+    applyTo(document, 4, ParagraphStyle::Body); // a paragraph after the list, not in it
+
+    StyleManager::setChecked(blockAt(document, 1), true, true);
+    QCOMPARE(itemsOf(document), (QStringList{QStringLiteral("Groceries"),
+                                             QStringLiteral("[ ] Eggs"), QStringLiteral("[ ] Tea"),
+                                             QStringLiteral("[x] Milk"), QStringLiteral("Done")}));
+    QCOMPARE(blockAt(document, 3).textList(), blockAt(document, 1).textList()); // same list
+    QCOMPARE(blockAt(document, 0).blockFormat().marker(), QTextBlockFormat::MarkerType::NoMarker);
+
+    // Without the setting it stays.
+    StyleManager::setChecked(blockAt(document, 1), true, false);
+    QCOMPARE(itemsOf(document).at(1), QStringLiteral("[x] Eggs"));
+}
+
+void tst_StyleManager::movingTakesNestedItemsAlong()
+{
+    QTextDocument document;
+    checklistOf(document, {QStringLiteral("Milk"), QStringLiteral("Oat"), QStringLiteral("Eggs")});
+    QTextCursor oat(blockAt(document, 2));
+    QVERIFY(StyleManager::indentList(oat, 1)); // "Oat" under "Milk"
+
+    StyleManager::setChecked(blockAt(document, 1), true, true);
+    QCOMPARE(itemsOf(document),
+             (QStringList{QStringLiteral("Groceries"), QStringLiteral("[ ] Eggs"),
+                          QStringLiteral("[x] Milk"), QStringLiteral("[ ] Oat")}));
+    QCOMPARE(blockAt(document, 3).textList()->format().indent(), 2);
+    QCOMPARE(blockAt(document, 2).textList(), blockAt(document, 1).textList());
+}
+
+void tst_StyleManager::firstParagraphMovesToo()
+{
+    QTextDocument document;
+    QTextCursor cursor(&document);
+    cursor.insertText(QStringLiteral("Milk"));
+    cursor.insertBlock();
+    cursor.insertText(QStringLiteral("Eggs"));
+    cursor.select(QTextCursor::Document);
+    StyleManager::apply(cursor, ParagraphStyle::Checklist);
+
+    StyleManager::setChecked(document.firstBlock(), true, true);
+    QCOMPARE(itemsOf(document),
+             (QStringList{QStringLiteral("[ ] Eggs"), QStringLiteral("[x] Milk")}));
+    QCOMPARE(document.blockCount(), 2);
+    document.undo();
+    QCOMPARE(itemsOf(document),
+             (QStringList{QStringLiteral("[ ] Milk"), QStringLiteral("[ ] Eggs")}));
+}
+
+void tst_StyleManager::lastItemStaysWhereItIs()
+{
+    QTextDocument document;
+    checklistOf(document, {QStringLiteral("Milk"), QStringLiteral("Eggs")});
+    StyleManager::setChecked(blockAt(document, 2), true, true);
+    QCOMPARE(itemsOf(document),
+             (QStringList{QStringLiteral("Groceries"), QStringLiteral("[ ] Milk"),
+                          QStringLiteral("[x] Eggs")}));
 }
 
 QTEST_MAIN(tst_StyleManager)
