@@ -44,7 +44,8 @@ public:
     // step. Does nothing while read-only.
     void setParagraphStyle(editor::ParagraphStyle style);
 
-    // Whether the text at the cursor (what typing would produce) has `style`.
+    // Whether the selected text all has `style`, or with nothing selected,
+    // whether typing would produce it.
     [[nodiscard]] bool inlineStyle(editor::InlineStyle style) const;
     // Turns `style` on or off for the selection (one undo step), or, with
     // nothing selected, for the text typed next. Bold can't be changed in a

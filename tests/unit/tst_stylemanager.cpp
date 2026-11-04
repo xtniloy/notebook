@@ -12,6 +12,7 @@
 
 #include <array>
 
+using notes::editor::InlineStyle;
 using notes::editor::NoteFormat;
 using notes::editor::ParagraphStyle;
 using notes::editor::StyleManager;
@@ -67,6 +68,9 @@ private slots:
     void outdentFromTopLeavesTheList();
     void listChangesAreOneUndoStep();
     void roundTripKeepsListKindsAndNesting();
+
+    // A selection's inline state.
+    void selectionHasNeedsEveryCharacter();
 
     // Checklists (task 3.6).
     void checklistItemsStartUnchecked();
@@ -454,6 +458,36 @@ void tst_StyleManager::roundTripKeepsListKindsAndNesting()
     }
     QCOMPARE(indentOf(loaded, 5), 3);
     QCOMPARE(NoteFormat::serialize(loaded), saved);
+}
+
+void tst_StyleManager::selectionHasNeedsEveryCharacter()
+{
+    QTextDocument document;
+    QTextCursor cursor(&document);
+    cursor.insertText(QStringLiteral("of "));
+    cursor.insertText(QStringLiteral("passages"),
+                      StyleManager::inlineFormat(InlineStyle::Bold, true));
+    cursor.insertText(QStringLiteral(" of"), QTextCharFormat());
+    const auto selection = [&](int anchor, int position) {
+        QTextCursor selected(&document);
+        selected.setPosition(anchor);
+        selected.setPosition(position, QTextCursor::KeepAnchor);
+        return selected;
+    };
+    QVERIFY(StyleManager::selectionHas(selection(3, 11), InlineStyle::Bold));
+    QVERIFY(StyleManager::selectionHas(selection(11, 3), InlineStyle::Bold));  // either way
+    QVERIFY(!StyleManager::selectionHas(selection(0, 11), InlineStyle::Bold)); // mixed
+    QVERIFY(!StyleManager::selectionHas(selection(11, 0), InlineStyle::Bold));
+    QVERIFY(!StyleManager::selectionHas(selection(3, 11), InlineStyle::Italic));
+    QVERIFY(!StyleManager::selectionHas(selection(4, 4), InlineStyle::Bold)); // no text
+
+    // Across paragraphs: the paragraph break isn't a character to check.
+    cursor.insertBlock();
+    cursor.insertText(QStringLiteral("Lorem"), StyleManager::inlineFormat(InlineStyle::Bold, true));
+    QVERIFY(!StyleManager::selectionHas(selection(3, 20), InlineStyle::Bold)); // " of" isn't
+    QTextCursor rest = selection(11, 14);
+    StyleManager::setInline(rest, InlineStyle::Bold, true);
+    QVERIFY(StyleManager::selectionHas(selection(3, 20), InlineStyle::Bold)); // now all is
 }
 
 namespace {

@@ -210,6 +210,9 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
     connect(m_editor->textEdit(), &QTextEdit::cursorPositionChanged, this,
             &MainWindow::updateFormatMenu);
     connect(m_editor->textEdit(), &QTextEdit::textChanged, this, &MainWindow::updateFormatMenu);
+    // A selection's formats are all of its text's (StyleManager::selectionHas()).
+    connect(m_editor->textEdit(), &QTextEdit::selectionChanged, this,
+            &MainWindow::updateFormatMenu);
     connect(m_formatMenu, &QMenu::aboutToShow, this, &MainWindow::updateFormatMenu);
     m_sidebar->setModel(m_sidebarModel);
     m_noteList->setModel(m_noteListModel);

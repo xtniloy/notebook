@@ -127,6 +127,12 @@ public:
 
     // Inline formats (task 3.4).
     [[nodiscard]] static bool hasInline(const QTextCharFormat& format, InlineStyle style);
+    // Whether every character the cursor's selection covers has `style`
+    // (a heading's bold counts). False when it covers no text. This is the
+    // state Bold and the others show for a selection, as in other editors:
+    // pressing one then removes it from fully formatted text and adds it to
+    // a mixed selection, whichever end the selection was made from.
+    [[nodiscard]] static bool selectionHas(const QTextCursor& cursor, InlineStyle style);
     // The format to merge to turn `style` on or off.
     [[nodiscard]] static QTextCharFormat inlineFormat(InlineStyle style, bool on);
     // Turns `style` on or off for the cursor's selection, as one undo step.

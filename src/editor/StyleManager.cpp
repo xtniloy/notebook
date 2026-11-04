@@ -572,6 +572,33 @@ bool StyleManager::hasInline(const QTextCharFormat& format, InlineStyle style)
     return false;
 }
 
+bool StyleManager::selectionHas(const QTextCursor& cursor, InlineStyle style)
+{
+    const QTextDocument* document = cursor.document();
+    if (document == nullptr || !cursor.hasSelection()) {
+        return false;
+    }
+    const int start = cursor.selectionStart();
+    const int end = cursor.selectionEnd();
+    bool anyText = false;
+    for (QTextBlock block = document->findBlock(start); block.isValid() && block.position() < end;
+         block = block.next()) {
+        for (QTextBlock::iterator it = block.begin(); !it.atEnd(); ++it) {
+            const QTextFragment fragment = it.fragment();
+            const bool overlaps =
+                fragment.position() < end && fragment.position() + fragment.length() > start;
+            if (!overlaps || fragment.charFormat().isImageFormat()) {
+                continue;
+            }
+            if (!hasInline(fragment.charFormat(), style)) {
+                return false;
+            }
+            anyText = true;
+        }
+    }
+    return anyText;
+}
+
 QTextCharFormat StyleManager::inlineFormat(InlineStyle style, bool on)
 {
     QTextCharFormat format;

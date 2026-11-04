@@ -96,6 +96,12 @@ void NoteTextEdit::setParagraphStyle(editor::ParagraphStyle style)
 
 bool NoteTextEdit::inlineStyle(editor::InlineStyle style) const
 {
+    const QTextCursor cursor = textCursor();
+    if (cursor.hasSelection()) {
+        // The whole selection's, not the one character before the cursor
+        // (which, selected from the end, is outside it).
+        return editor::StyleManager::selectionHas(cursor, style);
+    }
     return editor::StyleManager::hasInline(currentCharFormat(), style);
 }
 

@@ -20,6 +20,7 @@
 #include <QTest>
 #include <QTextBlock>
 
+#include <array>
 #include <memory>
 
 using notes::editor::InlineStyle;
@@ -48,6 +49,8 @@ private slots:
     void toggleIsOneUndoStep();
     void headingsKeepTheirBold();
     void formatsSurviveSaving();
+    void overlappingSelections_data();
+    void overlappingSelections();
 
 private:
     void openWindow();
@@ -261,6 +264,115 @@ void tst_InlineFormats::formatsSurviveSaving()
     QVERIFY(StyleManager::hasInline(at(kMilkEnd + 1), InlineStyle::Underline));
     QVERIFY(StyleManager::hasInline(at(kMilkEnd + 1), InlineStyle::Strikethrough));
     QVERIFY(!StyleManager::hasInline(at(kMilkEnd + 1), InlineStyle::Bold));
+}
+
+// The reported sequence: apply and remove a format on selections that
+// overlap formatted text, selected either way. The action's state is the
+// selection's (on only when every selected character has it), so a press
+// removes the format from a fully formatted selection and adds it otherwise,
+// whichever end the selection was made from.
+void tst_InlineFormats::overlappingSelections_data()
+{
+    QTest::addColumn<InlineStyle>("style");
+    QTest::addColumn<int>("key");
+    QTest::addColumn<bool>("shift");
+    QTest::addColumn<bool>("backwards"); // selected from the end to the start
+    struct Row
+    {
+        const char* name = nullptr;
+        InlineStyle style = InlineStyle::Bold;
+        int key = 0;
+        bool shift = false;
+    };
+    constexpr std::array rows{
+        Row{.name = "bold", .style = InlineStyle::Bold, .key = Qt::Key_B},
+        Row{.name = "italic", .style = InlineStyle::Italic, .key = Qt::Key_I},
+        Row{.name = "underline", .style = InlineStyle::Underline, .key = Qt::Key_U},
+        Row{.name = "strikethrough",
+            .style = InlineStyle::Strikethrough,
+            .key = Qt::Key_X,
+            .shift = true},
+    };
+    for (const bool backwards : {false, true}) {
+        for (const Row& row : rows) {
+            const QByteArray name = QByteArray(row.name) + (backwards ? " backwards" : " forwards");
+            QTest::newRow(name.constData()) << row.style << row.key << row.shift << backwards;
+        }
+    }
+}
+
+void tst_InlineFormats::overlappingSelections()
+{
+    QFETCH(InlineStyle, style);
+    QFETCH(int, key);
+    QFETCH(bool, shift);
+    QFETCH(bool, backwards);
+    const QString text =
+        QStringLiteral("There are many variations of passages of Lorem Ipsum available");
+    m_note = await(m_context->notes().updateBody(m_note.id, QString(), text)).value();
+    m_window = std::make_unique<MainWindow>(*m_context);
+    m_window->show();
+    m_window->activateWindow();
+    QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+    m_edit = m_window->findChild<EditorView*>(QStringLiteral("editorPane"))->textEdit();
+    QTRY_COMPARE(m_edit->toPlainText(), text);
+    m_edit->setFocus();
+    QTRY_VERIFY(m_edit->hasFocus());
+
+    const Qt::KeyboardModifiers modifiers =
+        shift ? (Qt::ControlModifier | Qt::ShiftModifier) : Qt::ControlModifier;
+    // Selects `words` (the occurrence at or after `from`) and presses the shortcut.
+    const auto toggle = [&](const QString& words, int from = 0) {
+        const auto start = static_cast<int>(text.indexOf(words, from));
+        const auto end = start + static_cast<int>(words.size());
+        if (backwards) {
+            select(end, start);
+        } else {
+            select(start, end);
+        }
+        QTest::keyClick(m_edit, static_cast<Qt::Key>(key), modifiers);
+    };
+    // The formatted text, as "[...]" around each run.
+    const auto marked = [&] {
+        QString result;
+        bool inside = false;
+        for (int i = 0; i < text.size(); ++i) {
+            const bool on = StyleManager::hasInline(formatAt(i), style);
+            if (on != inside) {
+                result += on ? QLatin1Char('[') : QLatin1Char(']');
+                inside = on;
+            }
+            result += text.at(i);
+        }
+        return inside ? result + QLatin1Char(']') : result;
+    };
+    const int second = static_cast<int>(text.indexOf(QStringLiteral("of Lorem")));
+
+    toggle(QStringLiteral("passages")); // 1: on
+    QCOMPARE(marked(),
+             QStringLiteral("There are many variations of [passages] of Lorem Ipsum available"));
+    toggle(QStringLiteral("passages")); // 2: off
+    QCOMPARE(marked(), text);
+    toggle(QStringLiteral("passages"));       // 3: on again
+    toggle(QStringLiteral("of passages of")); // 4: mixed: on for all
+    QCOMPARE(marked(),
+             QStringLiteral("There are many variations [of passages of] Lorem Ipsum available"));
+    toggle(QStringLiteral("of passages of")); // 5: all on: off
+    QCOMPARE(marked(), text);
+    toggle(QStringLiteral("of passages of"));   // (back to step 4's state)
+    toggle(QStringLiteral("of Lorem"), second); // 6: mixed: on
+    QCOMPARE(marked(),
+             QStringLiteral("There are many variations [of passages of Lorem] Ipsum available"));
+    // 7: all on: off, only there (the space before it wasn't selected).
+    toggle(QStringLiteral("of Lorem"), second);
+    QCOMPARE(marked(),
+             QStringLiteral("There are many variations [of passages ]of Lorem Ipsum available"));
+    toggle(QStringLiteral("of passages")); // 8: all on: off
+    QCOMPARE(marked(),
+             QStringLiteral("There are many variations of passages[ ]of Lorem Ipsum available"));
+    toggle(QStringLiteral("of passages of")); // mixed: on for all, then off
+    toggle(QStringLiteral("of passages of"));
+    QCOMPARE(marked(), text);
 }
 
 QTEST_MAIN(tst_InlineFormats)
