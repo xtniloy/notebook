@@ -51,6 +51,7 @@ public:
 
 protected:
     void changeEvent(QEvent* event) override;
+    void insertFromMimeData(const QMimeData* source) override;
     void keyPressEvent(QKeyEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
 

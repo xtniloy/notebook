@@ -353,6 +353,32 @@ void StyleManager::styleHeadings(QTextDocument& document)
     }
 }
 
+void StyleManager::fitText(QTextCursor& cursor)
+{
+    const QTextDocument* document = cursor.document();
+    if (document == nullptr) {
+        return;
+    }
+    const QFont base = document->defaultFont();
+    cursor.beginEditBlock();
+    for (const QTextBlock& block : selectedBlocks(cursor)) {
+        if (const int level = block.blockFormat().headingLevel(); level > 0) {
+            editRuns(block, [&](QTextCharFormat& run) { styleHeadingRun(run, level, base); });
+        } else {
+            // Only headings set a size, so a sized run here has a heading's
+            // font, bold included.
+            editRuns(block, [](QTextCharFormat& run) {
+                if (run.hasProperty(QTextFormat::FontPointSize) ||
+                    run.hasProperty(QTextFormat::FontPixelSize)) {
+                    clearSize(run);
+                    run.clearProperty(QTextFormat::FontWeight);
+                }
+            });
+        }
+    }
+    cursor.endEditBlock();
+}
+
 bool StyleManager::hasInline(const QTextCharFormat& format, InlineStyle style)
 {
     switch (style) {

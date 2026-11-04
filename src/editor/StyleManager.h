@@ -90,6 +90,10 @@ public:
     // Heading fonts for every heading in `document`, after loading (not an
     // edit: the caller decides about undo).
     static void styleHeadings(QTextDocument& document);
+    // Gives the text of the selected paragraphs their style's font, as part of
+    // the current edit: a heading's size and bold, and no heading size or bold
+    // elsewhere. For inserted text, which comes in the cursor's font.
+    static void fitText(QTextCursor& cursor);
 
     // Whether text in `format` is monospaced: ours (JetBrains Mono, fixed
     // pitch) or Qt's Markdown code ("monospace" family).

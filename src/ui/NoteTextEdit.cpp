@@ -122,6 +122,29 @@ void NoteTextEdit::setInlineStyle(editor::InlineStyle style, bool on)
     }
 }
 
+void NoteTextEdit::insertFromMimeData(const QMimeData* source)
+{
+    const int start = textCursor().selectionStart();
+    const QTextBlockFormat startFormat = document()->findBlock(start).blockFormat();
+    const int revision = document()->revision();
+    QTextEdit::insertFromMimeData(source);
+    if (isReadOnly() || document()->revision() == revision) {
+        return;
+    }
+    // Pasted or dropped plain text takes the paragraph format of its own
+    // first line and the font at the cursor: pasted into a new note's title,
+    // every line became Body in the title's size and bold. The paragraph
+    // pasted into keeps its style, the lines after it are Body, and each
+    // gets its style's font, in the same undo step.
+    QTextCursor cursor(document());
+    cursor.setPosition(start);
+    cursor.setPosition(textCursor().position(), QTextCursor::KeepAnchor);
+    cursor.joinPreviousEditBlock();
+    QTextCursor(document()->findBlock(start)).setBlockFormat(startFormat);
+    editor::StyleManager::fitText(cursor);
+    cursor.endEditBlock();
+}
+
 void NoteTextEdit::keyPressEvent(QKeyEvent* event)
 {
     if (!isReadOnly() && (headingKey(event) || listKey(event))) {

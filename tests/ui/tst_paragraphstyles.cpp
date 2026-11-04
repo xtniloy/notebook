@@ -19,6 +19,8 @@
 #include "ui/Sidebar.h"
 
 #include <QAction>
+#include <QApplication>
+#include <QClipboard>
 #include <QMenuBar>
 #include <QSettings>
 #include <QTest>
@@ -61,6 +63,7 @@ private slots:
     void stylesNeedAnEditableNote();
     void newNoteStartsWithTitle();
     void deletingFirstLineRenamesNote();
+    void pasteIntoTitleGivesBody();
 
 private:
     void openWindow();
@@ -356,6 +359,36 @@ void tst_ParagraphStyles::deletingFirstLineRenamesNote()
 
     const Note saved = closeAndReload();
     QCOMPARE(saved.title, QStringLiteral("Milk"));
+}
+
+// Pasted lines come in the title's font: below the first line they're Body,
+// at Body's size and weight, not Body that looks (and checks Bold) like a
+// title. One Ctrl+Z takes the paste back.
+void tst_ParagraphStyles::pasteIntoTitleGivesBody()
+{
+    openWindow();
+    newNote();
+    QApplication::clipboard()->setText(QStringLiteral("Groceries\nMilk\nEggs"));
+    QTest::keyClick(m_edit, Qt::Key_V, Qt::ControlModifier);
+    QCOMPARE(m_edit->toPlainText(), QStringLiteral("Groceries\nMilk\nEggs"));
+
+    QCOMPARE(styleOfParagraph(0), ParagraphStyle::Title);
+    const QTextBlock title = m_edit->document()->firstBlock();
+    QVERIFY(title.begin().fragment().charFormat().fontWeight() >= QFont::Bold);
+    for (int index : {1, 2}) {
+        QCOMPARE(styleOfParagraph(index), ParagraphStyle::Body);
+        const QTextBlock block = m_edit->document()->findBlockByNumber(index);
+        const QTextCharFormat format = block.begin().fragment().charFormat();
+        QVERIFY(!format.hasProperty(QTextFormat::FontPointSize));
+        QVERIFY(!format.hasProperty(QTextFormat::FontPixelSize));
+        QVERIFY(format.fontWeight() < QFont::Bold);
+    }
+    moveToParagraph(1);
+    QVERIFY(formatMenu()->styleAction(ParagraphStyle::Body)->isChecked());
+    QVERIFY(!formatMenu()->inlineAction(notes::editor::InlineStyle::Bold)->isChecked());
+
+    QTest::keyClick(m_edit, Qt::Key_Z, Qt::ControlModifier);
+    QVERIFY(m_edit->toPlainText().isEmpty());
 }
 
 QTEST_MAIN(tst_ParagraphStyles)
