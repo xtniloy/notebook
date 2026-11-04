@@ -71,6 +71,7 @@ protected:
     void keyPressEvent(QKeyEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
 
@@ -91,9 +92,6 @@ private:
     // coordinates), if any.
     [[nodiscard]] QTextBlock checkboxAt(QPointF position) const;
     void paintCheckbox(QPainter& painter, const QRectF& box, bool checked) const;
-    // A click on a checkbox toggles it (one undo step), and a double click
-    // twice. True if it was one.
-    bool toggleCheckboxAt(QPointF position);
     // Checked items' text is grayed: drawn so, not stored (extra selections).
     void updateCheckedText();
 
@@ -104,6 +102,9 @@ private:
     int m_bottomPadding = 0;
     bool m_moveCheckedToBottom = false;
     bool m_overCheckbox = false; // the pointer shows a hand there
+    // The checkbox a left button press went to: the click is ours from press
+    // to release (Qt sees none of it), and toggles if released on it too.
+    QTextBlock m_pressedCheckbox;
 };
 
 } // namespace notes::ui

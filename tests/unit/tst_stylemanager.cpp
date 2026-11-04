@@ -498,7 +498,9 @@ void tst_StyleManager::checklistItemsStartUnchecked()
                           QStringLiteral("[ ] Eggs")}));
     QCOMPARE(StyleManager::styleOf(blockAt(document, 1)), ParagraphStyle::Checklist);
     QCOMPARE(blockAt(document, 1).textList(), blockAt(document, 2).textList());
-    // Qt draws no marker: the editor draws the checkboxes.
+    // Qt draws no marker and has no checkbox of its own: the editor draws
+    // and toggles them.
+    QVERIFY(!blockAt(document, 1).blockFormat().hasProperty(QTextFormat::BlockMarker));
     QCOMPARE(blockAt(document, 1).textList()->format().style(),
              QTextListFormat::ListStyleUndefined);
 }
@@ -510,19 +512,19 @@ void tst_StyleManager::leavingAChecklistDropsTheCheckbox()
     StyleManager::setChecked(blockAt(document, 1), true, false);
 
     applyTo(document, 1, ParagraphStyle::BulletedList); // the whole list changes kind
-    QCOMPARE(blockAt(document, 1).blockFormat().marker(), QTextBlockFormat::MarkerType::NoMarker);
-    QCOMPARE(blockAt(document, 2).blockFormat().marker(), QTextBlockFormat::MarkerType::NoMarker);
+    QVERIFY(!blockAt(document, 1).blockFormat().hasProperty(NoteFormat::kCheckedProperty));
+    QVERIFY(!blockAt(document, 2).blockFormat().hasProperty(NoteFormat::kCheckedProperty));
 
     applyTo(document, 1, ParagraphStyle::Checklist);
     QCOMPARE(itemsOf(document).at(1), QStringLiteral("[ ] Milk"));
     QCOMPARE(itemsOf(document).at(2), QStringLiteral("[ ] Eggs"));
 
     applyTo(document, 2, ParagraphStyle::Body);
-    QVERIFY(!blockAt(document, 2).blockFormat().hasProperty(QTextFormat::BlockMarker));
+    QVERIFY(!blockAt(document, 2).blockFormat().hasProperty(NoteFormat::kCheckedProperty));
 
     QTextCursor cursor(blockAt(document, 1));
     StyleManager::removeFromList(cursor); // Backspace at the start
-    QVERIFY(!blockAt(document, 1).blockFormat().hasProperty(QTextFormat::BlockMarker));
+    QVERIFY(!blockAt(document, 1).blockFormat().hasProperty(NoteFormat::kCheckedProperty));
 }
 
 void tst_StyleManager::nestingKeepsTheCheck()
@@ -566,7 +568,7 @@ void tst_StyleManager::checkedItemMovesToTheBottom()
                                              QStringLiteral("[ ] Eggs"), QStringLiteral("[ ] Tea"),
                                              QStringLiteral("[x] Milk"), QStringLiteral("Done")}));
     QCOMPARE(blockAt(document, 3).textList(), blockAt(document, 1).textList()); // same list
-    QCOMPARE(blockAt(document, 0).blockFormat().marker(), QTextBlockFormat::MarkerType::NoMarker);
+    QVERIFY(!blockAt(document, 0).blockFormat().hasProperty(NoteFormat::kCheckedProperty));
 
     // Without the setting it stays.
     StyleManager::setChecked(blockAt(document, 1), true, false);

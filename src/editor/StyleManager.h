@@ -5,6 +5,7 @@
 #include <cstdint>
 
 class QTextBlock;
+class QTextBlockFormat;
 class QTextCharFormat;
 class QTextCursor;
 class QTextDocument;
@@ -91,14 +92,26 @@ public:
     // their text and style stay.
     static void removeFromList(QTextCursor& cursor);
 
-    // Checklists (task 3.6). A checklist item's checkbox is Qt's block marker
-    // (Checked or Unchecked), which NoteTextEdit draws.
+    // Checklists (task 3.6). Whether an item is checked is our own block
+    // property (NoteFormat::kCheckedProperty); NoteTextEdit draws the boxes.
     [[nodiscard]] static bool isChecklistItem(const QTextBlock& block);
     [[nodiscard]] static bool isChecked(const QTextBlock& block);
     // Checks or unchecks the checklist item `block`, as one undo step. With
     // `toBottom`, a checked item, with the items nested under it, then moves
     // below the last item of its checklist.
     static void setChecked(const QTextBlock& block, bool checked, bool toBottom);
+    // Turns Markdown task lists ("- [x] ..." read by QTextDocument::setMarkdown,
+    // which marks them with Qt's block markers) into our checklists, and
+    // removes the markers. For Markdown coming into a note; not an undo step
+    // of its own.
+    static void adoptTaskLists(QTextDocument& document);
+
+    // Removes block properties that only repeat Qt's defaults (heading level
+    // 0, indent 0, no-break off, unchecked, not collapsed), so a plain
+    // paragraph's format is the default one. Qt's Enter on an empty paragraph
+    // whose format isn't the default resets it instead of starting a new
+    // line: such leftovers made Enter do nothing once on empty lines.
+    static void clearDefaults(QTextBlockFormat& format);
 
     // Heading fonts for every heading in `document`, after loading (not an
     // edit: the caller decides about undo).

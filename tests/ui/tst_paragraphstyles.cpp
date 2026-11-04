@@ -59,6 +59,7 @@ private slots:
     void aaButtonOpensStyles();
     void undoRestoresStyleInOneStep();
     void enterAfterHeadingContinuesInBody();
+    void enterOnEmptyLineAddsALine();
     void stylesSurviveSaving();
     void stylesNeedAnEditableNote();
     void newNoteStartsWithTitle();
@@ -270,6 +271,37 @@ void tst_ParagraphStyles::enterAfterHeadingContinuesInBody()
     QTest::keyClick(m_edit, Qt::Key_Return);
     QCOMPARE(styleOfParagraph(0), ParagraphStyle::Title);
     QCOMPARE(styleOfParagraph(1), ParagraphStyle::Title);
+}
+
+// Every Enter on an empty Body line adds a line: after a title, after
+// choosing Body, and in a note loaded from storage. (A leftover heading level
+// or indent of 0 made Qt reset the line's format instead, the first time.)
+void tst_ParagraphStyles::enterOnEmptyLineAddsALine()
+{
+    openWindow();
+    moveToParagraph(0); // "Trip", loaded from storage
+    QTest::keyClick(m_edit, Qt::Key_T, Qt::ControlModifier | Qt::ShiftModifier);
+    QTest::keyClick(m_edit, Qt::Key_Return); // an empty Body line after the title
+    QCOMPARE(m_edit->document()->blockCount(), 4);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(m_edit->document()->blockCount(), 5);
+
+    moveToParagraph(4); // "Passport": Heading, then Body, then two Enters
+    QTest::keyClick(m_edit, Qt::Key_H, Qt::ControlModifier | Qt::ShiftModifier);
+    QTest::keyClick(m_edit, Qt::Key_B, Qt::ControlModifier | Qt::ShiftModifier);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(m_edit->document()->blockCount(), 7);
+
+    // Saved with empty lines, then opened again.
+    const Note saved = closeAndReload();
+    QTextDocument stored;
+    QVERIFY(!notes::editor::NoteFormat::deserialize(saved.body, stored).has_value());
+    for (QTextBlock block = stored.begin(); block.isValid(); block = block.next()) {
+        if (block.blockFormat().headingLevel() == 0) {
+            QVERIFY2(block.blockFormat().properties().isEmpty(), qPrintable(block.text()));
+        }
+    }
 }
 
 // Done when: styles survive save.

@@ -50,8 +50,13 @@ private slots:
     void shortcutAgainGivesBody();
     void clickOnCheckboxToggles();
     void doubleClickTogglesTwice();
+    void hoverThenClickTogglesOnce();
+    void clickChangesOnlyTheClickedItem();
+    void clicksAddNoParagraphs();
+    void dragOffTheCheckboxCancels();
     void toggleUndoesInOneStep();
     void enterGivesUncheckedItem();
+    void enterOnEmptyItemLeavesTheChecklist();
     void checkedTextIsGrayed();
     void toggleIsSaved();
     void checkedItemMovesToBottom();
@@ -178,7 +183,7 @@ void tst_Checklists::shortcutAgainGivesBody()
     QCOMPARE(items(), (QStringList{QStringLiteral("Groceries"), QStringLiteral("Milk"),
                                    QStringLiteral("Eggs"), QStringLiteral("Tea")}));
     QCOMPARE(StyleManager::styleOf(block(2)), ParagraphStyle::Body);
-    QCOMPARE(block(2).blockFormat().marker(), QTextBlockFormat::MarkerType::NoMarker);
+    QVERIFY(!block(2).blockFormat().hasProperty(notes::editor::NoteFormat::kCheckedProperty));
 }
 
 // TC-EDT-016
@@ -207,6 +212,75 @@ void tst_Checklists::doubleClickTogglesTwice()
     QTest::mouseDClick(m_edit->viewport(), Qt::LeftButton, Qt::NoModifier, checkboxOf(1));
     QCOMPARE(items().at(1), QStringLiteral("[ ] Milk"));
     QVERIFY(!m_edit->textCursor().hasSelection()); // no word selected
+}
+
+// A real click comes after the pointer moved there. (Qt's own checkbox
+// handling, for its block markers, toggled again on the release.)
+void tst_Checklists::hoverThenClickTogglesOnce()
+{
+    openWindow();
+    makeChecklist();
+    for (const QString& expected :
+         {QStringLiteral("[x] Eggs"), QStringLiteral("[ ] Eggs"), QStringLiteral("[x] Eggs")}) {
+        QTest::mouseMove(m_edit->viewport(), checkboxOf(2));
+        QTest::mouseClick(m_edit->viewport(), Qt::LeftButton, Qt::NoModifier, checkboxOf(2));
+        QCOMPARE(items().at(2), expected);
+    }
+}
+
+// The caret is in another item (as after typing it): clicking a checkbox
+// changes that item only.
+void tst_Checklists::clickChangesOnlyTheClickedItem()
+{
+    openWindow();
+    makeChecklist();
+    for (const int caretIn : {2, 3}) {
+        QTextCursor caret(block(caretIn));
+        caret.movePosition(QTextCursor::EndOfBlock);
+        m_edit->setTextCursor(caret);
+        QTest::mouseMove(m_edit->viewport(), checkboxOf(1));
+        QTest::mouseClick(m_edit->viewport(), Qt::LeftButton, Qt::NoModifier, checkboxOf(1));
+        QTest::mouseMove(m_edit->viewport(), checkboxOf(3));
+        QTest::mouseClick(m_edit->viewport(), Qt::LeftButton, Qt::NoModifier, checkboxOf(3));
+    }
+    // Two clicks each: back to unchecked, and Eggs never touched.
+    QCOMPARE(items(), (QStringList{QStringLiteral("Groceries"), QStringLiteral("[ ] Milk"),
+                                   QStringLiteral("[ ] Eggs"), QStringLiteral("[ ] Tea")}));
+}
+
+void tst_Checklists::clicksAddNoParagraphs()
+{
+    openWindow();
+    makeChecklist();
+    QTextCursor end(block(3));
+    end.movePosition(QTextCursor::EndOfBlock);
+    m_edit->setTextCursor(end);
+    QTest::keyClick(m_edit, Qt::Key_Return); // an empty item, the caret in it
+    QCOMPARE(m_edit->document()->blockCount(), 5);
+    moveCheckedAction()->setChecked(true);
+    for (int i = 0; i < 6; ++i) {
+        const int item = 1 + (i % 4);
+        QTest::mouseMove(m_edit->viewport(), checkboxOf(item));
+        QTest::mouseClick(m_edit->viewport(), Qt::LeftButton, Qt::NoModifier, checkboxOf(item));
+        QCOMPARE(m_edit->document()->blockCount(), 5);
+    }
+    QStringList texts;
+    for (const QString& item : items()) {
+        texts.append(item.mid(item.indexOf(QLatin1Char(']')) + 1).trimmed());
+    }
+    texts.sort();
+    QCOMPARE(texts, (QStringList{QString(), QStringLiteral("Eggs"), QStringLiteral("Groceries"),
+                                 QStringLiteral("Milk"), QStringLiteral("Tea")}));
+}
+
+// Pressing on a checkbox and letting go elsewhere doesn't toggle it.
+void tst_Checklists::dragOffTheCheckboxCancels()
+{
+    openWindow();
+    makeChecklist();
+    QTest::mousePress(m_edit->viewport(), Qt::LeftButton, Qt::NoModifier, checkboxOf(1));
+    QTest::mouseRelease(m_edit->viewport(), Qt::LeftButton, Qt::NoModifier, textOf(2));
+    QCOMPARE(items().at(1), QStringLiteral("[ ] Milk"));
 }
 
 // TC-EDT-017
@@ -238,7 +312,43 @@ void tst_Checklists::enterGivesUncheckedItem()
     QTest::keyClick(m_edit, Qt::Key_Return);
     QTest::keyClick(m_edit, Qt::Key_Return);
     QCOMPARE(StyleManager::styleOf(block(5)), ParagraphStyle::Body);
-    QCOMPARE(block(5).blockFormat().marker(), QTextBlockFormat::MarkerType::NoMarker);
+    QVERIFY(!block(5).blockFormat().hasProperty(notes::editor::NoteFormat::kCheckedProperty));
+}
+
+// Enter on an empty item: out of the checklist, the item a plain line where
+// the caret stays, and the next Enter a new line, at the end and in the
+// middle (where the items below stay checklist items).
+void tst_Checklists::enterOnEmptyItemLeavesTheChecklist()
+{
+    openWindow();
+    makeChecklist();
+    QTextCursor end(block(3));
+    end.movePosition(QTextCursor::EndOfBlock);
+    m_edit->setTextCursor(end);
+    QTest::keyClick(m_edit, Qt::Key_Return); // a new, empty item
+    QCOMPARE(items().last(), QStringLiteral("[ ] "));
+    QTest::keyClick(m_edit, Qt::Key_Return); // out: no second empty item
+    QCOMPARE(items(),
+             (QStringList{QStringLiteral("Groceries"), QStringLiteral("[ ] Milk"),
+                          QStringLiteral("[ ] Eggs"), QStringLiteral("[ ] Tea"), QString()}));
+    QCOMPARE(m_edit->textCursor().blockNumber(), 4);
+    QTest::keyClick(m_edit, Qt::Key_Return); // a new line at once
+    QCOMPARE(items().size(), 6);
+    QCOMPARE(m_edit->textCursor().blockNumber(), 5);
+
+    QTextCursor milk(block(1));
+    milk.movePosition(QTextCursor::EndOfBlock);
+    m_edit->setTextCursor(milk);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(items().mid(0, 5),
+             (QStringList{QStringLiteral("Groceries"), QStringLiteral("[ ] Milk"), QString(),
+                          QStringLiteral("[ ] Eggs"), QStringLiteral("[ ] Tea")}));
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(items().mid(0, 6),
+             (QStringList{QStringLiteral("Groceries"), QStringLiteral("[ ] Milk"), QString(),
+                          QString(), QStringLiteral("[ ] Eggs"), QStringLiteral("[ ] Tea")}));
+    QCOMPARE(m_edit->textCursor().blockNumber(), 3);
 }
 
 void tst_Checklists::checkedTextIsGrayed()

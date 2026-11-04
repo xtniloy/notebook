@@ -128,15 +128,8 @@ public:
         if (QTextList* list = block.textList()) {
             node.insert(QStringLiteral("list"), listIndex(list));
         }
-        switch (format.marker()) {
-        case QTextBlockFormat::MarkerType::Checked:
-            node.insert(QStringLiteral("check"), true);
-            break;
-        case QTextBlockFormat::MarkerType::Unchecked:
-            node.insert(QStringLiteral("check"), false);
-            break;
-        case QTextBlockFormat::MarkerType::NoMarker:
-            break;
+        if (StyleManager::isChecklistItem(block)) {
+            node.insert(QStringLiteral("check"), StyleManager::isChecked(block));
         }
         if (format.indent() > 0) {
             node.insert(QStringLiteral("indent"), format.indent());
@@ -291,9 +284,9 @@ QTextBlockFormat blockFormatFor(const QJsonObject& node)
 {
     QTextBlockFormat format;
     format.setHeadingLevel(std::clamp(node.value(QStringLiteral("h")).toInt(), 0, kMaxHeading));
-    if (const QJsonValue check = node.value(QStringLiteral("check")); check.isBool()) {
-        format.setMarker(check.toBool() ? QTextBlockFormat::MarkerType::Checked
-                                        : QTextBlockFormat::MarkerType::Unchecked);
+    // Only a checklist item's: on any other paragraph it's ignored.
+    if (node.value(QStringLiteral("check")).toBool()) {
+        format.setProperty(NoteFormat::kCheckedProperty, true);
     }
     format.setIndent(std::clamp(node.value(QStringLiteral("indent")).toInt(), 0, kMaxIndent));
     const QString align = node.value(QStringLiteral("align")).toString();
@@ -312,6 +305,7 @@ QTextBlockFormat blockFormatFor(const QJsonObject& node)
         format.setProperty(QTextFormat::BlockCodeFence, QStringLiteral("`"));
         format.setProperty(QTextFormat::BlockCodeLanguage, code.toString());
     }
+    StyleManager::clearDefaults(format); // a plain paragraph's is Qt's default
     return format;
 }
 

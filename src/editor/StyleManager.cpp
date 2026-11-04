@@ -152,23 +152,20 @@ void leaveList(const QTextBlock& block)
     list->remove(block);
     QTextBlockFormat format = block.blockFormat();
     format.setIndent(indent);
+    StyleManager::clearDefaults(format);
     QTextCursor(block).setBlockFormat(format);
 }
 
-// A checklist's items have a checkbox (Qt's block marker), unchecked when
-// new; other paragraphs have none.
-void fitMarker(const QTextBlock& block)
+// Only a checklist item can be checked: a paragraph that leaves a checklist
+// loses its check, so it joins one again unchecked.
+void fitCheck(const QTextBlock& block)
 {
-    const bool checklist = StyleManager::isChecklistItem(block);
     QTextBlockFormat format = block.blockFormat();
-    if (checklist == (format.marker() != QTextBlockFormat::MarkerType::NoMarker)) {
+    if (StyleManager::isChecklistItem(block) || !format.hasProperty(NoteFormat::kCheckedProperty)) {
         return;
     }
-    if (checklist) {
-        format.setMarker(QTextBlockFormat::MarkerType::Unchecked);
-    } else {
-        format.clearProperty(QTextFormat::BlockMarker);
-    }
+    format.clearProperty(NoteFormat::kCheckedProperty);
+    StyleManager::clearDefaults(format);
     QTextCursor(block).setBlockFormat(format);
 }
 
@@ -395,6 +392,7 @@ void StyleManager::apply(QTextCursor& cursor, ParagraphStyle style)
             format.clearProperty(QTextFormat::BlockCodeLanguage);
             format.setNonBreakableLines(false);
         }
+        clearDefaults(format);
         QTextCursor(block).setBlockFormat(format);
         editRuns(block, [&](QTextCharFormat& run) { restyleRun(run, from, text, base); });
 
@@ -406,7 +404,7 @@ void StyleManager::apply(QTextCursor& cursor, ParagraphStyle style)
             if (listStyleOf(*list) != style) {
                 list->setFormat(listFormat(style, list->format().indent()));
                 for (int i = 0; i < list->count(); ++i) {
-                    fitMarker(list->item(i));
+                    fitCheck(list->item(i));
                 }
             }
         } else if (joined != nullptr) {
@@ -415,7 +413,7 @@ void StyleManager::apply(QTextCursor& cursor, ParagraphStyle style)
             joinList(block, style, 1);
             joined = block.textList();
         }
-        fitMarker(block);
+        fitCheck(block);
     }
     cursor.endEditBlock();
 }
@@ -440,7 +438,7 @@ bool StyleManager::indentList(QTextCursor& cursor, int levels)
         if (to >= 1) {
             joinList(block, style, to);
         }
-        fitMarker(block); // a checked item stays checked
+        fitCheck(block); // a checked item stays checked
     }
     cursor.endEditBlock();
     return true;
@@ -451,7 +449,7 @@ void StyleManager::removeFromList(QTextCursor& cursor)
     cursor.beginEditBlock();
     for (const QTextBlock& block : selectedBlocks(cursor)) {
         leaveList(block);
-        fitMarker(block);
+        fitCheck(block);
     }
     cursor.endEditBlock();
 }
@@ -464,8 +462,7 @@ bool StyleManager::isChecklistItem(const QTextBlock& block)
 
 bool StyleManager::isChecked(const QTextBlock& block)
 {
-    return isChecklistItem(block) &&
-           block.blockFormat().marker() == QTextBlockFormat::MarkerType::Checked;
+    return isChecklistItem(block) && block.blockFormat().boolProperty(NoteFormat::kCheckedProperty);
 }
 
 void StyleManager::setChecked(const QTextBlock& block, bool checked, bool toBottom)
@@ -476,8 +473,11 @@ void StyleManager::setChecked(const QTextBlock& block, bool checked, bool toBott
     QTextCursor cursor(block);
     cursor.beginEditBlock();
     QTextBlockFormat format = block.blockFormat();
-    format.setMarker(checked ? QTextBlockFormat::MarkerType::Checked
-                             : QTextBlockFormat::MarkerType::Unchecked);
+    if (checked) {
+        format.setProperty(NoteFormat::kCheckedProperty, true);
+    } else {
+        format.clearProperty(NoteFormat::kCheckedProperty);
+    }
     cursor.setBlockFormat(format);
     if (checked && toBottom) {
         const QTextBlock last = lastNestedUnder(block);
@@ -486,6 +486,39 @@ void StyleManager::setChecked(const QTextBlock& block, bool checked, bool toBott
         }
     }
     cursor.endEditBlock();
+}
+
+void StyleManager::clearDefaults(QTextBlockFormat& format)
+{
+    const auto clearIf = [&](int property, bool isDefault) {
+        if (format.hasProperty(property) && isDefault) {
+            format.clearProperty(property);
+        }
+    };
+    clearIf(QTextFormat::HeadingLevel, format.headingLevel() == 0);
+    clearIf(QTextFormat::BlockIndent, format.indent() == 0);
+    clearIf(QTextFormat::BlockNonBreakableLines, !format.nonBreakableLines());
+    clearIf(NoteFormat::kCheckedProperty, !format.boolProperty(NoteFormat::kCheckedProperty));
+    clearIf(NoteFormat::kCollapsedProperty, !format.boolProperty(NoteFormat::kCollapsedProperty));
+}
+
+void StyleManager::adoptTaskLists(QTextDocument& document)
+{
+    for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
+        QTextBlockFormat format = block.blockFormat();
+        if (!format.hasProperty(QTextFormat::BlockMarker)) {
+            continue;
+        }
+        if (QTextList* list = block.textList(); list != nullptr && !isChecklistItem(block)) {
+            list->setFormat(listFormat(ParagraphStyle::Checklist, list->format().indent()));
+        }
+        const bool checked = format.marker() == QTextBlockFormat::MarkerType::Checked;
+        format.clearProperty(QTextFormat::BlockMarker);
+        if (checked && block.textList() != nullptr) {
+            format.setProperty(NoteFormat::kCheckedProperty, true);
+        }
+        QTextCursor(block).setBlockFormat(format);
+    }
 }
 
 void StyleManager::styleHeadings(QTextDocument& document)

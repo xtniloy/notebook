@@ -51,6 +51,7 @@ int NoteTextEdit::rightInset() const
 
 void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText)
 {
+    m_pressedCheckbox = QTextBlock(); // a click doesn't carry over to another note
     editor::NoteFormat::load(body, plainText, *document());
     if (document()->isEmpty()) {
         // A new (empty) note starts with its title, as in macOS Notes (task
@@ -214,8 +215,9 @@ bool NoteTextEdit::headingKey(const QKeyEvent* event)
         // A new paragraph without the heading's level or font. Keeps what
         // isn't the heading's own (indent, alignment).
         QTextBlockFormat body = cursor.blockFormat();
-        body.setHeadingLevel(0);
+        body.clearProperty(QTextFormat::HeadingLevel);
         body.clearProperty(editor::NoteFormat::kCollapsedProperty);
+        editor::StyleManager::clearDefaults(body);
         cursor.insertBlock(body, QTextCharFormat());
     } else {
         // Split: both halves stay headings. (Qt's own Enter drops the
@@ -241,11 +243,11 @@ bool NoteTextEdit::listKey(const QKeyEvent* event)
         if (modifiers == Qt::NoModifier && editor::StyleManager::isChecklistItem(cursor.block()) &&
             !cursor.block().text().isEmpty()) {
             // The next checklist item starts unchecked, even after a checked
-            // one (Qt's Enter would copy the checkbox).
+            // one (Qt's Enter would copy the check).
             cursor.beginEditBlock();
             cursor.removeSelectedText();
             QTextBlockFormat item = cursor.blockFormat();
-            item.setMarker(QTextBlockFormat::MarkerType::Unchecked);
+            item.clearProperty(editor::NoteFormat::kCheckedProperty);
             cursor.insertBlock(item, cursor.charFormat());
             cursor.endEditBlock();
             setTextCursor(cursor);
@@ -411,39 +413,54 @@ QTextBlock NoteTextEdit::checkboxAt(QPointF position) const
     return {};
 }
 
-bool NoteTextEdit::toggleCheckboxAt(QPointF position)
-{
-    const QTextBlock block = checkboxAt(position);
-    if (isReadOnly() || !block.isValid()) {
-        return false;
-    }
-    editor::StyleManager::setChecked(block, !editor::StyleManager::isChecked(block),
-                                     m_moveCheckedToBottom);
-    return true;
-}
-
 void NoteTextEdit::mousePressEvent(QMouseEvent* event)
 {
-    // The caret stays where it was, as in macOS Notes.
-    if (event->button() == Qt::LeftButton && toggleCheckboxAt(event->position())) {
-        event->accept();
-        return;
+    if (event->button() == Qt::LeftButton && !isReadOnly()) {
+        m_pressedCheckbox = checkboxAt(event->position());
+        if (m_pressedCheckbox.isValid()) {
+            event->accept(); // the caret stays where it was, as in macOS Notes
+            return;
+        }
     }
     QTextEdit::mousePressEvent(event);
 }
 
-void NoteTextEdit::mouseDoubleClickEvent(QMouseEvent* event)
+void NoteTextEdit::mouseReleaseEvent(QMouseEvent* event)
 {
-    // The second click's press has toggled again already: no word selected.
-    if (event->button() == Qt::LeftButton && checkboxAt(event->position()).isValid()) {
+    if (event->button() == Qt::LeftButton && m_pressedCheckbox.isValid()) {
+        // A click: pressed and released on the same checkbox. One undo step.
+        if (checkboxAt(event->position()) == m_pressedCheckbox && !isReadOnly()) {
+            editor::StyleManager::setChecked(m_pressedCheckbox,
+                                             !editor::StyleManager::isChecked(m_pressedCheckbox),
+                                             m_moveCheckedToBottom);
+        }
+        m_pressedCheckbox = QTextBlock();
         event->accept();
         return;
+    }
+    QTextEdit::mouseReleaseEvent(event);
+}
+
+void NoteTextEdit::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    // The second press of a double click: a second click on the checkbox
+    // (toggled on its release), not a word to select.
+    if (event->button() == Qt::LeftButton && !isReadOnly()) {
+        m_pressedCheckbox = checkboxAt(event->position());
+        if (m_pressedCheckbox.isValid()) {
+            event->accept();
+            return;
+        }
     }
     QTextEdit::mouseDoubleClickEvent(event);
 }
 
 void NoteTextEdit::mouseMoveEvent(QMouseEvent* event)
 {
+    if (m_pressedCheckbox.isValid()) {
+        event->accept(); // pressed on a checkbox: no text selection
+        return;
+    }
     QTextEdit::mouseMoveEvent(event);
     const bool over = event->buttons() == Qt::NoButton && !isReadOnly() &&
                       checkboxAt(event->position()).isValid();

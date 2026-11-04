@@ -254,6 +254,9 @@ void tst_NoteFormat::aiAnswerFromMarkdownSurvives()
                        "```python\nprint(\"have a good trip\")\n```\n\n"
                        "| Day | City |\n|-----|------|\n| 1 | Lisbon |\n| 2 | Porto |\n\n"
                        "See [the guide](https://example.com/guide)."));
+    // Qt reads task lists with its block markers; they become our checklists.
+    notes::editor::StyleManager::adoptTaskLists(answer);
+    QVERIFY(notes::editor::StyleManager::isChecked(answer.findBlockByNumber(5))); // "Book hotel"
     const QString json = NoteFormat::serialize(answer);
     const auto reloaded = load(json);
     QVERIFY(reloaded);

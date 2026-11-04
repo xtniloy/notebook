@@ -46,6 +46,8 @@ private slots:
     void typedMarkerStartsList();
     void markersOnlyAtTheStartOfBody();
     void enterTwiceEndsList();
+    void enterFlowLikeGoogleDocs_data();
+    void enterFlowLikeGoogleDocs();
     void tabNestsAndRestartsNumbering();
     void tabOutsideListIsATab();
     void backspaceRemovesMarkerFirst();
@@ -186,6 +188,12 @@ void tst_Lists::enterTwiceEndsList()
     QCOMPARE(m_edit->document()->blockCount(), 3); // no extra paragraph
     QCOMPARE(styleOf(2), ParagraphStyle::Body);
     QCOMPARE(m_edit->textCursor().block(), block(2));
+    // It's a plain line now: the next Enter starts a new one at once (Qt's
+    // Enter only reset an empty line's leftover list format the first time).
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(m_edit->document()->blockCount(), 4);
+    QTest::keyClick(m_edit, Qt::Key_Backspace);
+    QCOMPARE(m_edit->document()->blockCount(), 3);
     QTest::keyClicks(m_edit, QStringLiteral("Done"));
     QCOMPARE(styleOf(2), ParagraphStyle::Body);
     QCOMPARE(styleOf(1), ParagraphStyle::BulletedList);
@@ -203,6 +211,96 @@ void tst_Lists::enterTwiceEndsList()
 }
 
 // TC-EDT-013
+// Enter in every kind of list, as Google Docs does it (and macOS Notes):
+// an empty item is never left behind and never added twice.
+void tst_Lists::enterFlowLikeGoogleDocs_data()
+{
+    QTest::addColumn<int>("key");
+    QTest::addColumn<ParagraphStyle>("style");
+    QTest::newRow("bulleted") << int(Qt::Key_7) << ParagraphStyle::BulletedList;
+    QTest::newRow("dashed") << int(Qt::Key_8) << ParagraphStyle::DashedList;
+    QTest::newRow("numbered") << int(Qt::Key_9) << ParagraphStyle::NumberedList;
+    QTest::newRow("checklist") << int(Qt::Key_L) << ParagraphStyle::Checklist;
+}
+
+void tst_Lists::enterFlowLikeGoogleDocs()
+{
+    QFETCH(int, key);
+    QFETCH(ParagraphStyle, style);
+    openWindow();
+    QTextDocument* document = m_edit->document();
+    const auto makeList = [&] {
+        QTest::keyClick(m_edit, static_cast<Qt::Key>(key), Qt::ControlModifier | Qt::ShiftModifier);
+    };
+    // No list item is ever empty, except the one the caret is in.
+    const auto noEmptyItems = [&] {
+        for (QTextBlock item = document->begin(); item.isValid(); item = item.next()) {
+            if (item.textList() != nullptr && item.text().isEmpty() &&
+                item != m_edit->textCursor().block()) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    // 1. A new list's empty item, then Enter: back to the plain line it was.
+    newParagraph();
+    makeList();
+    QCOMPARE(styleOf(1), style);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(document->blockCount(), 2);
+    QCOMPARE(styleOf(1), ParagraphStyle::Body);
+    QCOMPARE(m_edit->textCursor().blockNumber(), 1);
+
+    // 2. One item, Enter, Enter: the item, then a plain line.
+    makeList();
+    QTest::keyClicks(m_edit, QStringLiteral("One"));
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(styleOf(2), style); // a new, empty item
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(document->blockCount(), 3);
+    QCOMPARE(styleOf(1), style);
+    QCOMPARE(styleOf(2), ParagraphStyle::Body);
+    QCOMPARE(m_edit->textCursor().blockNumber(), 2);
+    QVERIFY(noEmptyItems());
+
+    // 3.1 More items, then Enter twice at the end of the last one.
+    QTextCursor one(block(1));
+    one.movePosition(QTextCursor::EndOfBlock);
+    m_edit->setTextCursor(one);
+    for (const QString& text : {QStringLiteral("Two"), QStringLiteral("Three")}) {
+        QTest::keyClick(m_edit, Qt::Key_Return);
+        QTest::keyClicks(m_edit, text);
+    }
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(document->toPlainText(), QStringLiteral("Shopping\nOne\nTwo\nThree\n\n"));
+    for (int i = 1; i <= 3; ++i) {
+        QCOMPARE(styleOf(i), style);
+    }
+    QCOMPARE(styleOf(4), ParagraphStyle::Body);
+    QCOMPARE(m_edit->textCursor().blockNumber(), 4);
+    QVERIFY(noEmptyItems());
+
+    // 3.2 Enter twice after "One": the list splits around a plain line.
+    one = QTextCursor(block(1));
+    one.movePosition(QTextCursor::EndOfBlock);
+    m_edit->setTextCursor(one);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(document->toPlainText(), QStringLiteral("Shopping\nOne\n\nTwo\nThree\n\n"));
+    QCOMPARE(styleOf(1), style);
+    QCOMPARE(styleOf(2), ParagraphStyle::Body);
+    QCOMPARE(styleOf(3), style);
+    QCOMPARE(styleOf(4), style);
+    QCOMPARE(m_edit->textCursor().blockNumber(), 2);
+    QVERIFY(noEmptyItems());
+    // And the next Enter is an ordinary new line.
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QCOMPARE(document->toPlainText(), QStringLiteral("Shopping\nOne\n\n\nTwo\nThree\n\n"));
+    QCOMPARE(m_edit->textCursor().blockNumber(), 3);
+}
+
 void tst_Lists::tabNestsAndRestartsNumbering()
 {
     openWindow();

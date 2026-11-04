@@ -40,8 +40,12 @@ public:
     // NoteTextEdit draws the dash.
     static constexpr int kDashedListProperty = QTextFormat::UserProperty + 2;
     // bool, on a QTextListFormat: a checklist ("check"), also without a style;
-    // its items' checkboxes are Qt's block markers, and NoteTextEdit draws them.
+    // NoteTextEdit draws its items' checkboxes.
     static constexpr int kChecklistProperty = QTextFormat::UserProperty + 3;
+    // bool, on a checklist item's block format: checked ("check": true).
+    // Not Qt's block marker: QTextEdit has its own click handling for those,
+    // which toggled the item with the caret as well as the one clicked.
+    static constexpr int kCheckedProperty = QTextFormat::UserProperty + 4;
 
     // The document as compact JSON.
     [[nodiscard]] static QString serialize(const QTextDocument& document);

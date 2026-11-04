@@ -617,7 +617,7 @@ Record each in `docs/adr/`:
 
 **Done when:** checklists work like Plan §3.1 mockup.
 
-_Notes:_ a checklist is a list with our `kChecklistProperty` (stored as list style `"check"`) and no Qt marker style; each item's state is Qt's block marker (`"check": true/false`). `NoteTextEdit` draws the circles (filled in the accent when checked) and grays checked text with extra selections, so the gray isn't stored. The setting is the checkable Format ▸ Move Checked Items to Bottom (`editor/moveCheckedToBottom`, off by default); a checked item moves with the items nested under it.
+_Notes:_ a checklist is a list with our `kChecklistProperty` (stored as list style `"check"`) and no Qt marker style; each item's state is our own block property `kCheckedProperty` (`"check": true/false`), not Qt's block marker, because QTextEdit's built-in handling of those markers toggled the item with the caret too. A click is press and release on the same box, all handled by `NoteTextEdit`; Markdown task lists are converted with `StyleManager::adoptTaskLists`. `NoteTextEdit` draws the circles (filled in the accent when checked) and grays checked text with extra selections, so the gray isn't stored. The setting is the checkable Format ▸ Move Checked Items to Bottom (`editor/moveCheckedToBottom`, off by default); a checked item moves with the items nested under it.
 
 ### 3.7 Images `L` → broken down
 

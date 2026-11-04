@@ -5,6 +5,7 @@
 // test. Needs Qt Gui: tests that include it link notesapp_ui.
 
 #include "editor/NoteFormat.h"
+#include "editor/StyleManager.h"
 
 #include <QColor>
 #include <QImage>
@@ -94,9 +95,8 @@ inline void buildFixture(QTextDocument& document)
         QTextList* created = nullptr;
         for (qsizetype i = 0; i < items.size(); ++i) {
             QTextBlockFormat item;
-            if (checklist) {
-                item.setMarker(i == 0 ? QTextBlockFormat::MarkerType::Checked
-                                      : QTextBlockFormat::MarkerType::Unchecked);
+            if (checklist && i == 0) {
+                item.setProperty(editor::NoteFormat::kCheckedProperty, true);
             }
             cursor.insertBlock(item, QTextCharFormat());
             if (created == nullptr) {
@@ -129,7 +129,7 @@ inline void buildFixture(QTextDocument& document)
          {QStringLiteral("Tickets"), QStringLiteral("Visa")},
          /*checklist=*/true);
     {
-        // A checklist is our property too; its items' markers are the boxes (task 3.6).
+        // A checklist is our property too, and so is a checked item (task 3.6).
         QTextListFormat checklist = cursor.currentList()->format();
         checklist.setProperty(editor::NoteFormat::kChecklistProperty, true);
         cursor.currentList()->setFormat(checklist);
@@ -176,10 +176,9 @@ inline QStringList dumpDocument(const QTextDocument& document)
                         .arg(list->format().indent())
                         .arg(kind);
         }
-        if (format.marker() != QTextBlockFormat::MarkerType::NoMarker) {
-            line += format.marker() == QTextBlockFormat::MarkerType::Checked
-                        ? QStringLiteral(" [x]")
-                        : QStringLiteral(" [ ]");
+        if (editor::StyleManager::isChecklistItem(block)) {
+            line += editor::StyleManager::isChecked(block) ? QStringLiteral(" [x]")
+                                                           : QStringLiteral(" [ ]");
         }
         if (format.indent() > 0) {
             line += QStringLiteral(" indent %1").arg(format.indent());
