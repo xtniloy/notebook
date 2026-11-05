@@ -147,6 +147,7 @@ The window draws its own frame (rounded corners, soft shadow) with no system tit
 - Inline: bold, italic, underline, strikethrough, highlight, text color, links
 - Tables with add/remove rows & columns
 - Images inline (drag & drop or paste), file attachments as cards
+- Paste keeps headings, lists, bold, italic and links from web pages and Markdown, and nothing else (no fonts, colors or remote images); Edit › Paste as Plain Text (`Ctrl+Shift+V`) and Paste as Markdown (`Ctrl+Alt+V`)
 - Collapsible headings (click arrow to fold a section)
 - Links to other notes (`>>` typing to search a note title)
 - Smooth typing with autosave (debounced 500 ms, no "Save" button)

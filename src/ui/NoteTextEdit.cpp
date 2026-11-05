@@ -2,15 +2,21 @@
 
 #include "editor/ImageObject.h"
 #include "editor/NoteFormat.h"
+#include "editor/PasteCleaner.h"
 #include "models/Uuid.h"
 
 #include <QAbstractTextDocumentLayout>
+#include <QAction>
+#include <QClipboard>
+#include <QContextMenuEvent>
 #include <QDataStream>
 #include <QEvent>
 #include <QFontMetricsF>
+#include <QGuiApplication>
 #include <QIODevice>
 #include <QImage>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
@@ -85,7 +91,21 @@ void forEachImage(const QTextDocument& document, Visit visit)
 NoteTextEdit::NoteTextEdit(QWidget* parent)
     : QTextEdit(parent)
     , m_imageObject(new editor::ImageObject(this))
+    , m_pasteAsPlainText(new QAction(tr("Paste as &Plain Text"), this))
+    , m_pasteAsMarkdown(new QAction(tr("Paste as &Markdown"), this))
 {
+    m_pasteAsPlainText->setObjectName(QStringLiteral("pasteAsPlainTextAction"));
+    m_pasteAsPlainText->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
+    m_pasteAsMarkdown->setObjectName(QStringLiteral("pasteAsMarkdownAction"));
+    m_pasteAsMarkdown->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_V));
+    for (QAction* action : {m_pasteAsPlainText, m_pasteAsMarkdown}) {
+        // Only while typing in the note, never into the search field.
+        action->setShortcutContext(Qt::WidgetShortcut);
+        addAction(action);
+    }
+    connect(m_pasteAsPlainText, &QAction::triggered, this,
+            [this] { pasteAs(PasteMode::PlainText); });
+    connect(m_pasteAsMarkdown, &QAction::triggered, this, [this] { pasteAs(PasteMode::Markdown); });
     // Pasted HTML would bring formatting the plain editor can't show or save
     // yet; rich text support comes with the Phase 3 document model.
     setAcceptRichText(false);
@@ -194,6 +214,23 @@ QVariant NoteTextEdit::loadResource(int type, const QUrl& name)
     return editor::ImageImport::decode(found->data); // null if unreadable: missing too
 }
 
+void NoteTextEdit::contextMenuEvent(QContextMenuEvent* event)
+{
+    const std::unique_ptr<QMenu> menu(createStandardContextMenu(event->pos()));
+    // After Qt's Paste.
+    QAction* after = nullptr;
+    const QList<QAction*> actions = menu->actions();
+    for (qsizetype i = 0; i < actions.size(); ++i) {
+        if (actions.at(i)->objectName() == u"edit-paste" && i + 1 < actions.size()) {
+            after = actions.at(i + 1);
+        }
+    }
+    if (!isReadOnly()) {
+        menu->insertActions(after, {m_pasteAsPlainText, m_pasteAsMarkdown});
+    }
+    menu->exec(event->globalPos());
+}
+
 bool NoteTextEdit::canInsertFromMimeData(const QMimeData* source) const
 {
     return source->hasFormat(QLatin1StringView(kFragmentMime)) || source->hasImage() ||
@@ -212,9 +249,6 @@ QMimeData* NoteTextEdit::createMimeDataFromSelection() const
             uuids.append(uuid);
         }
     });
-    if (uuids.isEmpty()) {
-        return QTextEdit::createMimeDataFromSelection(); // text only: as before
-    }
     // A plain copy of Qt's: its own lists only the formats it makes.
     auto* mime = new QMimeData;
     {
@@ -235,7 +269,7 @@ QMimeData* NoteTextEdit::createMimeDataFromSelection() const
     mime->setData(QLatin1StringView(kFragmentMime), encoded);
     // An image alone also goes as an image, for other apps. (One character,
     // plus the paragraph end every document has.)
-    if (copy.characterCount() == 2) {
+    if (uuids.size() == 1 && copy.characterCount() == 2) {
         mime->setImageData(editor::ImageImport::decode(m_attachments.value(uuids.first()).data));
     }
     return mime;
@@ -328,20 +362,37 @@ void NoteTextEdit::setMoveCheckedToBottom(bool move)
 
 void NoteTextEdit::insertFromMimeData(const QMimeData* source)
 {
-    const int start = textCursor().selectionStart();
-    const QTextBlockFormat startFormat = document()->findBlock(start).blockFormat();
-    const int revision = document()->revision();
     if (isReadOnly()) {
         return;
     }
-    if (!insertImages(source)) {
+    const int start = textCursor().selectionStart();
+    const QTextBlock startBlock = document()->findBlock(start);
+    const QTextBlockFormat startFormat = startBlock.blockFormat();
+    // Pasting into an empty paragraph replaces it, as far as its style goes.
+    const bool startEmpty = startBlock.length() == 1;
+    const int revision = document()->revision();
+
+    bool rich = false;
+    switch (m_pasteMode) {
+    case PasteMode::Auto:
+        rich = insertImages(source) || insertRichText(source);
+        break;
+    case PasteMode::Markdown:
+        rich = source->hasText() && insertBody(editor::PasteCleaner::fromMarkdown(source->text()));
+        break;
+    case PasteMode::PlainText:
+        break;
+    }
+    if (!rich && source->hasText()) {
         // Right after an image, the cursor's format is the image's: pasted
         // text would become one image per character.
         if (QTextCursor cursor = textCursor(); cursor.charFormat().isImageFormat()) {
             cursor.setCharFormat(textFormat(cursor.charFormat()));
             setTextCursor(cursor);
         }
-        QTextEdit::insertFromMimeData(source);
+        QMimeData text;
+        text.setText(source->text());
+        QTextEdit::insertFromMimeData(&text);
     }
     if (document()->revision() == revision) {
         return;
@@ -349,15 +400,93 @@ void NoteTextEdit::insertFromMimeData(const QMimeData* source)
     // Pasted or dropped plain text takes the paragraph format of its own
     // first line and the font at the cursor: pasted into a new note's title,
     // every line became Body in the title's size and bold. The paragraph
-    // pasted into keeps its style, the lines after it are Body, and each
-    // gets its style's font, in the same undo step.
+    // pasted into keeps its style (unless it was empty and the paste brings
+    // styles of its own), the lines after it are Body or their own style, and
+    // each gets its style's font, in the same undo step.
     QTextCursor cursor(document());
     cursor.setPosition(start);
     cursor.setPosition(textCursor().position(), QTextCursor::KeepAnchor);
     cursor.joinPreviousEditBlock();
-    QTextCursor(document()->findBlock(start)).setBlockFormat(startFormat);
+    if (!(rich && startEmpty)) {
+        QTextCursor(document()->findBlock(start)).setBlockFormat(startFormat);
+    }
     editor::StyleManager::fitText(cursor);
     cursor.endEditBlock();
+}
+
+void NoteTextEdit::pasteAs(PasteMode mode)
+{
+    if (isReadOnly()) {
+        return;
+    }
+    const QMimeData* source = QGuiApplication::clipboard()->mimeData();
+    if (source == nullptr || !source->hasText()) {
+        return;
+    }
+    m_pasteMode = mode;
+    insertFromMimeData(source);
+    m_pasteMode = PasteMode::Auto;
+    ensureCursorVisible();
+}
+
+bool NoteTextEdit::insertRichText(const QMimeData* source)
+{
+    // HTML wins: it is the formatted version of the same text.
+    if (source->hasHtml()) {
+        return insertBody(editor::PasteCleaner::fromHtml(source->html()));
+    }
+    if (source->hasText() && editor::PasteCleaner::looksLikeMarkdown(source->text())) {
+        return insertBody(editor::PasteCleaner::fromMarkdown(source->text()));
+    }
+    return false;
+}
+
+bool NoteTextEdit::insertBody(const QString& body)
+{
+    QTextDocument pasted;
+    if (body.isEmpty() || editor::NoteFormat::deserialize(body, pasted)) {
+        return false; // nothing left: the plain text instead
+    }
+    insertDocument(pasted);
+    return true;
+}
+
+void NoteTextEdit::insertDocument(const QTextDocument& pasted)
+{
+    QTextCursor cursor = textCursor();
+    const QTextBlock target = cursor.block();
+    // Into an empty paragraph, the first pasted one comes with its style.
+    const bool intoEmpty = !cursor.hasSelection() && target.length() == 1;
+    const QTextBlock first = pasted.firstBlock();
+    cursor.beginEditBlock();
+    if (intoEmpty) {
+        // For when Qt adds the first pasted paragraph to this one, which
+        // keeps its own style then.
+        QTextBlockFormat format = first.blockFormat();
+        format.clearProperty(QTextFormat::ObjectIndex); // the pasted document's list
+        cursor.setBlockFormat(format);
+    }
+    cursor.insertFragment(QTextDocumentFragment(&pasted));
+    if (intoEmpty && target.length() == 1 && target.next().isValid()) {
+        // Qt put it on a paragraph of its own instead (a list item does),
+        // after this one, which is left over: remove it.
+        QTextCursor leftover(target);
+        if (target.previous().isValid()) {
+            leftover.movePosition(QTextCursor::PreviousCharacter, QTextCursor::KeepAnchor);
+            leftover.removeSelectedText();
+        } else {
+            // The first line: the next one joins it, with its style and list.
+            const QTextBlock next = target.next();
+            QTextList* list = next.textList();
+            leftover.setBlockFormat(next.blockFormat());
+            leftover.deleteChar();
+            if (list != nullptr) {
+                list->add(target);
+            }
+        }
+    }
+    cursor.endEditBlock();
+    setTextCursor(cursor);
 }
 
 bool NoteTextEdit::insertImages(const QMimeData* source)
@@ -463,9 +592,7 @@ bool NoteTextEdit::insertFragment(const QByteArray& encoded)
     for (const models::Attachment& attachment : std::as_const(copies)) {
         m_attachments.insert(attachment.uuid, attachment);
     }
-    QTextCursor cursor = textCursor();
-    cursor.insertFragment(QTextDocumentFragment(&pasted));
-    setTextCursor(cursor);
+    insertDocument(pasted);
     return true;
 }
 

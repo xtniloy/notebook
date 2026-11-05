@@ -10,8 +10,10 @@
 #include <QTextBlock>
 #include <QTextEdit>
 
+#include <cstdint>
 #include <optional>
 
+class QAction;
 class QPainter;
 
 namespace notes::editor {
@@ -21,8 +23,8 @@ class ImageObject;
 namespace notes::ui {
 
 // The note body editor (Plan §3.5): paragraph styles (task 3.2), inline
-// formats (3.4), lists (3.5), checklists (3.6) and images (3.7); tables
-// arrive later in Phase 3.
+// formats (3.4), lists (3.5), checklists (3.6), images (3.7) and safe paste
+// (3.8); tables arrive later.
 //
 // Images are attachments (models::Attachment) the document shows as
 // `attachment://<uuid>` images. The editor holds the note's attachments with
@@ -49,9 +51,10 @@ public:
     // From the text to the widget's right edge: the padding plus the scroll bar.
     [[nodiscard]] int rightInset() const;
 
-    // Copied or dragged selections with images carry them in this format: the
-    // selection in the note format plus its images' data, so they paste into
-    // any note as images of its own (new uuids).
+    // Copied or dragged selections carry this format too: the selection in
+    // the note format plus its images' data, so they paste into any note with
+    // every style kept (checklists included) and images of their own (new
+    // uuids).
     static constexpr const char* kFragmentMime = "application/x-notesapp-fragment";
 
     // A stored body (editor::NoteFormat::load()), keeping the bottom padding,
@@ -72,6 +75,17 @@ public:
     // Files that aren't images, or are over the limits, are left out, and
     // imageRejected() says why. Does nothing while read-only.
     void insertImageFiles(const QStringList& paths);
+
+    // Pasting (task 3.8). Ctrl+V keeps what a note can show of the
+    // clipboard, cleaned (editor::PasteCleaner): HTML from other apps, or
+    // plain text that clearly is Markdown. These two act on the editor only
+    // (their shortcuts work while it has focus) and are in its context menu;
+    // the window's Edit menu shows them too.
+    // Ctrl+Shift+V: the clipboard's plain text, as it is.
+    [[nodiscard]] QAction* pasteAsPlainTextAction() const { return m_pasteAsPlainText; }
+    // Ctrl+Alt+V: the clipboard's text read as Markdown, even when it doesn't
+    // look like it.
+    [[nodiscard]] QAction* pasteAsMarkdownAction() const { return m_pasteAsMarkdown; }
 
     // The style of the paragraph at the cursor (the first one selected).
     [[nodiscard]] editor::ParagraphStyle paragraphStyle() const;
@@ -111,6 +125,7 @@ protected:
     QVariant loadResource(int type, const QUrl& name) override;
     [[nodiscard]] bool canInsertFromMimeData(const QMimeData* source) const override;
     [[nodiscard]] QMimeData* createMimeDataFromSelection() const override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
     void insertFromMimeData(const QMimeData* source) override;
     void keyPressEvent(QKeyEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
@@ -120,6 +135,19 @@ protected:
     void mouseMoveEvent(QMouseEvent* event) override;
 
 private:
+    enum class PasteMode : std::uint8_t {
+        Auto,      // Ctrl+V: rich when the clipboard has it
+        PlainText, // Ctrl+Shift+V
+        Markdown,  // Ctrl+Alt+V
+    };
+    void pasteAs(PasteMode mode);
+    // Cleaned HTML, or Markdown that looks like it. False if there is
+    // neither (or nothing is left of it): the plain text is pasted instead.
+    bool insertRichText(const QMimeData* source);
+    // A note body (PasteCleaner's) at the cursor; false if empty or unreadable.
+    bool insertBody(const QString& body);
+    void insertDocument(const QTextDocument& pasted);
+
     // Inserts the images `source` holds (a fragment of ours, image files, an
     // image), or reports why they were refused. False if it holds none, and
     // the text is pasted as usual.
@@ -159,6 +187,9 @@ private:
     void applyBottomPadding();
 
     editor::ImageObject* m_imageObject;
+    QAction* m_pasteAsPlainText;
+    QAction* m_pasteAsMarkdown;
+    PasteMode m_pasteMode = PasteMode::Auto;
     // The note's attachments by uuid: loaded with it, and every one added since.
     QHash<QString, models::Attachment> m_attachments;
 

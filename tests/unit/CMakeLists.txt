@@ -33,3 +33,6 @@ notes_add_test(NAME tst_stylemanager SOURCES tst_stylemanager.cpp LABELS unit LI
 
 # TC-EDT-022, TC-EDT-023, TC-EDT-024: images coming into a note (task 3.7).
 notes_add_test(NAME tst_imageimport SOURCES tst_imageimport.cpp LABELS unit LIBS notesapp_ui)
+
+# TC-EDT-028, TC-EDT-053: cleaning pasted HTML and Markdown (task 3.8).
+notes_add_test(NAME tst_pastecleaner SOURCES tst_pastecleaner.cpp LABELS unit LIBS notesapp_ui)

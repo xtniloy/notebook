@@ -384,6 +384,10 @@ void MainWindow::createMenus()
     add(fileMenu, {ActionId::LockNote, ActionId::ShareExport});
 
     QMenu* editMenu = menuBar()->addMenu(tr("&Edit"));
+    // The editor's own (task 3.8): their shortcuts work while it has focus.
+    editMenu->addAction(m_editor->textEdit()->pasteAsPlainTextAction());
+    editMenu->addAction(m_editor->textEdit()->pasteAsMarkdownAction());
+    editMenu->addSeparator();
     add(editMenu, {ActionId::DeleteNote});
     editMenu->addSeparator();
     add(editMenu, {ActionId::FindInNote, ActionId::SearchAllNotes});
@@ -832,6 +836,8 @@ void MainWindow::updateFormatMenu()
     m_actions->action(ActionId::Format)->setEnabled(editable);
     m_actions->action(ActionId::Checklist)->setEnabled(editable);
     m_actions->action(ActionId::Attachment)->setEnabled(editable);
+    edit->pasteAsPlainTextAction()->setEnabled(editable);
+    edit->pasteAsMarkdownAction()->setEnabled(editable);
     m_formatMenu->setStylesEnabled(editable);
     m_formatMenu->setCurrentStyle(edit->paragraphStyle());
     using editor::InlineStyle;

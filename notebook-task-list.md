@@ -641,12 +641,12 @@ _Notes:_ a checklist is a list with our `kChecklistProperty` (stored as list sty
 
 ### 3.8 Safe paste `M`
 
-- [ ] Paste from web pages/other apps: keep supported formatting (bold, italic, lists, headings), strip everything else (fonts, colors, scripts, styles)
-- [ ] **Never fetch remote images or URLs** from pasted HTML (privacy: prevents tracking pixels); convert remote `<img>` to a link or drop it
-- [ ] `Ctrl+Shift+V` = paste as plain text
-- [ ] **Markdown paste** (e.g. an AI chat answer copied with its Copy button, which puts Markdown on the clipboard): plain-text clipboard content that clearly looks like Markdown (headings, lists, `**bold**`, fenced code, tables; several signals, not one `*`) is converted with `QTextDocument::setMarkdown()` and goes through the same sanitizing as HTML paste
-- [ ] **Edit › Paste as Markdown** (`Ctrl+Alt+V`) forces the conversion; `Ctrl+Shift+V` always pastes the raw text
-- [ ] HTML on the clipboard wins over Markdown detection (it's the formatted version of the same content)
+- [x] Paste from web pages/other apps: keep supported formatting (bold, italic, lists, headings), strip everything else (fonts, colors, scripts, styles)
+- [x] **Never fetch remote images or URLs** from pasted HTML (privacy: prevents tracking pixels); convert remote `<img>` to a link or drop it
+- [x] `Ctrl+Shift+V` = paste as plain text
+- [x] **Markdown paste** (e.g. an AI chat answer copied with its Copy button, which puts Markdown on the clipboard): plain-text clipboard content that clearly looks like Markdown (headings, lists, `**bold**`, fenced code, tables; several signals, not one `*`) is converted with `QTextDocument::setMarkdown()` and goes through the same sanitizing as HTML paste
+- [x] **Edit › Paste as Markdown** (`Ctrl+Alt+V`) forces the conversion; `Ctrl+Shift+V` always pastes the raw text
+- [x] HTML on the clipboard wins over Markdown detection (it's the formatted version of the same content)
 
 **Tests**
 - `TC-EDT-027` (UI) Paste HTML with `<img src="http://127.0.0.1:<port>/pixel.png">` → local test server receives **zero** requests.
