@@ -11,6 +11,7 @@
 #include "services/FolderService.h"
 #include "services/NoteService.h"
 #include "ui/ActionRegistry.h"
+#include "ui/AppStyle.h"
 #include "ui/EditorView.h"
 #include "ui/FormatMenu.h"
 #include "ui/MainWindow.h"
@@ -317,6 +318,11 @@ void tst_ParagraphStyles::aaMenuLooksLikeMacNotes()
     QAction* bodyAction = formatMenu()->styleAction(ParagraphStyle::Body);
     QCOMPARE(formatMenu()->actionGeometry(bodyAction).height(),
              menuBarFormat->actionGeometry(bodyAction).height() + 6);
+    // And room under the last one, not ending right at the border.
+    const QRect last =
+        formatMenu()->actionGeometry(formatMenu()->styleAction(ParagraphStyle::NumberedList));
+    QVERIFY(formatMenu()->sizeHint().height() - last.bottom() >=
+            8 + notes::ui::AppStyle::kPanelPadding);
 }
 
 void tst_ParagraphStyles::aaMenuButtonsSetInlineFormats()

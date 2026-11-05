@@ -52,6 +52,8 @@ signals:
 private:
     // Extra room above and below each item (AppStyle::kExtraItemPaddingProperty).
     static constexpr int kExtraItemPadding = 3;
+    // Room under the last style, so it doesn't end right at the border.
+    static constexpr int kBottomMargin = 8;
     static constexpr std::size_t kStyleCount = 8;
     static constexpr std::size_t kInlineCount = 4;
     std::array<QAction*, kStyleCount> m_actions{};

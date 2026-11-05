@@ -195,6 +195,7 @@ FormatMenu::FormatMenu(QWidget* parent)
     setObjectName(QStringLiteral("formatMenu"));
     // A little more room between the styles than in other menus.
     setProperty(AppStyle::kExtraItemPaddingProperty, kExtraItemPadding);
+    setContentsMargins(0, 0, 0, kBottomMargin);
 
     // The inline formats: a row of buttons, as in macOS Notes.
     auto* row = new QWidget(this);
