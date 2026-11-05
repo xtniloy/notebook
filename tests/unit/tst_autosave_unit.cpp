@@ -37,7 +37,7 @@ private slots:
 private:
     [[nodiscard]] Autosave::Reader reader()
     {
-        return [this] { return Autosave::Content{.body = {}, .text = m_text}; };
+        return [this] { return Autosave::Content{.body = {}, .text = m_text, .attachments = {}}; };
     }
     [[nodiscard]] QString textOf(qint64 id) { return await(m_notes->get(id)).value().bodyText; }
 

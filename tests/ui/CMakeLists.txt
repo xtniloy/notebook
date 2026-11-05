@@ -24,3 +24,5 @@ notes_add_test(NAME tst_inlineformats SOURCES tst_inlineformats.cpp LABELS ui LI
 notes_add_test(NAME tst_lists SOURCES tst_lists.cpp LABELS ui LIBS notesapp_ui)
 # TC-EDT-015 .. TC-EDT-018: checklists in the window (task 3.6).
 notes_add_test(NAME tst_checklists SOURCES tst_checklists.cpp LABELS ui LIBS notesapp_ui)
+# TC-EDT-020, TC-EDT-026: images in the window (task 3.7).
+notes_add_test(NAME tst_images SOURCES tst_images.cpp LABELS ui integration LIBS notesapp_ui)

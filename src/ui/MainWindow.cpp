@@ -30,8 +30,10 @@
 #include <QCloseEvent>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QFileDialog>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QImageReader>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
@@ -41,6 +43,7 @@
 #include <QSettings>
 #include <QSizePolicy>
 #include <QSplitter>
+#include <QStandardPaths>
 #include <QToolBar>
 #include <QToolButton>
 
@@ -52,6 +55,19 @@
 namespace notes::ui {
 
 namespace {
+
+// The Attach action's file dialog: images only until file attachments (task 7.2).
+QStringList pickImages(QWidget* parent)
+{
+    QStringList patterns;
+    for (const QByteArray& format : QImageReader::supportedImageFormats()) {
+        patterns.append(QStringLiteral("*.") + QString::fromLatin1(format));
+    }
+    const QString filter = MainWindow::tr("Images (%1)").arg(patterns.join(QLatin1Char(' ')));
+    return QFileDialog::getOpenFileNames(
+        parent, MainWindow::tr("Add Image"),
+        QStandardPaths::writableLocation(QStandardPaths::PicturesLocation), filter);
+}
 
 constexpr QLatin1StringView kGeometryKey("mainWindow/geometry");
 constexpr QLatin1StringView kPaneWidthsKey("mainWindow/paneWidths");
@@ -198,6 +214,10 @@ MainWindow::MainWindow(app::AppContext& context, QWidget* parent)
         m_editor->textEdit()->toggleChecklist();
         updateFormatMenu();
     });
+    connect(m_actions->action(ActionId::Attachment), &QAction::triggered, this,
+            &MainWindow::addImages);
+    connect(m_editor->textEdit(), &NoteTextEdit::imageRejected, this,
+            &MainWindow::showImageRejected);
     m_editor->textEdit()->setMoveCheckedToBottom(
         context.settings().value(kMoveCheckedToBottomKey, false).toBool());
     connect(m_formatMenu, &FormatMenu::inlineStyleToggled, this,
@@ -455,30 +475,31 @@ void MainWindow::openNote(qint64 noteId)
     // load below is queued behind the save, so reopening it shows the saved text.
     m_autosave->flush();
     m_openingNote = noteId;
-    m_context.notes().get(noteId).then(
-        this, [this, noteId](const storage::DbResult<models::Note>& note) {
+    m_context.notes().open(noteId).then(
+        this, [this, noteId](const storage::DbResult<services::OpenedNote>& opened) {
             if (noteId != m_openingNote) {
                 return; // another note was selected meanwhile
             }
             // Anything typed into the old note while this one loaded.
             m_autosave->untrack();
-            if (!note) {
+            if (!opened) {
                 m_editor->clear();
                 updateFormatMenu();
                 return;
             }
-            const QDateTime modified = QDateTime::fromMSecsSinceEpoch(note.value().updatedAt);
-            if (note.value().locked) {
+            const models::Note& note = opened.value().note;
+            const QDateTime modified = QDateTime::fromMSecsSinceEpoch(note.updatedAt);
+            if (note.locked) {
                 m_editor->showLockedNote(modified);
                 updateFormatMenu();
                 return;
             }
-            m_editor->showNoteBody(note.value().body, note.value().bodyText, modified);
+            m_editor->showNoteBody(note.body, note.bodyText, modified, opened.value().attachments);
             if (noteId == m_focusEditorFor) {
                 m_focusEditorFor = 0;
                 m_editor->textEdit()->setFocus(Qt::OtherFocusReason);
             }
-            if (note.value().isTrashed()) {
+            if (note.isTrashed()) {
                 // Read-only in Recently Deleted, as in macOS Notes: recover it to edit.
                 m_editor->textEdit()->setReadOnly(true);
                 updateFormatMenu();
@@ -487,7 +508,8 @@ void MainWindow::openNote(qint64 noteId)
             const NoteTextEdit* edit = m_editor->textEdit();
             m_autosave->track(noteId, [edit] {
                 return services::Autosave::Content{.body = edit->noteBody(),
-                                                   .text = edit->toPlainText()};
+                                                   .text = edit->notePlainText(),
+                                                   .attachments = edit->attachments()};
             });
             updateFormatMenu();
         });
@@ -766,6 +788,27 @@ void MainWindow::deleteFolder(qint64 folderId)
     });
 }
 
+void MainWindow::addImages()
+{
+    NoteTextEdit* edit = m_editor->textEdit();
+    if (!m_editor->hasNote() || edit->isReadOnly()) {
+        return;
+    }
+    const QStringList paths = m_imagePicker ? m_imagePicker(this) : pickImages(this);
+    if (!paths.isEmpty()) {
+        edit->insertImageFiles(paths);
+        edit->setFocus(Qt::OtherFocusReason);
+    }
+}
+
+void MainWindow::showImageRejected(const QString& message)
+{
+    AlertDialog alert(tr("The image couldn't be added."), message, this);
+    alert.setObjectName(QStringLiteral("imageRejectedDialog"));
+    alert.addButton(tr("OK"), AlertDialog::ButtonRole::Accept);
+    alert.exec();
+}
+
 void MainWindow::showError(const QString& text, const QString& details)
 {
     QMessageBox box(QMessageBox::Warning, windowTitle(), text, QMessageBox::Ok, this);
@@ -788,6 +831,7 @@ void MainWindow::updateFormatMenu()
     const bool editable = m_editor->hasNote() && !edit->isReadOnly();
     m_actions->action(ActionId::Format)->setEnabled(editable);
     m_actions->action(ActionId::Checklist)->setEnabled(editable);
+    m_actions->action(ActionId::Attachment)->setEnabled(editable);
     m_formatMenu->setStylesEnabled(editable);
     m_formatMenu->setCurrentStyle(edit->paragraphStyle());
     using editor::InlineStyle;

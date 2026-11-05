@@ -30,3 +30,6 @@ notes_add_test(NAME tst_noteformat SOURCES tst_noteformat.cpp LABELS unit LIBS n
 
 # TC-EDT-002, TC-EDT-004, TC-EDT-005 on the document: paragraph styles (task 3.2).
 notes_add_test(NAME tst_stylemanager SOURCES tst_stylemanager.cpp LABELS unit LIBS notesapp_ui)
+
+# TC-EDT-022, TC-EDT-023, TC-EDT-024: images coming into a note (task 3.7).
+notes_add_test(NAME tst_imageimport SOURCES tst_imageimport.cpp LABELS unit LIBS notesapp_ui)

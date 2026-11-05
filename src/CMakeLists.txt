@@ -40,6 +40,8 @@ add_library(notesapp_core STATIC
     services/NoteText.h
     services/TrashPurger.cpp
     services/TrashPurger.h
+    storage/AttachmentRepository.cpp
+    storage/AttachmentRepository.h
     storage/Database.cpp
     storage/Database.h
     storage/DbResult.h
@@ -80,6 +82,10 @@ target_link_libraries(notesapp_core
 add_library(notesapp_ui STATIC
     app/Application.cpp
     app/Application.h
+    editor/ImageImport.cpp
+    editor/ImageImport.h
+    editor/ImageObject.cpp
+    editor/ImageObject.h
     editor/NoteFormat.cpp
     editor/NoteFormat.h
     editor/StyleManager.cpp

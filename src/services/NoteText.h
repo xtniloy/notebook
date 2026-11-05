@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 #include <QStringView>
 
 namespace notes::services {
@@ -21,6 +22,12 @@ public:
     // The non-empty lines after the title, trimmed and joined with spaces, at
     // most kMaxSnippetLength characters.
     [[nodiscard]] static QString snippet(QStringView plainText);
+
+    // The attachments a note body (editor::NoteFormat's JSON) shows as images,
+    // as uuids in body order, each once (task 3.7). Read from the JSON text,
+    // so the core needs no editor: an image run is
+    // `"image":"attachment://<uuid>"` there.
+    [[nodiscard]] static QStringList attachmentUuids(const QString& body);
 };
 
 } // namespace notes::services

@@ -1,6 +1,9 @@
 #pragma once
 
+#include "models/Attachment.h"
+
 #include <QByteArray>
+#include <QList>
 #include <QObject>
 #include <QString>
 #include <QTimer>
@@ -33,6 +36,10 @@ public:
     {
         QString body; // in the current note format (editor::NoteFormat)
         QString text;
+        // The editor's copies of the images in `body`, so new ones get stored
+        // (NoteService::updateBody()). Not part of the comparison: the body
+        // names every image by its uuid.
+        QList<models::Attachment> attachments;
     };
     using Reader = std::function<Content()>;
 

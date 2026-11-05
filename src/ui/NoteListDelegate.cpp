@@ -3,7 +3,11 @@
 #include "models/NoteListRoles.h"
 #include "ui/Icons.h"
 
+#include <QImage>
 #include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
+#include <QPixmapCache>
 
 namespace notes::ui {
 
@@ -21,6 +25,7 @@ constexpr int kIconGap = 4;
 constexpr int kTimeGap = 8; // between the time and the preview
 constexpr qreal kHighlightRadius = 6.0;
 constexpr qreal kThumbnailRadius = 4.0;
+constexpr qreal kThumbnailEdgeAlpha = 0.12;
 constexpr qreal kHeaderScale = 1.1;
 // Section headers ("Pinned", "Today", ...): gentle space above, a little below.
 constexpr int kHeaderTopPadding = 12;
@@ -55,6 +60,33 @@ void drawSeparator(QPainter* painter, const QRect& rect, const QPalette& palette
 QRect iconRect(int left, const QRect& line)
 {
     return {left, line.center().y() - (kIconSize / 2) + 1, kIconSize, kIconSize};
+}
+
+// The decoded thumbnail of the note at `index`, at `side` device pixels
+// square, cropped to fill it; null if there is none to decode. Cached, so
+// scrolling doesn't decode again.
+QPixmap thumbnailFor(const QModelIndex& index, int side)
+{
+    const QString key = index.data(models::kThumbnailKeyRole).toString();
+    const QByteArray encoded = index.data(models::kThumbnailRole).toByteArray();
+    if (key.isEmpty() || encoded.isEmpty()) {
+        return {};
+    }
+    const QString cacheKey = QStringLiteral("noteThumbnail:%1@%2").arg(key).arg(side);
+    QPixmap pixmap;
+    if (QPixmapCache::find(cacheKey, &pixmap)) {
+        return pixmap;
+    }
+    const QImage image = QImage::fromData(encoded);
+    if (image.isNull()) {
+        return {};
+    }
+    const QImage filled =
+        image.scaled(side, side, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+    pixmap = QPixmap::fromImage(
+        filled.copy((filled.width() - side) / 2, (filled.height() - side) / 2, side, side));
+    QPixmapCache::insert(cacheKey, pixmap);
+    return pixmap;
 }
 
 } // namespace
@@ -111,14 +143,32 @@ void NoteListDelegate::paintNote(QPainter* painter, const QStyleOptionViewItem& 
     QRect content = option.rect.adjusted(kHorizontalPadding + kNoteIndent, kVerticalPadding,
                                          -kHorizontalPadding, -kVerticalPadding);
 
-    // Thumbnail slot; the image itself arrives with attachments (task 3.x).
+    // The note's first image (task 3.7), on the right, cropped to a square.
     if (index.data(models::kHasThumbnailRole).toBool()) {
         const int side = content.height();
         const QRectF slot(content.right() - side + 1, content.top(), side, side);
-        painter->setPen(palette.color(QPalette::Mid));
-        painter->setBrush(palette.color(QPalette::Midlight));
-        painter->drawRoundedRect(slot.adjusted(0.5, 0.5, -0.5, -0.5), kThumbnailRadius,
-                                 kThumbnailRadius);
+        const qreal ratio = painter->device()->devicePixelRatioF();
+        const QPixmap thumbnail = thumbnailFor(index, qRound(side * ratio));
+        const QRectF frame = slot.adjusted(0.5, 0.5, -0.5, -0.5);
+        if (thumbnail.isNull()) {
+            painter->setPen(palette.color(QPalette::Mid));
+            painter->setBrush(palette.color(QPalette::Midlight));
+            painter->drawRoundedRect(frame, kThumbnailRadius, kThumbnailRadius);
+        } else {
+            QPainterPath rounded;
+            rounded.addRoundedRect(slot, kThumbnailRadius, kThumbnailRadius);
+            painter->save();
+            painter->setClipPath(rounded);
+            painter->setRenderHint(QPainter::SmoothPixmapTransform);
+            painter->drawPixmap(slot, thumbnail, QRectF(thumbnail.rect()));
+            painter->restore();
+            // A hairline edge, so a white image doesn't melt into the row.
+            QColor edge = palette.color(QPalette::Text);
+            edge.setAlphaF(kThumbnailEdgeAlpha);
+            painter->setPen(edge);
+            painter->setBrush(Qt::NoBrush);
+            painter->drawRoundedRect(frame, kThumbnailRadius, kThumbnailRadius);
+        }
         content.setRight(static_cast<int>(slot.left()) - kHorizontalPadding);
     }
 

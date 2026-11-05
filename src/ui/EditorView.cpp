@@ -76,11 +76,12 @@ void EditorView::showNote(const QString& text, const QDateTime& modified)
 }
 
 void EditorView::showNoteBody(const QString& body, const QString& plainText,
-                              const QDateTime& modified)
+                              const QDateTime& modified,
+                              const QList<models::Attachment>& attachments)
 {
     m_header->setText(headerText(modified));
     m_header->show();
-    m_textEdit->setNoteBody(body, plainText); // no undo history
+    m_textEdit->setNoteBody(body, plainText, attachments); // no undo history
     m_textEdit->setReadOnly(false);
     m_pages->setCurrentWidget(m_textEdit);
     m_hasNote = true;

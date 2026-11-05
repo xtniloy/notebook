@@ -3,13 +3,17 @@
 #include "app/IClock.h"
 #include "models/SidebarRoles.h"
 #include "services/NoteText.h"
+#include "storage/AttachmentRepository.h"
 #include "storage/DbThread.h"
 #include "storage/FolderRepository.h"
+#include "storage/Transaction.h"
 
 namespace notes::services {
 
+using models::Attachment;
 using models::Note;
 using models::NoteSummary;
+using storage::AttachmentRepository;
 using storage::Database;
 using storage::DbError;
 using storage::DbResult;
@@ -18,6 +22,7 @@ using storage::FolderRepository;
 using storage::NoteContent;
 using storage::NoteRepository;
 using storage::NoteSort;
+using storage::Transaction;
 using Kind = DbError::Kind;
 
 namespace {
@@ -27,7 +32,8 @@ NoteContent contentFor(const QString& body, const QString& bodyText)
     return {.title = NoteText::title(bodyText),
             .snippet = NoteText::snippet(bodyText),
             .body = body,
-            .bodyText = bodyText};
+            .bodyText = bodyText,
+            .thumbnailUuid = {}};
 }
 
 } // namespace
@@ -79,6 +85,7 @@ QFuture<DbResult<Note>> NoteService::duplicate(qint64 id)
     return m_db
         .post([clock, id, titleFormat](Database& db) -> DbResult<Note> {
             NoteRepository notes(db, *clock);
+            AttachmentRepository attachments(db, *clock);
             DbResult<Note> original = notes.get(id);
             if (!original) {
                 return original.error();
@@ -88,13 +95,43 @@ QFuture<DbResult<Note>> NoteService::duplicate(qint64 id)
                 return DbError::make(Kind::InvalidArgument,
                                      QStringLiteral("Only live, unlocked notes can be duplicated"));
             }
+            DbResult<Transaction> tx = Transaction::begin(db);
+            if (!tx) {
+                return tx.error();
+            }
             // Explicit title: the body (and so the derived title) is identical.
-            const NoteContent copy{.title = note.title.isEmpty() ? QString()
-                                                                 : titleFormat.arg(note.title),
-                                   .snippet = note.snippet,
-                                   .body = note.body,
-                                   .bodyText = note.bodyText};
-            return notes.create(note.folderId, copy);
+            NoteContent copy{.title =
+                                 note.title.isEmpty() ? QString() : titleFormat.arg(note.title),
+                             .snippet = note.snippet,
+                             .body = note.body,
+                             .bodyText = note.bodyText,
+                             .thumbnailUuid = {}};
+            DbResult<Note> created = notes.create(note.folderId, copy);
+            if (!created) {
+                return created;
+            }
+            // Its own copies of the images: an attachment belongs to one note,
+            // so deleting an image from one copy keeps it in the other.
+            DbResult<QHash<QString, QString>> renamed =
+                attachments.copyAll(note.id, created.value().id);
+            if (!renamed) {
+                return renamed.error();
+            }
+            if (!renamed.value().isEmpty()) {
+                for (auto it = renamed.value().cbegin(); it != renamed.value().cend(); ++it) {
+                    copy.body.replace(QStringLiteral("attachment://") + it.key(),
+                                      QStringLiteral("attachment://") + it.value());
+                }
+                copy.thumbnailUuid = renamed.value().value(note.thumbnailUuid);
+                created = notes.updateBody(created.value().id, copy);
+                if (!created) {
+                    return created;
+                }
+            }
+            if (const DbStatus status = tx.value().commit(); !status) {
+                return status.error();
+            }
+            return created;
         })
         .then(this, [this](DbResult<Note> result) {
             if (result) {
@@ -110,13 +147,56 @@ QFuture<DbResult<Note>> NoteService::get(qint64 id)
     return m_db.post([clock, id](Database& db) { return NoteRepository(db, *clock).get(id); });
 }
 
+QFuture<DbResult<OpenedNote>> NoteService::open(qint64 id)
+{
+    const app::IClock* clock = &m_clock;
+    return m_db.post([clock, id](Database& db) -> DbResult<OpenedNote> {
+        DbResult<Note> note = NoteRepository(db, *clock).get(id);
+        if (!note) {
+            return note.error();
+        }
+        OpenedNote opened{.note = note.value(), .attachments = {}};
+        if (opened.note.locked) {
+            return opened; // its content stays sealed (Phase 6)
+        }
+        DbResult<QList<Attachment>> attachments = AttachmentRepository(db, *clock).forNote(id);
+        if (!attachments) {
+            return attachments.error();
+        }
+        opened.attachments = attachments.value();
+        return opened;
+    });
+}
+
 QFuture<DbResult<Note>> NoteService::updateBody(qint64 id, const QString& body,
-                                                const QString& bodyText)
+                                                const QString& bodyText,
+                                                const QList<Attachment>& attachments)
 {
     const app::IClock* clock = &m_clock;
     return m_db
-        .post([clock, id, content = contentFor(body, bodyText)](Database& db) {
-            return NoteRepository(db, *clock).updateBody(id, content);
+        .post([clock, id, content = contentFor(body, bodyText),
+               attachments](Database& db) mutable -> DbResult<Note> {
+            DbResult<Transaction> tx = Transaction::begin(db);
+            if (!tx) {
+                return tx.error();
+            }
+            // Attachments first, for the thumbnail; a body that can't be saved
+            // (locked, trashed) rolls them back too.
+            DbResult<QString> thumbnail =
+                AttachmentRepository(db, *clock)
+                    .keepOnly(id, NoteText::attachmentUuids(content.body), attachments);
+            if (!thumbnail) {
+                return thumbnail.error();
+            }
+            content.thumbnailUuid = thumbnail.value();
+            DbResult<Note> saved = NoteRepository(db, *clock).updateBody(id, content);
+            if (!saved) {
+                return saved;
+            }
+            if (const DbStatus status = tx.value().commit(); !status) {
+                return status.error();
+            }
+            return saved;
         })
         .then(this, [this](DbResult<Note> result) {
             if (result) {

@@ -621,12 +621,12 @@ _Notes:_ a checklist is a list with our `kChecklistProperty` (stored as list sty
 
 ### 3.7 Images `L` → broken down
 
-- [ ] **(M)** Insert by paste, drag & drop, and file picker
-- [ ] **(M)** Store image bytes in the `attachments` table; reference in the document as `attachment://<uuid>`; resolve with a `loadResource` override
-- [ ] **(S)** Scale images to fit editor width; keep aspect ratio
-- [ ] **(S)** Generate a thumbnail once at insert time, store in `attachments.thumbnail` (Plan §10)
-- [ ] **(S)** Limits: max file size (e.g. 25 MB), `QImageReader::setAllocationLimit` against decompression bombs
-- [ ] **(S)** Orphan cleanup: attachments no longer referenced by the note body are deleted on save
+- [x] **(M)** Insert by paste, drag & drop, and file picker
+- [x] **(M)** Store image bytes in the `attachments` table; reference in the document as `attachment://<uuid>`; resolve with a `loadResource` override
+- [x] **(S)** Scale images to fit editor width; keep aspect ratio
+- [x] **(S)** Generate a thumbnail once at insert time, store in `attachments.thumbnail` (Plan §10)
+- [x] **(S)** Limits: max file size (e.g. 25 MB), `QImageReader::setAllocationLimit` against decompression bombs
+- [x] **(S)** Orphan cleanup: attachments no longer referenced by the note body are deleted on save
 
 **Tests**
 - `TC-EDT-020` (UI) Paste a PNG from the clipboard → one `attachments` row; editor shows the image.

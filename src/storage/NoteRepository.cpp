@@ -15,14 +15,16 @@ using Kind = DbError::Kind;
 
 namespace {
 
-constexpr QLatin1StringView
-    kNoteColumns("id, uuid, folder_id, title, snippet, body, body_text, is_pinned, is_locked,"
-                 " created_at, updated_at, trashed_at, deleted_at, version, sync_state");
+constexpr QLatin1StringView kNoteColumns(
+    "id, uuid, folder_id, title, snippet, body, body_text, is_pinned, is_locked,"
+    " created_at, updated_at, trashed_at, deleted_at, version, sync_state,"
+    " thumbnail_uuid, (SELECT thumbnail FROM attachments WHERE uuid = thumbnail_uuid)");
 
 // What lists read: no body / body_text (TC-STO-014).
 constexpr QLatin1StringView kSummaryColumns(
     "id, uuid, folder_id, title, snippet, is_pinned, is_locked, created_at, updated_at,"
-    " trashed_at");
+    " trashed_at, thumbnail_uuid,"
+    " (SELECT thumbnail FROM attachments WHERE uuid = thumbnail_uuid)");
 
 // What every change does to a row.
 constexpr QLatin1StringView kBump("version = version + 1, sync_state = 0");
@@ -47,6 +49,8 @@ Note readNote(const Statement& row)
     note.deletedAt = row.column<std::optional<qint64>>(12);
     note.version = row.column<int>(13);
     note.syncState = row.column<models::SyncState>(14);
+    note.thumbnailUuid = row.column<QString>(15);
+    note.thumbnail = row.column<QByteArray>(16);
     return note;
 }
 
@@ -63,6 +67,8 @@ NoteSummary readSummary(const Statement& row)
     note.createdAt = row.column<qint64>(7);
     note.updatedAt = row.column<qint64>(8);
     note.trashedAt = row.column<std::optional<qint64>>(9);
+    note.thumbnailUuid = row.column<QString>(10);
+    note.thumbnail = row.column<QByteArray>(11);
     return note;
 }
 
@@ -78,6 +84,15 @@ QLatin1StringView orderFor(NoteSort sort)
         return QLatin1StringView("is_pinned DESC, title COLLATE LOCALE, id");
     }
     return QLatin1StringView("is_pinned DESC, updated_at DESC, id DESC");
+}
+
+// NULL for no thumbnail.
+std::optional<QString> thumbnailOf(const NoteContent& content)
+{
+    if (content.thumbnailUuid.isEmpty()) {
+        return std::nullopt;
+    }
+    return content.thumbnailUuid;
 }
 
 DbError notFound(qint64 id)
@@ -154,8 +169,9 @@ DbResult<Note> NoteRepository::create(qint64 folderId, const NoteContent& conten
     }
     const qint64 now = m_clock.nowMs();
     DbResult<ScopedStatement> insert = m_db.prepare(QStringLiteral(
-        "INSERT INTO notes (uuid, folder_id, title, snippet, body, body_text, created_at,"
-        " updated_at) VALUES (:uuid, :folder, :title, :snippet, :body, :text, :now, :now)"));
+        "INSERT INTO notes (uuid, folder_id, title, snippet, body, body_text, thumbnail_uuid,"
+        " created_at, updated_at) VALUES (:uuid, :folder, :title, :snippet, :body, :text, :thumb,"
+        " :now, :now)"));
     if (!insert) {
         return insert.error();
     }
@@ -166,6 +182,7 @@ DbResult<Note> NoteRepository::create(qint64 folderId, const NoteContent& conten
                                     .bind(":snippet", content.snippet)
                                     .bind(":body", content.body)
                                     .bind(":text", content.bodyText)
+                                    .bind(":thumb", thumbnailOf(content))
                                     .bind(":now", now)
                                     .run();
         !status) {
@@ -186,7 +203,7 @@ DbResult<Note> NoteRepository::updateBody(qint64 id, const NoteContent& content)
     }
     DbResult<ScopedStatement> update = m_db.prepare(
         QStringLiteral("UPDATE notes SET title = :title, snippet = :snippet, body = :body,"
-                       " body_text = :text, updated_at = :now, %1"
+                       " body_text = :text, thumbnail_uuid = :thumb, updated_at = :now, %1"
                        " WHERE id = :id")
             .arg(kBump));
     if (!update) {
@@ -197,6 +214,7 @@ DbResult<Note> NoteRepository::updateBody(qint64 id, const NoteContent& content)
                                     .bind(":snippet", content.snippet)
                                     .bind(":body", content.body)
                                     .bind(":text", content.bodyText)
+                                    .bind(":thumb", thumbnailOf(content))
                                     .bind(":now", m_clock.nowMs())
                                     .bind(":id", id)
                                     .run();
@@ -321,6 +339,7 @@ DbStatus NoteRepository::purge(qint64 id)
         DbResult<ScopedStatement> wipe = m_db.prepare(
             QStringLiteral(
                 "UPDATE notes SET title = '', snippet = NULL, body = NULL, body_text = NULL,"
+                " thumbnail_uuid = NULL,"
                 " locked_blob = NULL, locked_nonce = NULL, wrapped_key = NULL, is_pinned = 0,"
                 " deleted_at = ?, %1 WHERE id = ?")
                 .arg(kBump));

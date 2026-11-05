@@ -1,29 +1,90 @@
 #include "ui/NoteTextEdit.h"
 
+#include "editor/ImageObject.h"
 #include "editor/NoteFormat.h"
+#include "models/Uuid.h"
 
 #include <QAbstractTextDocumentLayout>
+#include <QDataStream>
 #include <QEvent>
 #include <QFontMetricsF>
+#include <QIODevice>
+#include <QImage>
 #include <QKeyEvent>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QScrollBar>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTextDocumentFragment>
+#include <QTextFragment>
 #include <QTextFrame>
 #include <QTextLayout>
 #include <QTextList>
+#include <QUrl>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <memory>
 
 namespace notes::ui {
 
+namespace {
+
+constexpr QLatin1StringView kAttachmentScheme("attachment://");
+// Version of kFragmentMime's layout, first in the data.
+constexpr qint32 kFragmentVersion = 1;
+// Sanity limit for a fragment's image count: far beyond a real selection.
+constexpr qint32 kMaxFragmentImages = 10'000;
+
+// The uuid in an image name `attachment://<uuid>`; empty for other names.
+QString uuidOf(const QString& imageName)
+{
+    if (!imageName.startsWith(kAttachmentScheme)) {
+        return {};
+    }
+    return imageName.sliced(kAttachmentScheme.size());
+}
+
+// `format` without what makes it an image, for text next to one.
+QTextCharFormat textFormat(QTextCharFormat format)
+{
+    for (const int property :
+         {QTextFormat::ObjectType, QTextFormat::ImageName, QTextFormat::ImageWidth,
+          QTextFormat::ImageHeight, QTextFormat::ImageQuality, QTextFormat::ImageAltText,
+          QTextFormat::ImageTitle}) {
+        format.clearProperty(property);
+    }
+    return format;
+}
+
+QString imageNameFor(const QString& uuid)
+{
+    return kAttachmentScheme + uuid;
+}
+
+// Calls `visit(fragment)` for each image in `document`, in document order
+// (table cells included: they are blocks too).
+template <typename Visit>
+void forEachImage(const QTextDocument& document, Visit visit)
+{
+    for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
+        for (auto it = block.begin(); !it.atEnd(); ++it) {
+            if (it.fragment().charFormat().isImageFormat()) {
+                visit(it.fragment());
+            }
+        }
+    }
+}
+
+} // namespace
+
 NoteTextEdit::NoteTextEdit(QWidget* parent)
     : QTextEdit(parent)
+    , m_imageObject(new editor::ImageObject(this))
 {
     // Pasted HTML would bring formatting the plain editor can't show or save
     // yet; rich text support comes with the Phase 3 document model.
@@ -32,6 +93,8 @@ NoteTextEdit::NoteTextEdit(QWidget* parent)
     setTabChangesFocus(false);
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     connect(document(), &QTextDocument::contentsChanged, this, &NoteTextEdit::scheduleCheckedText);
+    // Images fit the text width (task 3.7).
+    m_imageObject->registerOn(*document());
 }
 
 NoteTextEdit::~NoteTextEdit() = default;
@@ -49,9 +112,14 @@ int NoteTextEdit::rightInset() const
     return m_rightPadding + verticalScrollBar()->sizeHint().width();
 }
 
-void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText)
+void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText,
+                               const QList<models::Attachment>& attachments)
 {
     m_pressedCheckbox = QTextBlock(); // a click doesn't carry over to another note
+    m_attachments.clear();
+    for (const models::Attachment& attachment : attachments) {
+        m_attachments.insert(attachment.uuid, attachment);
+    }
     // No cursors of ours in the document while it's cleared and refilled.
     setExtraSelections({});
     editor::NoteFormat::load(body, plainText, *document());
@@ -76,6 +144,101 @@ void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText)
 QString NoteTextEdit::noteBody() const
 {
     return editor::NoteFormat::serialize(*document());
+}
+
+QString NoteTextEdit::notePlainText() const
+{
+    return toPlainText().remove(QChar::ObjectReplacementCharacter);
+}
+
+QList<models::Attachment> NoteTextEdit::attachments() const
+{
+    QList<models::Attachment> result;
+    QStringList seen;
+    forEachImage(*document(), [&](const QTextFragment& fragment) {
+        const QString uuid = uuidOf(fragment.charFormat().toImageFormat().name());
+        if (uuid.isEmpty() || seen.contains(uuid)) {
+            return;
+        }
+        seen.append(uuid);
+        models::Attachment attachment = m_attachments.value(uuid);
+        attachment.uuid = uuid;
+        result.append(attachment);
+    });
+    return result;
+}
+
+void NoteTextEdit::insertImageFiles(const QStringList& paths)
+{
+    if (isReadOnly()) {
+        return;
+    }
+    QList<editor::ImageImport::Result> results;
+    for (const QString& path : paths) {
+        results.append(editor::ImageImport::fromFile(path));
+    }
+    insertImported(results);
+}
+
+QVariant NoteTextEdit::loadResource(int type, const QUrl& name)
+{
+    // Always an answer, never an invalid QVariant: given none, QTextDocument
+    // reads the name as a local file itself.
+    if (type != QTextDocument::ImageResource) {
+        return QByteArray();
+    }
+    const auto found = m_attachments.constFind(uuidOf(name.toString()));
+    if (found == m_attachments.cend()) {
+        return QImage(); // drawn as a missing image
+    }
+    return editor::ImageImport::decode(found->data); // null if unreadable: missing too
+}
+
+bool NoteTextEdit::canInsertFromMimeData(const QMimeData* source) const
+{
+    return source->hasFormat(QLatin1StringView(kFragmentMime)) || source->hasImage() ||
+           QTextEdit::canInsertFromMimeData(source);
+}
+
+QMimeData* NoteTextEdit::createMimeDataFromSelection() const
+{
+    const QTextDocumentFragment selection = textCursor().selection();
+    QTextDocument copy;
+    QTextCursor(&copy).insertFragment(selection);
+    QStringList uuids;
+    forEachImage(copy, [&](const QTextFragment& fragment) {
+        const QString uuid = uuidOf(fragment.charFormat().toImageFormat().name());
+        if (m_attachments.contains(uuid) && !uuids.contains(uuid)) {
+            uuids.append(uuid);
+        }
+    });
+    if (uuids.isEmpty()) {
+        return QTextEdit::createMimeDataFromSelection(); // text only: as before
+    }
+    // A plain copy of Qt's: its own lists only the formats it makes.
+    auto* mime = new QMimeData;
+    {
+        const std::unique_ptr<QMimeData> text(QTextEdit::createMimeDataFromSelection());
+        for (const QString& format : text->formats()) {
+            mime->setData(format, text->data(format));
+        }
+    }
+    QByteArray encoded;
+    QDataStream out(&encoded, QIODevice::WriteOnly);
+    out << kFragmentVersion << editor::NoteFormat::serialize(copy)
+        << static_cast<qint32>(uuids.size());
+    for (const QString& uuid : std::as_const(uuids)) {
+        const models::Attachment attachment = m_attachments.value(uuid);
+        out << attachment.uuid << attachment.fileName << attachment.mimeType << attachment.data
+            << attachment.thumbnail;
+    }
+    mime->setData(QLatin1StringView(kFragmentMime), encoded);
+    // An image alone also goes as an image, for other apps. (One character,
+    // plus the paragraph end every document has.)
+    if (copy.characterCount() == 2) {
+        mime->setImageData(editor::ImageImport::decode(m_attachments.value(uuids.first()).data));
+    }
+    return mime;
 }
 
 editor::ParagraphStyle NoteTextEdit::paragraphStyle() const
@@ -168,8 +331,19 @@ void NoteTextEdit::insertFromMimeData(const QMimeData* source)
     const int start = textCursor().selectionStart();
     const QTextBlockFormat startFormat = document()->findBlock(start).blockFormat();
     const int revision = document()->revision();
-    QTextEdit::insertFromMimeData(source);
-    if (isReadOnly() || document()->revision() == revision) {
+    if (isReadOnly()) {
+        return;
+    }
+    if (!insertImages(source)) {
+        // Right after an image, the cursor's format is the image's: pasted
+        // text would become one image per character.
+        if (QTextCursor cursor = textCursor(); cursor.charFormat().isImageFormat()) {
+            cursor.setCharFormat(textFormat(cursor.charFormat()));
+            setTextCursor(cursor);
+        }
+        QTextEdit::insertFromMimeData(source);
+    }
+    if (document()->revision() == revision) {
         return;
     }
     // Pasted or dropped plain text takes the paragraph format of its own
@@ -184,6 +358,115 @@ void NoteTextEdit::insertFromMimeData(const QMimeData* source)
     QTextCursor(document()->findBlock(start)).setBlockFormat(startFormat);
     editor::StyleManager::fitText(cursor);
     cursor.endEditBlock();
+}
+
+bool NoteTextEdit::insertImages(const QMimeData* source)
+{
+    if (source->hasFormat(QLatin1StringView(kFragmentMime))) {
+        return insertFragment(source->data(QLatin1StringView(kFragmentMime)));
+    }
+    if (source->hasUrls()) {
+        QList<editor::ImageImport::Result> results;
+        for (const QUrl& url : source->urls()) {
+            // Local image files only: nothing is fetched from the network.
+            if (url.isLocalFile() && editor::ImageImport::isImageFile(url.toLocalFile())) {
+                results.append(editor::ImageImport::fromFile(url.toLocalFile()));
+            }
+        }
+        if (results.isEmpty()) {
+            return false; // not images: the links paste as text
+        }
+        insertImported(results);
+        return true;
+    }
+    // An image alone (a screenshot, "Copy Image" in a browser). With text
+    // too, the text wins: word processors add a picture of the copied text.
+    if (source->hasImage() && (!source->hasText() || source->text().trimmed().isEmpty())) {
+        insertImported(
+            {editor::ImageImport::fromImage(qvariant_cast<QImage>(source->imageData()))});
+        return true;
+    }
+    return false;
+}
+
+void NoteTextEdit::insertImported(const QList<editor::ImageImport::Result>& results)
+{
+    QTextCursor cursor = textCursor();
+    cursor.beginEditBlock();
+    QString error;
+    for (const editor::ImageImport::Result& result : results) {
+        if (!result.ok()) {
+            if (error.isEmpty()) {
+                error = result.error;
+            }
+            continue;
+        }
+        m_attachments.insert(result.attachment.uuid, result.attachment);
+        QTextImageFormat image;
+        image.setName(imageNameFor(result.attachment.uuid));
+        cursor.insertImage(image);
+    }
+    cursor.endEditBlock();
+    setTextCursor(cursor);
+    if (!error.isEmpty()) {
+        emit imageRejected(error);
+    }
+}
+
+bool NoteTextEdit::insertFragment(const QByteArray& encoded)
+{
+    QDataStream in(encoded);
+    qint32 version = 0;
+    QString body;
+    qint32 count = 0;
+    in >> version >> body >> count;
+    if (in.status() != QDataStream::Ok || version != kFragmentVersion || count < 0 ||
+        count > kMaxFragmentImages) {
+        return false;
+    }
+    QHash<QString, models::Attachment> copies; // old uuid -> copy under a new one
+    for (qint32 i = 0; i < count; ++i) {
+        models::Attachment attachment;
+        in >> attachment.uuid >> attachment.fileName >> attachment.mimeType >> attachment.data >>
+            attachment.thumbnail;
+        if (in.status() != QDataStream::Ok) {
+            return false;
+        }
+        const QString original = attachment.uuid;
+        attachment.uuid = models::newUuid();
+        attachment.sizeBytes = attachment.data.size();
+        copies.insert(original, attachment);
+    }
+    QTextDocument pasted;
+    if (editor::NoteFormat::deserialize(body, pasted)) {
+        return false; // unreadable
+    }
+    // Each image becomes its own copy: an attachment belongs to one note,
+    // and deleting the original mustn't take the copy with it.
+    QList<std::pair<int, QTextImageFormat>> renamed;
+    forEachImage(pasted, [&](const QTextFragment& fragment) {
+        QTextImageFormat image = fragment.charFormat().toImageFormat();
+        const auto copy = copies.constFind(uuidOf(image.name()));
+        if (copy != copies.cend()) {
+            image.setName(imageNameFor(copy->uuid));
+            for (int at = fragment.position(); at < fragment.position() + fragment.length(); ++at) {
+                renamed.append({at, image});
+            }
+        }
+    });
+    for (const auto& [position, image] : std::as_const(renamed)) {
+        QTextCursor at(&pasted);
+        at.setPosition(position);
+        at.setPosition(position + 1, QTextCursor::KeepAnchor);
+        at.setCharFormat(image);
+    }
+    for (const models::Attachment& attachment : std::as_const(copies)) {
+        m_attachments.insert(attachment.uuid, attachment);
+    }
+    QTextCursor cursor = textCursor();
+    cursor.insertFragment(QTextDocumentFragment(&pasted));
+    setTextCursor(cursor);
+    return true;
 }
 
 void NoteTextEdit::keyPressEvent(QKeyEvent* event)

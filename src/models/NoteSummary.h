@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QString>
 
 #include <optional>
@@ -16,6 +17,10 @@ struct NoteSummary
     qint64 folderId = 0;
     QString title;
     QString snippet; // empty for locked notes
+    // Its first image's thumbnail and that attachment's uuid (task 3.7); empty
+    // when the note has no image.
+    QString thumbnailUuid;
+    QByteArray thumbnail;
     bool pinned = false;
     bool locked = false;
     qint64 createdAt = 0;

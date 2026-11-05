@@ -31,5 +31,11 @@ inline constexpr int kHasThumbnailRole = Qt::UserRole + 8;
 inline constexpr int kSectionRole = Qt::UserRole + 9;
 // qint64, notes only: the folder the note is in (or was in, when trashed).
 inline constexpr int kNoteFolderIdRole = Qt::UserRole + 10;
+// QByteArray: the encoded thumbnail of the note's first image (PNG or JPEG),
+// empty without one or when locked; kHasThumbnailRole says whether there is one.
+inline constexpr int kThumbnailRole = Qt::UserRole + 11;
+// QString: what identifies that thumbnail (its attachment's uuid; a thumbnail
+// never changes), so views can cache the decoded image.
+inline constexpr int kThumbnailKeyRole = Qt::UserRole + 12;
 
 } // namespace notes::models

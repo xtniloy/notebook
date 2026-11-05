@@ -38,7 +38,8 @@ NoteContent content(const QString& title, const QString& body = {})
     return {.title = title,
             .snippet = title + QStringLiteral(" snippet"),
             .body = QStringLiteral("<p>%1</p>").arg(body.isEmpty() ? title : body),
-            .bodyText = body.isEmpty() ? title : body};
+            .bodyText = body.isEmpty() ? title : body,
+            .thumbnailUuid = {}};
 }
 
 QStringList titles(const DbResult<QList<NoteSummary>>& notes)
@@ -145,7 +146,8 @@ void tst_NoteRepository::createThenGetIsIdentical()
                                    QString::fromLatin1(notes::test::kSecretMarker) +
                                    QStringLiteral("</p>"),
                            .bodyText = QStringLiteral("Shopping List\nMilk, eggs 🥚 ") +
-                                       QString::fromLatin1(notes::test::kSecretMarker)};
+                                       QString::fromLatin1(notes::test::kSecretMarker),
+                           .thumbnailUuid = {}};
     const DbResult<Note> created = m_notes->create(m_work, body);
     QVERIFY2(created, qPrintable(created.error().message));
     const DbResult<Note> loaded = m_notes->get(created.value().id);
@@ -289,7 +291,8 @@ void tst_NoteRepository::oneMegabyteBodyRoundTrips()
     const NoteContent big{.title = QStringLiteral("Big"),
                           .snippet = QString(),
                           .body = QStringLiteral("<pre>") + text + QStringLiteral("</pre>"),
-                          .bodyText = text};
+                          .bodyText = text,
+                          .thumbnailUuid = {}};
 
     const DbResult<Note> created = m_notes->create(m_work, big);
     QVERIFY(created);

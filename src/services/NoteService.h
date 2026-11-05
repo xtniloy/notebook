@@ -1,5 +1,6 @@
 #pragma once
 
+#include "models/Attachment.h"
 #include "models/Note.h"
 #include "models/NoteSummary.h"
 #include "storage/DbResult.h"
@@ -19,6 +20,13 @@ class DbThread;
 }
 
 namespace notes::services {
+
+// A note with the attachments its body shows (NoteService::open()).
+struct OpenedNote
+{
+    models::Note note;
+    QList<models::Attachment> attachments; // empty for locked notes
+};
 
 // Notes for the UI (task 2.7, ADR 0003). Each call runs NoteRepository on the
 // DB thread and returns at once with a QFuture; continue with
@@ -49,12 +57,20 @@ public:
     QFuture<storage::DbResult<models::Note>> create(qint64 folderId, const QString& body,
                                                     const QString& bodyText);
     // A new note in the same folder with the same body, titled "<title> copy"
-    // (TC-UI-023); noteCreated(). Not for trashed or locked notes.
+    // (TC-UI-023); noteCreated(). Its images are copies with their own uuids.
+    // Not for trashed or locked notes.
     QFuture<storage::DbResult<models::Note>> duplicate(qint64 id);
     [[nodiscard]] QFuture<storage::DbResult<models::Note>> get(qint64 id);
+    // The note with its attachments' data, for the editor (task 3.7).
+    [[nodiscard]] QFuture<storage::DbResult<OpenedNote>> open(qint64 id);
     // Saves the editor's content; the title and snippet follow from the text.
-    QFuture<storage::DbResult<models::Note>> updateBody(qint64 id, const QString& body,
-                                                        const QString& bodyText);
+    // The images in `body` are the note's attachments from now on, in one
+    // transaction with the body: new ones are stored from `attachments` (the
+    // editor's copies), ones no longer in the body are deleted, and the first
+    // one becomes the note list's thumbnail.
+    QFuture<storage::DbResult<models::Note>>
+    updateBody(qint64 id, const QString& body, const QString& bodyText,
+               const QList<models::Attachment>& attachments = {});
     QFuture<storage::DbStatus> setPinned(qint64 id, bool pinned);
     QFuture<storage::DbStatus> moveToFolder(qint64 id, qint64 folderId);
     // NoteRepository::liveIdsForUuids(), for drops.

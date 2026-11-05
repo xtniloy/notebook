@@ -98,11 +98,11 @@ The window draws its own frame (rounded corners, soft shadow) with no system tit
 
 **Sidebar:** "On My Computer" holds **All Notes**, the default **Notes** folder and user folders (nested, expandable), each with a note count; **Recently Deleted** sits below it. **New Folder** is at the bottom. See §3.3.
 
-**Note list:** notes under section headers (**Pinned**, Today, Yesterday, Previous 7 Days, Previous 30 Days, months, years), indented past the headers. Each row: bold title, then time and preview; a pin marks pinned notes. In Recently Deleted the time is replaced by "N days remaining". See §3.4.
+**Note list:** notes under section headers (**Pinned**, Today, Yesterday, Previous 7 Days, Previous 30 Days, months, years), indented past the headers. Each row: bold title, then time and preview; a pin marks pinned notes, and a note with an image shows its first image's thumbnail on the right. In Recently Deleted the time is replaced by "N days remaining". See §3.4.
 
 **Editor:** the date and time centered in gray above the text; the first line is the note's title. "No note selected" when the list is empty. See §3.5.
 
-*Planned, not yet in the window:* the account name once Google sync is on (Phase 9), **Tags** and **Smart Folders** in the sidebar (Phases 7–8), thumbnails in note rows and the gallery view (Phases 3 and 8), and the rich-text tools in the toolbar's middle group (Phase 3).
+*Planned, not yet in the window:* the account name once Google sync is on (Phase 9), **Tags** and **Smart Folders** in the sidebar (Phases 7–8), the gallery view (Phase 8), and the rich-text tools in the toolbar's middle group (Phase 3).
 
 ### 3.2 Toolbar (left to right)
 
@@ -318,6 +318,7 @@ CREATE TABLE notes (
     snippet       TEXT,                   -- preview line (NULL if locked)
     body          TEXT,                   -- note format JSON (NULL if locked)
     body_text     TEXT,                   -- for FTS (NULL if locked)
+    thumbnail_uuid TEXT,                  -- attachment whose thumbnail the list shows
     is_pinned     INTEGER DEFAULT 0,
     is_locked     INTEGER DEFAULT 0,
     locked_blob   BLOB,                   -- encrypted body when locked

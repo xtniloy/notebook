@@ -1,6 +1,7 @@
 #include "services/NoteText.h"
 
 #include <QList>
+#include <QRegularExpression>
 
 namespace notes::services {
 
@@ -62,6 +63,20 @@ QString NoteText::snippet(QStringView plainText)
         result += all.at(i);
     }
     return truncated(result, kMaxSnippetLength);
+}
+
+QStringList NoteText::attachmentUuids(const QString& body)
+{
+    static const QRegularExpression kImage(
+        QStringLiteral(R"re("image"\s*:\s*"attachment://([0-9A-Fa-f-]{36})")re"));
+    QStringList uuids;
+    for (const QRegularExpressionMatch& match : kImage.globalMatch(body)) {
+        const QString uuid = match.captured(1);
+        if (!uuids.contains(uuid)) {
+            uuids.append(uuid);
+        }
+    }
+    return uuids;
 }
 
 } // namespace notes::services

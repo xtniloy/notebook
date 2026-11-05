@@ -35,6 +35,10 @@ NoteSummary summaryOf(const Note& note)
     summary.createdAt = note.createdAt;
     summary.updatedAt = note.updatedAt;
     summary.trashedAt = note.trashedAt;
+    if (!note.locked) {
+        summary.thumbnailUuid = note.thumbnailUuid;
+        summary.thumbnail = note.thumbnail;
+    }
     return summary;
 }
 
@@ -366,7 +370,11 @@ QVariant NoteListModel::data(const QModelIndex& index, int role) const
     case kLockedRole:
         return note.locked;
     case kHasThumbnailRole:
-        return false; // attachments arrive in Phase 3
+        return !note.locked && !note.thumbnail.isEmpty();
+    case kThumbnailRole:
+        return note.locked ? QByteArray() : note.thumbnail;
+    case kThumbnailKeyRole:
+        return note.locked ? QString() : note.thumbnailUuid;
     case kSectionRole:
         return row.section;
     case kNoteFolderIdRole:

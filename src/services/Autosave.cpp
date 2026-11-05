@@ -66,7 +66,7 @@ void Autosave::flush()
         return; // e.g. typed, then undid it
     }
     m_savedHash = std::move(hash);
-    m_notes.updateBody(m_noteId, content.body, content.text)
+    m_notes.updateBody(m_noteId, content.body, content.text, content.attachments)
         .then(this, [](const storage::DbResult<models::Note>& result) {
             if (!result) {
                 // Category and code only: never note content.

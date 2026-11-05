@@ -29,6 +29,9 @@ struct NoteContent
     QString snippet;
     QString body; // the note format's JSON (models/Note.h)
     QString bodyText;
+    // The attachment whose thumbnail the note list shows: the body's first
+    // image (task 3.7). Empty for none.
+    QString thumbnailUuid;
 };
 
 enum class NoteSort : std::uint8_t {

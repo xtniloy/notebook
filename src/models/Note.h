@@ -2,6 +2,7 @@
 
 #include "models/SyncState.h"
 
+#include <QByteArray>
 #include <QString>
 
 #include <optional>
@@ -27,6 +28,10 @@ struct Note
     // notes from before the format, which show `bodyText`.
     QString body;
     QString bodyText; // plain text for search; empty for locked notes
+    // The note list's thumbnail: its first image's (task 3.7), with that
+    // attachment's uuid. Empty when the note has no image.
+    QString thumbnailUuid;
+    QByteArray thumbnail;
     bool pinned = false;
     bool locked = false;
     qint64 createdAt = 0;

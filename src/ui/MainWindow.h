@@ -5,8 +5,11 @@
 #include <QMainWindow>
 #include <QSize>
 #include <QString>
+#include <QStringList>
 
+#include <functional>
 #include <optional>
+#include <utility>
 
 class QAction;
 class QSplitter;
@@ -64,6 +67,11 @@ public:
     [[nodiscard]] ActionRegistry& actions() const { return *m_actions; }
     [[nodiscard]] ThemeManager& themes() const { return *m_themes; }
 
+    // Asks for image files to add to the note (the Attach action); returns
+    // their paths, none if cancelled. A file dialog unless replaced (tests).
+    using ImagePicker = std::function<QStringList(QWidget* parent)>;
+    void setImagePicker(ImagePicker picker) { m_imagePicker = std::move(picker); }
+
 protected:
     void closeEvent(QCloseEvent* event) override;
     void showEvent(QShowEvent* event) override;
@@ -96,6 +104,9 @@ private:
     [[nodiscard]] std::optional<QString> askFolderName(const QString& title, const QString& initial,
                                                        const QString& acceptText);
     void showError(const QString& text, const QString& details);
+    // Task 3.7: images from the picker into the note at the cursor.
+    void addImages();
+    void showImageRejected(const QString& message);
     // Selects m_pendingNote / m_pendingFolder once their rows have arrived.
     void selectPendingNote();
     void selectPendingFolder();
@@ -146,6 +157,7 @@ private:
     // Applied on first show, when the splitter knows its real width.
     int m_initialNoteListWidth = kNoteListDefaultWidth;
     bool m_shown = false;
+    ImagePicker m_imagePicker;
 };
 
 } // namespace notes::ui

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "models/Attachment.h"
+
+#include <QList>
 #include <QLocale>
 #include <QWidget>
 
@@ -24,9 +27,10 @@ public:
     ~EditorView() override;
 
     void showNote(const QString& text, const QDateTime& modified);
-    // A stored note body (editor::NoteFormat); `plainText` shows when it is
-    // empty or unreadable.
-    void showNoteBody(const QString& body, const QString& plainText, const QDateTime& modified);
+    // A stored note body (editor::NoteFormat) with the attachments its images
+    // show; `plainText` shows when it is empty or unreadable.
+    void showNoteBody(const QString& body, const QString& plainText, const QDateTime& modified,
+                      const QList<models::Attachment>& attachments = {});
     // The date stays visible; the content never reaches the editor.
     void showLockedNote(const QDateTime& modified);
     // Empty state: "No note selected", read-only editor.
