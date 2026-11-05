@@ -86,6 +86,8 @@ add_library(notesapp_ui STATIC
     editor/ImageImport.h
     editor/ImageObject.cpp
     editor/ImageObject.h
+    editor/Links.cpp
+    editor/Links.h
     editor/NoteFormat.cpp
     editor/NoteFormat.h
     editor/PasteCleaner.cpp

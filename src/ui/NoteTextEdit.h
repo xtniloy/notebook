@@ -11,6 +11,7 @@
 #include <QTextEdit>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 class QAction;
@@ -24,7 +25,7 @@ namespace notes::ui {
 
 // The note body editor (Plan §3.5): paragraph styles (task 3.2), inline
 // formats (3.4), lists (3.5), checklists (3.6), images (3.7) and safe paste
-// (3.8); tables arrive later.
+// (3.8) and links (3.9); tables arrive later.
 //
 // Images are attachments (models::Attachment) the document shows as
 // `attachment://<uuid>` images. The editor holds the note's attachments with
@@ -115,6 +116,18 @@ public:
     // when `block` isn't a checklist item or isn't laid out.
     [[nodiscard]] QRectF checkboxRect(const QTextBlock& block) const;
 
+    // Links (task 3.9). A web or e-mail address typed and followed by a
+    // space, Enter or Tab becomes a link (Ctrl+Z gives the plain text back).
+    // Links are drawn in the theme's link color, underlined (drawn so, not
+    // stored), and Ctrl+Click opens them, only http, https and mailto ones
+    // (editor::Links::isAllowed()); nothing else is ever opened.
+    // How a link is opened: QDesktopServices::openUrl() unless replaced
+    // (tests). Only ever called with an allowed link.
+    using LinkOpener = std::function<bool(const QUrl& url)>;
+    void setLinkOpener(LinkOpener opener) { m_linkOpener = std::move(opener); }
+    // Opens `href` if it's allowed; false (and nothing opened) if it isn't.
+    bool openLink(const QString& href);
+
 signals:
     // An image wasn't added (too large, unreadable); `message` is for the user.
     void imageRejected(const QString& message);
@@ -133,6 +146,8 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
+    // The link's address and how to open it, as a tooltip.
+    bool viewportEvent(QEvent* event) override;
 
 private:
     enum class PasteMode : std::uint8_t {
@@ -160,6 +175,22 @@ private:
     // Enter in a heading: at its end a Body paragraph follows, as in macOS
     // Notes; elsewhere it splits into two headings. True if handled.
     bool headingKey(const QKeyEvent* event);
+    // A key as the editor handles it without links.
+    void typeKey(QKeyEvent* event);
+    // An address typed before the cursor, made a link once the key that
+    // ends it (Space, Enter, Tab) is typed.
+    struct PendingLink
+    {
+        int position = 0;
+        QString text;
+        QString href;
+    };
+    [[nodiscard]] std::optional<PendingLink> linkBeforeKey(const QKeyEvent* event) const;
+    // Makes the pending link one: its own undo step.
+    void applyLink(const PendingLink& link);
+    // Whether a click at `position` (viewport coordinates) with `modifiers`
+    // opens a link: Ctrl held, over an allowed one.
+    [[nodiscard]] QString linkToOpenAt(QPointF position, Qt::KeyboardModifiers modifiers) const;
     // Lists (task 3.5): Tab / Shift+Tab nest and un-nest items, Enter on an
     // empty item goes up a level (or out of the list), Backspace at the start
     // of an item removes its marker. True if handled.
@@ -173,15 +204,16 @@ private:
     // coordinates), if any.
     [[nodiscard]] QTextBlock checkboxAt(QPointF position) const;
     void paintCheckbox(QPainter& painter, const QRectF& box, bool checked) const;
-    // Checked items' text is grayed: drawn so, not stored (extra selections).
-    void updateCheckedText();
-    // Updates the gray text after the current change, from the event loop.
+    // Checked items' text is grayed and links take the link color, drawn so,
+    // not stored (extra selections).
+    void updateTextDecorations();
+    // Updates them after the current change, from the event loop.
     // Never from inside the document's signals: QTextDocument::clear() emits
     // contentsChanged() while it holds its cursor list aside, and replacing
     // the extra selections there freed cursors it then put back (heap
     // corruption, the app aborted when switching from a note with checked
     // items).
-    void scheduleCheckedText();
+    void scheduleTextDecorations();
 
     void updateViewportMargins();
     void applyBottomPadding();
@@ -196,11 +228,14 @@ private:
     int m_rightPadding = 0;
     int m_bottomPadding = 0;
     bool m_moveCheckedToBottom = false;
-    bool m_overCheckbox = false; // the pointer shows a hand there
-    bool m_checkedTextPending = false;
+    bool m_overClickable = false; // the pointer shows a hand there
+    bool m_decorationsPending = false;
     // The checkbox a left button press went to: the click is ours from press
     // to release (Qt sees none of it), and toggles if released on it too.
     QTextBlock m_pressedCheckbox;
+    // Likewise the link a Ctrl+Click went to: opened if released on it.
+    QString m_pressedLink;
+    LinkOpener m_linkOpener;
 };
 
 } // namespace notes::ui

@@ -28,3 +28,5 @@ notes_add_test(NAME tst_checklists SOURCES tst_checklists.cpp LABELS ui LIBS not
 notes_add_test(NAME tst_images SOURCES tst_images.cpp LABELS ui integration LIBS notesapp_ui)
 # TC-EDT-027, TC-EDT-029, TC-EDT-052, TC-EDT-054: safe paste in the window (task 3.8).
 notes_add_test(NAME tst_paste SOURCES tst_paste.cpp LABELS ui LIBS notesapp_ui Qt6::Network)
+# TC-EDT-030, TC-EDT-031: links typed, drawn and opened in the editor (task 3.9).
+notes_add_test(NAME tst_linkediting SOURCES tst_linkediting.cpp LABELS ui LIBS notesapp_ui)

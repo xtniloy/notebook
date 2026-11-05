@@ -1,6 +1,7 @@
 #include "ui/NoteTextEdit.h"
 
 #include "editor/ImageObject.h"
+#include "editor/Links.h"
 #include "editor/NoteFormat.h"
 #include "editor/PasteCleaner.h"
 #include "models/Uuid.h"
@@ -10,9 +11,11 @@
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QDataStream>
+#include <QDesktopServices>
 #include <QEvent>
 #include <QFontMetricsF>
 #include <QGuiApplication>
+#include <QHelpEvent>
 #include <QIODevice>
 #include <QImage>
 #include <QKeyEvent>
@@ -29,6 +32,7 @@
 #include <QTextFrame>
 #include <QTextLayout>
 #include <QTextList>
+#include <QToolTip>
 #include <QUrl>
 
 #include <algorithm>
@@ -93,6 +97,7 @@ NoteTextEdit::NoteTextEdit(QWidget* parent)
     , m_imageObject(new editor::ImageObject(this))
     , m_pasteAsPlainText(new QAction(tr("Paste as &Plain Text"), this))
     , m_pasteAsMarkdown(new QAction(tr("Paste as &Markdown"), this))
+    , m_linkOpener([](const QUrl& url) { return QDesktopServices::openUrl(url); })
 {
     m_pasteAsPlainText->setObjectName(QStringLiteral("pasteAsPlainTextAction"));
     m_pasteAsPlainText->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
@@ -112,7 +117,8 @@ NoteTextEdit::NoteTextEdit(QWidget* parent)
     setFrameShape(QFrame::NoFrame);
     setTabChangesFocus(false);
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    connect(document(), &QTextDocument::contentsChanged, this, &NoteTextEdit::scheduleCheckedText);
+    connect(document(), &QTextDocument::contentsChanged, this,
+            &NoteTextEdit::scheduleTextDecorations);
     // Images fit the text width (task 3.7).
     m_imageObject->registerOn(*document());
 }
@@ -158,7 +164,7 @@ void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText,
     // only line was left without a layout, and Qt draws no caret there: a new
     // note showed no caret until the first key. Lay it all out again.
     document()->markContentsDirty(0, document()->characterCount());
-    updateCheckedText(); // grayed from the start, not a moment later
+    updateTextDecorations(); // grayed from the start, not a moment later
 }
 
 QString NoteTextEdit::noteBody() const
@@ -598,6 +604,71 @@ bool NoteTextEdit::insertFragment(const QByteArray& encoded)
 
 void NoteTextEdit::keyPressEvent(QKeyEvent* event)
 {
+    const std::optional<PendingLink> link = isReadOnly() ? std::nullopt : linkBeforeKey(event);
+    typeKey(event);
+    if (link) {
+        applyLink(*link);
+    }
+}
+
+std::optional<NoteTextEdit::PendingLink> NoteTextEdit::linkBeforeKey(const QKeyEvent* event) const
+{
+    const int key = event->key();
+    const bool endsWord =
+        key == Qt::Key_Space || key == Qt::Key_Return || key == Qt::Key_Enter || key == Qt::Key_Tab;
+    const Qt::KeyboardModifiers modifiers =
+        event->modifiers() & ~(Qt::KeypadModifier | Qt::ShiftModifier);
+    const QTextCursor cursor = textCursor();
+    // Not in code, and not after a link already (a space typed after one).
+    if (!endsWord || modifiers != Qt::NoModifier || cursor.hasSelection() ||
+        cursor.charFormat().isAnchor() ||
+        editor::StyleManager::styleOf(cursor.block()) == editor::ParagraphStyle::Monospaced) {
+        return std::nullopt;
+    }
+    const QTextBlock block = cursor.block();
+    const std::optional<editor::Links::Match> match =
+        editor::Links::endingAt(QStringView(block.text()).first(cursor.positionInBlock()));
+    if (!match) {
+        return std::nullopt;
+    }
+    return PendingLink{.position = block.position() + static_cast<int>(match->start),
+                       .text = block.text().sliced(match->start, match->length),
+                       .href = match->href};
+}
+
+void NoteTextEdit::applyLink(const PendingLink& link)
+{
+    QTextCursor cursor(document());
+    cursor.setPosition(link.position);
+    cursor.setPosition(link.position + static_cast<int>(link.text.size()), QTextCursor::KeepAnchor);
+    if (cursor.selectedText() != link.text) {
+        return; // the key changed the text (it never should)
+    }
+    QTextCharFormat format;
+    format.setAnchor(true);
+    format.setAnchorHref(link.href);
+    cursor.mergeCharFormat(format);
+}
+
+bool NoteTextEdit::openLink(const QString& href)
+{
+    if (!editor::Links::isAllowed(href)) {
+        return false;
+    }
+    return m_linkOpener(QUrl(href));
+}
+
+QString NoteTextEdit::linkToOpenAt(QPointF position, Qt::KeyboardModifiers modifiers) const
+{
+    if (!modifiers.testFlag(Qt::ControlModifier)) {
+        return {};
+    }
+    const QString href = anchorAt(position.toPoint());
+    return editor::Links::isAllowed(href) ? href : QString();
+}
+
+void NoteTextEdit::typeKey(QKeyEvent* event)
+{
     if (!isReadOnly() && (headingKey(event) || listKey(event))) {
         event->accept();
         ensureCursorVisible();
@@ -834,6 +905,14 @@ QTextBlock NoteTextEdit::checkboxAt(QPointF position) const
 
 void NoteTextEdit::mousePressEvent(QMouseEvent* event)
 {
+    if (event->button() == Qt::LeftButton) {
+        // Ctrl+Click on a link: opened on release; the caret stays.
+        m_pressedLink = linkToOpenAt(event->position(), event->modifiers());
+        if (!m_pressedLink.isEmpty()) {
+            event->accept();
+            return;
+        }
+    }
     if (event->button() == Qt::LeftButton && !isReadOnly()) {
         m_pressedCheckbox = checkboxAt(event->position());
         if (m_pressedCheckbox.isValid()) {
@@ -846,6 +925,14 @@ void NoteTextEdit::mousePressEvent(QMouseEvent* event)
 
 void NoteTextEdit::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (event->button() == Qt::LeftButton && !m_pressedLink.isEmpty()) {
+        if (anchorAt(event->position().toPoint()) == m_pressedLink) {
+            openLink(m_pressedLink);
+        }
+        m_pressedLink.clear();
+        event->accept();
+        return;
+    }
     if (event->button() == Qt::LeftButton && m_pressedCheckbox.isValid()) {
         // A click: pressed and released on the same checkbox. One undo step.
         if (checkboxAt(event->position()) == m_pressedCheckbox && !isReadOnly()) {
@@ -863,7 +950,14 @@ void NoteTextEdit::mouseReleaseEvent(QMouseEvent* event)
 void NoteTextEdit::mouseDoubleClickEvent(QMouseEvent* event)
 {
     // The second press of a double click: a second click on the checkbox
-    // (toggled on its release), not a word to select.
+    // (toggled on its release) or the link, not a word to select.
+    if (event->button() == Qt::LeftButton) {
+        m_pressedLink = linkToOpenAt(event->position(), event->modifiers());
+        if (!m_pressedLink.isEmpty()) {
+            event->accept();
+            return;
+        }
+    }
     if (event->button() == Qt::LeftButton && !isReadOnly()) {
         m_pressedCheckbox = checkboxAt(event->position());
         if (m_pressedCheckbox.isValid()) {
@@ -876,44 +970,76 @@ void NoteTextEdit::mouseDoubleClickEvent(QMouseEvent* event)
 
 void NoteTextEdit::mouseMoveEvent(QMouseEvent* event)
 {
-    if (m_pressedCheckbox.isValid()) {
-        event->accept(); // pressed on a checkbox: no text selection
+    if (m_pressedCheckbox.isValid() || !m_pressedLink.isEmpty()) {
+        event->accept(); // pressed on a checkbox or link: no text selection
         return;
     }
     QTextEdit::mouseMoveEvent(event);
-    const bool over = event->buttons() == Qt::NoButton && !isReadOnly() &&
-                      checkboxAt(event->position()).isValid();
-    if (over != m_overCheckbox) {
-        m_overCheckbox = over;
+    const bool over = event->buttons() == Qt::NoButton &&
+                      ((!isReadOnly() && checkboxAt(event->position()).isValid()) ||
+                       !linkToOpenAt(event->position(), event->modifiers()).isEmpty());
+    if (over != m_overClickable) {
+        m_overClickable = over;
         viewport()->setCursor(over ? Qt::PointingHandCursor : Qt::IBeamCursor);
     }
 }
 
-void NoteTextEdit::scheduleCheckedText()
+bool NoteTextEdit::viewportEvent(QEvent* event)
 {
-    if (m_checkedTextPending) {
+    if (const auto* help = dynamic_cast<const QHelpEvent*>(event);
+        help != nullptr && event->type() == QEvent::ToolTip) {
+        const QString href = anchorAt(help->pos());
+        if (href.isEmpty()) {
+            QToolTip::hideText();
+            event->ignore();
+            return true;
+        }
+        const QString how = editor::Links::isAllowed(href)
+                                ? tr("Ctrl+Click to open")
+                                : tr("Links of this kind can't be opened");
+        QToolTip::showText(help->globalPos(), href + u'\n' + how, viewport());
+        return true;
+    }
+    return QTextEdit::viewportEvent(event);
+}
+
+void NoteTextEdit::scheduleTextDecorations()
+{
+    if (m_decorationsPending) {
         return;
     }
-    m_checkedTextPending = true;
+    m_decorationsPending = true;
     QMetaObject::invokeMethod(
         this,
         [this] {
-            m_checkedTextPending = false;
-            updateCheckedText();
+            m_decorationsPending = false;
+            updateTextDecorations();
         },
         Qt::QueuedConnection);
 }
 
-void NoteTextEdit::updateCheckedText()
+void NoteTextEdit::updateTextDecorations()
 {
     QTextCharFormat gray;
     gray.setForeground(palette().color(QPalette::PlaceholderText));
+    QTextCharFormat link;
+    link.setForeground(palette().color(QPalette::Link));
+    link.setFontUnderline(true);
     QList<ExtraSelection> selections;
     for (QTextBlock block = document()->begin(); block.isValid(); block = block.next()) {
         if (block.length() > 1 && editor::StyleManager::isChecked(block)) {
             QTextCursor text(block);
             text.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
             selections.append({.cursor = text, .format = gray});
+        }
+        for (auto it = block.begin(); !it.atEnd(); ++it) {
+            const QTextFragment fragment = it.fragment();
+            if (fragment.charFormat().isAnchor() && !fragment.charFormat().anchorHref().isEmpty()) {
+                QTextCursor text(document());
+                text.setPosition(fragment.position());
+                text.setPosition(fragment.position() + fragment.length(), QTextCursor::KeepAnchor);
+                selections.append({.cursor = text, .format = link});
+            }
         }
     }
     setExtraSelections(selections);
@@ -942,7 +1068,7 @@ void NoteTextEdit::changeEvent(QEvent* event)
         updateViewportMargins(); // the scroll bar's width may have changed
     }
     if (event->type() == QEvent::PaletteChange) {
-        updateCheckedText(); // the theme's gray
+        updateTextDecorations(); // the theme's gray
     }
 }
 

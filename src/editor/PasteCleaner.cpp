@@ -1,5 +1,6 @@
 #include "editor/PasteCleaner.h"
 
+#include "editor/Links.h"
 #include "editor/NoteFormat.h"
 #include "editor/StyleManager.h"
 
@@ -49,12 +50,6 @@ const QRegularExpression& hiddenElements()
     return kHidden;
 }
 
-bool isSafeLink(const QString& href)
-{
-    const QString scheme = QUrl(href).scheme().toLower();
-    return scheme == u"http" || scheme == u"https" || scheme == u"mailto";
-}
-
 // Pasted headings become ours: levels 1 and 2 Heading, deeper ones
 // Subheading. Title stays for a note's first line.
 int headingFor(int level)
@@ -78,8 +73,7 @@ QJsonArray cleanRuns(const QJsonArray& runs)
         text.replace(QChar::Nbsp, u' ');
         QJsonObject kept{{QStringLiteral("text"), text}};
         const QString href = run.value(QStringLiteral("href")).toString();
-        const bool link = !href.isEmpty() && isSafeLink(href);
-        if (link) {
+        if (Links::isAllowed(href)) {
             kept.insert(QStringLiteral("href"), href);
         }
         for (const char* key : {"b", "i", "s", "mono"}) {

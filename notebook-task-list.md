@@ -660,9 +660,9 @@ _Notes:_ a checklist is a list with our `kChecklistProperty` (stored as list sty
 
 ### 3.9 Links `S`
 
-- [ ] Auto-detect URLs while typing
-- [ ] `Ctrl+Click` opens with `QDesktopServices::openUrl`
-- [ ] Only allow `http`, `https`, `mailto` schemes; ignore everything else
+- [x] Auto-detect URLs while typing
+- [x] `Ctrl+Click` opens with `QDesktopServices::openUrl`
+- [x] Only allow `http`, `https`, `mailto` schemes; ignore everything else
 
 **Tests**
 - `TC-EDT-030` (UI) Typing `https://example.com ` turns it into a link.

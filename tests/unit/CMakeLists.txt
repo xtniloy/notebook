@@ -36,3 +36,5 @@ notes_add_test(NAME tst_imageimport SOURCES tst_imageimport.cpp LABELS unit LIBS
 
 # TC-EDT-028, TC-EDT-053: cleaning pasted HTML and Markdown (task 3.8).
 notes_add_test(NAME tst_pastecleaner SOURCES tst_pastecleaner.cpp LABELS unit LIBS notesapp_ui)
+# TC-EDT-031: which links open, and finding a typed address (task 3.9).
+notes_add_test(NAME tst_links SOURCES tst_links.cpp LABELS unit LIBS notesapp_ui)
