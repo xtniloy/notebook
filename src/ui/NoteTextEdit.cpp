@@ -71,6 +71,44 @@ QTextCharFormat textFormat(QTextCharFormat format)
     return format;
 }
 
+// `document` without the spacing the editor puts around code (block margins,
+// letter spacing; see NoteTextEdit::syncCodeSpacing()): for other apps.
+void clearCodeSpacing(QTextDocument& document)
+{
+    QTextCursor cursor(&document);
+    for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
+        QTextBlockFormat format = block.blockFormat();
+        for (const int property : {QTextFormat::BlockTopMargin, QTextFormat::BlockBottomMargin,
+                                   QTextFormat::BlockLeftMargin, QTextFormat::BlockRightMargin}) {
+            format.clearProperty(property);
+        }
+        cursor.setPosition(block.position());
+        cursor.setBlockFormat(format);
+        struct Run
+        {
+            int position = 0;
+            int length = 0;
+            QTextCharFormat format;
+        };
+        QList<Run> spaced; // collected first: editing merges fragments
+        for (auto it = block.begin(); !it.atEnd(); ++it) {
+            const QTextFragment fragment = it.fragment();
+            if (fragment.charFormat().hasProperty(QTextFormat::FontLetterSpacing)) {
+                spaced.append({.position = fragment.position(),
+                               .length = fragment.length(),
+                               .format = fragment.charFormat()});
+            }
+        }
+        for (Run& run : spaced) {
+            run.format.clearProperty(QTextFormat::FontLetterSpacing);
+            run.format.clearProperty(QTextFormat::FontLetterSpacingType);
+            cursor.setPosition(run.position);
+            cursor.setPosition(run.position + run.length, QTextCursor::KeepAnchor);
+            cursor.setCharFormat(run.format);
+        }
+    }
+}
+
 QString imageNameFor(const QString& uuid)
 {
     return kAttachmentScheme + uuid;
@@ -130,12 +168,12 @@ void NoteTextEdit::setTextPadding(int right, int bottom)
     m_rightPadding = right;
     m_bottomPadding = bottom;
     updateViewportMargins();
-    applyBottomPadding();
+    applyFramePadding();
 }
 
 int NoteTextEdit::rightInset() const
 {
-    return m_rightPadding + verticalScrollBar()->sizeHint().width();
+    return m_rightPadding - kTextBleed + verticalScrollBar()->sizeHint().width();
 }
 
 void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText,
@@ -157,9 +195,10 @@ void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText,
         QTextCursor(document()).setBlockFormat(title);
         editor::StyleManager::styleHeadings(*document());
     }
+    syncCodeSpacing(false);
     // Loading isn't an edit: start the note with no undo history.
     document()->clearUndoRedoStacks();
-    applyBottomPadding();
+    applyFramePadding();
     // Filled directly rather than through setPlainText(), an empty document's
     // only line was left without a layout, and Qt draws no caret there: a new
     // note showed no caret until the first key. Lay it all out again.
@@ -262,6 +301,13 @@ QMimeData* NoteTextEdit::createMimeDataFromSelection() const
         for (const QString& format : text->formats()) {
             mime->setData(format, text->data(format));
         }
+    }
+    // Other apps get the HTML without the room made around code here.
+    if (mime->hasHtml()) {
+        QTextDocument html;
+        QTextCursor(&html).insertFragment(selection);
+        clearCodeSpacing(html);
+        mime->setHtml(QTextDocumentFragment(&html).toHtml());
     }
     QByteArray encoded;
     QDataStream out(&encoded, QIODevice::WriteOnly);
@@ -793,6 +839,7 @@ std::optional<editor::ParagraphStyle> NoteTextEdit::listMarker(const QKeyEvent* 
 
 void NoteTextEdit::paintEvent(QPaintEvent* event)
 {
+    paintCodeBackgrounds(); // behind the text
     QTextEdit::paintEvent(event);
     paintMarkers();
 }
@@ -805,7 +852,257 @@ QFont markerFont(const QTextBlock& block, const QTextDocument& document)
     return block.charFormat().font().resolve(document.defaultFont());
 }
 
+// Code backgrounds. Inline code: the pill reaches kPillPad past the text, and
+// kInlineGap of space before and after the code (letter spacing on the
+// characters next to it, syncCodeSpacing()) keeps its neighbors off it. A
+// code block: its text kPanelPadX inside the panel at the sides and
+// kPanelPadY at the top and bottom, the panel kPanelGap from the text around.
+constexpr qreal kPillPad = 4;
+constexpr qreal kInlineGap = 7;
+constexpr qreal kPillRadius = 4;
+constexpr qreal kPanelPadX = 12;
+constexpr qreal kPanelPadY = 8;
+constexpr qreal kPanelGap = 8;
+constexpr qreal kPanelRadius = 6;
+
+// A Monospaced paragraph outside a table: part of a code panel.
+bool isCodeBlock(const QTextBlock& block)
+{
+    return block.isValid() &&
+           editor::StyleManager::styleOf(block) == editor::ParagraphStyle::Monospaced &&
+           QTextCursor(block).currentTable() == nullptr;
+}
+
+// Monospaced text in a paragraph that isn't code: [start, end) offsets in the
+// block, neighboring runs (bold code next to code) as one.
+struct CodeRange
+{
+    int start = 0;
+    int end = 0;
+};
+
+QList<CodeRange> inlineCode(const QTextBlock& block)
+{
+    QList<CodeRange> ranges;
+    if (isCodeBlock(block)) {
+        return ranges;
+    }
+    for (auto it = block.begin(); !it.atEnd(); ++it) {
+        const QTextFragment fragment = it.fragment();
+        const QTextCharFormat format = fragment.charFormat();
+        if (format.isImageFormat() || !editor::StyleManager::isMonospaced(format)) {
+            continue;
+        }
+        const int start = fragment.position() - block.position();
+        const int end = start + fragment.length();
+        if (!ranges.isEmpty() && ranges.last().end == start) {
+            ranges.last().end = end;
+        } else {
+            ranges.append({.start = start, .end = end});
+        }
+    }
+    return ranges;
+}
+
+// Where `block`'s layout is, in viewport coordinates (`offset`: the scroll).
+QPointF layoutOrigin(const QTextBlock& block, const QAbstractTextDocumentLayout& layout,
+                     const QPointF& offset)
+{
+    return layout.blockBoundingRect(block).topLeft() - block.layout()->boundingRect().topLeft() +
+           offset;
+}
+
+qreal gapOf(const QTextCharFormat& format)
+{
+    return format.hasProperty(QTextFormat::FontLetterSpacing) ? format.fontLetterSpacing() : 0;
+}
+
+// The letter spacing syncCodeSpacing() gave the character at `position`.
+qreal gapAt(const QTextBlock& block, int position)
+{
+    for (auto it = block.begin(); !it.atEnd(); ++it) {
+        const QTextFragment fragment = it.fragment();
+        if (fragment.contains(position)) {
+            return gapOf(fragment.charFormat());
+        }
+    }
+    return 0;
+}
+
+// `block`'s format with the margins of code (see syncCodeSpacing()).
+QTextBlockFormat spacedFormat(const QTextBlock& block)
+{
+    QTextBlockFormat format = block.blockFormat();
+    for (const int property : {QTextFormat::BlockTopMargin, QTextFormat::BlockBottomMargin,
+                               QTextFormat::BlockLeftMargin, QTextFormat::BlockRightMargin}) {
+        format.clearProperty(property);
+    }
+    if (!isCodeBlock(block)) {
+        return format;
+    }
+    // Its text inside the panel, the panel off its neighbors.
+    format.setLeftMargin(kPanelPadX);
+    format.setRightMargin(kPanelPadX);
+    if (!isCodeBlock(block.previous())) {
+        format.setTopMargin(kPanelPadY + kPanelGap);
+    }
+    if (!isCodeBlock(block.next())) {
+        format.setBottomMargin(kPanelPadY + kPanelGap);
+    }
+    return format;
+}
+
+// The characters of `block` whose letter spacing isn't what inline code
+// wants (a gap after the character before the code and after its last), with
+// the format each should have.
+QList<std::pair<int, QTextCharFormat>> gapChanges(const QTextBlock& block)
+{
+    QList<int> gaps;
+    for (const CodeRange& range : inlineCode(block)) {
+        if (range.start > 0) {
+            gaps.append(block.position() + range.start - 1);
+        }
+        gaps.append(block.position() + range.end - 1);
+    }
+    QList<std::pair<int, QTextCharFormat>> changes;
+    for (auto it = block.begin(); !it.atEnd(); ++it) {
+        const QTextFragment fragment = it.fragment();
+        const QTextCharFormat format = fragment.charFormat();
+        if (format.isImageFormat()) {
+            continue;
+        }
+        for (int position = fragment.position(); position < fragment.position() + fragment.length();
+             ++position) {
+            const qreal want = gaps.contains(position) ? kInlineGap : 0;
+            if (qFuzzyCompare(gapOf(format) + 1, want + 1)) {
+                continue;
+            }
+            QTextCharFormat changed = format;
+            changed.clearProperty(QTextFormat::FontLetterSpacing);
+            changed.clearProperty(QTextFormat::FontLetterSpacingType);
+            if (want > 0) {
+                changed.setFontLetterSpacingType(QFont::AbsoluteSpacing);
+                changed.setFontLetterSpacing(want);
+            }
+            changes.append({position, changed});
+        }
+    }
+    return changes;
+}
+
+// The pills behind `block`'s inline code, one per line it's on.
+QList<QRectF> pillsFor(const QTextBlock& block, const QPointF& origin)
+{
+    QList<QRectF> pills;
+    const QTextLayout* layout = block.layout();
+    for (const CodeRange& range : inlineCode(block)) {
+        // Not the space after the code: that's the gap.
+        const qreal trailing = gapAt(block, block.position() + range.end - 1);
+        for (int i = 0; i < layout->lineCount(); ++i) {
+            const QTextLine line = layout->lineAt(i);
+            const int from = std::max(range.start, line.textStart());
+            const int to = std::min(range.end, line.textStart() + line.textLength());
+            if (from >= to) {
+                continue;
+            }
+            const qreal left = line.cursorToX(from) - kPillPad;
+            const qreal right = line.cursorToX(to) + kPillPad - (to == range.end ? trailing : 0);
+            pills.append(
+                QRectF(origin.x() + left, origin.y() + line.y(), right - left, line.height()));
+        }
+    }
+    return pills;
+}
+
+// The top and bottom of `block`'s lines, in viewport coordinates.
+std::pair<qreal, qreal> linesSpan(const QTextBlock& block, const QPointF& origin)
+{
+    const QTextLayout* layout = block.layout();
+    if (layout->lineCount() == 0) {
+        return {origin.y(), origin.y()};
+    }
+    const QTextLine last = layout->lineAt(layout->lineCount() - 1);
+    return {origin.y() + layout->lineAt(0).y(), origin.y() + last.y() + last.height()};
+}
+
 } // namespace
+
+void NoteTextEdit::paintCodeBackgrounds()
+{
+    QPainter painter(viewport());
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(palette().color(QPalette::AlternateBase));
+    const QPointF offset(-horizontalScrollBar()->value(), -verticalScrollBar()->value());
+    const QAbstractTextDocumentLayout& layout = *document()->documentLayout();
+    const QRect visible = viewport()->rect();
+    // The text column, where panels go.
+    const QTextFrameFormat frame = document()->rootFrame()->frameFormat();
+    const qreal columnLeft = offset.x() + frame.leftMargin();
+    const qreal columnRight = offset.x() + document()->textWidth() - frame.rightMargin();
+
+    QTextBlock block = cursorForPosition(QPoint(0, 0)).block();
+    while (isCodeBlock(block) && isCodeBlock(block.previous())) {
+        block = block.previous(); // a panel starting above the view
+    }
+    while (block.isValid()) {
+        if (block.layout() == nullptr) {
+            block = block.next();
+            continue;
+        }
+        QPointF origin = layoutOrigin(block, layout, offset);
+        if (origin.y() > visible.bottom()) {
+            break;
+        }
+        if (!isCodeBlock(block)) {
+            for (const QRectF& pill : pillsFor(block, origin)) {
+                painter.drawRoundedRect(pill, kPillRadius, kPillRadius);
+            }
+            block = block.next();
+            continue;
+        }
+        // One panel for the run of Monospaced paragraphs, the column's width.
+        const qreal left = columnLeft + (block.blockFormat().indent() * document()->indentWidth());
+        const qreal top = linesSpan(block, origin).first;
+        qreal bottom = linesSpan(block, origin).second;
+        for (block = block.next(); isCodeBlock(block) && block.layout() != nullptr;
+             block = block.next()) {
+            origin = layoutOrigin(block, layout, offset);
+            bottom = linesSpan(block, origin).second;
+        }
+        const QRectF panel(QPointF(left, top - kPanelPadY),
+                           QPointF(columnRight, bottom + kPanelPadY));
+        painter.drawRoundedRect(panel, kPanelRadius, kPanelRadius);
+    }
+}
+
+void NoteTextEdit::syncCodeSpacing(bool joinUndo)
+{
+    QTextCursor cursor(document());
+    bool editing = false;
+    const auto edit = [&] {
+        if (!editing) {
+            joinUndo ? cursor.joinPreviousEditBlock() : cursor.beginEditBlock();
+            editing = true;
+        }
+    };
+    for (QTextBlock block = document()->begin(); block.isValid(); block = block.next()) {
+        if (const QTextBlockFormat format = spacedFormat(block); format != block.blockFormat()) {
+            edit();
+            cursor.setPosition(block.position());
+            cursor.setBlockFormat(format);
+        }
+        for (const auto& [position, format] : gapChanges(block)) {
+            edit();
+            cursor.setPosition(position);
+            cursor.setPosition(position + 1, QTextCursor::KeepAnchor);
+            cursor.setCharFormat(format);
+        }
+    }
+    if (editing) {
+        cursor.endEditBlock();
+    }
+}
 
 QRectF NoteTextEdit::checkboxRect(const QTextBlock& block) const
 {
@@ -1013,6 +1310,9 @@ void NoteTextEdit::scheduleTextDecorations()
         this,
         [this] {
             m_decorationsPending = false;
+            if (!isReadOnly()) {
+                syncCodeSpacing(true);
+            }
             updateTextDecorations();
         },
         Qt::QueuedConnection);
@@ -1045,10 +1345,11 @@ void NoteTextEdit::updateTextDecorations()
     setExtraSelections(selections);
 }
 
-void NoteTextEdit::applyBottomPadding()
+void NoteTextEdit::applyFramePadding()
 {
     // On the document's root frame, so it scrolls with the text: space after
-    // the last line, not a band that hides text while scrolling.
+    // the last line, not a band that hides text while scrolling; and
+    // kTextBleed at the sides, room for code backgrounds.
     // Not an edit: no undo step (a freshly opened note has no undo history).
     // Turning undo off and on also clears it, which setPlainText() did anyway.
     QTextDocument* doc = document();
@@ -1057,6 +1358,8 @@ void NoteTextEdit::applyBottomPadding()
     QTextFrame* root = doc->rootFrame();
     QTextFrameFormat format = root->frameFormat();
     format.setBottomMargin(doc->documentMargin() + m_bottomPadding);
+    format.setLeftMargin(doc->documentMargin() + kTextBleed);
+    format.setRightMargin(doc->documentMargin() + kTextBleed);
     root->setFrameFormat(format);
     doc->setUndoRedoEnabled(undo);
 }
@@ -1074,7 +1377,7 @@ void NoteTextEdit::changeEvent(QEvent* event)
 
 void NoteTextEdit::updateViewportMargins()
 {
-    setViewportMargins(0, 0, m_rightPadding, 0);
+    setViewportMargins(0, 0, m_rightPadding - kTextBleed, 0);
 }
 
 } // namespace notes::ui

@@ -312,6 +312,9 @@ void tst_ThemeManager::colorsAreReadable()
     check(selectedMuted, c.accent, "selected muted text");
     QVERIFY(contrast(selectedMuted, c.accent) < contrast(c.accentText, c.accent)); // muted
     check(c.link, c.base, "link on base");
+    check(c.text, c.codeBackground, "code on its background");
+    // The code background shows against the note's.
+    QVERIFY(contrast(c.codeBackground, c.base) > 1.05);
     QCOMPARE(c.accent, ThemeManager::colors(Theme::Light).accent); // shared accent
 }
 

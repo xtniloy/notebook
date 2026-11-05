@@ -37,6 +37,7 @@ struct ThemeColors
     QColor accent;     // selection highlight, focus ring (Plan §3.6)
     QColor accentText; // text and icons on the accent
     QColor link;
+    QColor codeBackground; // behind code in notes (QPalette::AlternateBase)
     // Scroll bars (drawn by AppStyle): a thin rounded handle; on hover a track
     // appears behind it and the handle darkens (UI review).
     QColor scrollHandle;

@@ -25,7 +25,7 @@ namespace notes::ui {
 
 // The note body editor (Plan §3.5): paragraph styles (task 3.2), inline
 // formats (3.4), lists (3.5), checklists (3.6), images (3.7) and safe paste
-// (3.8) and links (3.9); tables arrive later.
+// (3.8), links (3.9) and code drawn on a gray background; tables arrive later.
 //
 // Images are attachments (models::Attachment) the document shows as
 // `attachment://<uuid>` images. The editor holds the note's attachments with
@@ -49,6 +49,10 @@ public:
     // re-wrap when a note becomes long enough to scroll. `bottom` is below the
     // last line, reached by scrolling to the end.
     void setTextPadding(int right, int bottom);
+    // Room around the text inside the editor for what's drawn behind it
+    // (code backgrounds reach out this far): part of the left margin, of
+    // setTextPadding()'s `right`, and the same again on each side.
+    static constexpr int kTextBleed = 8;
     // From the text to the widget's right edge: the padding plus the scroll bar.
     [[nodiscard]] int rightInset() const;
 
@@ -200,6 +204,20 @@ private:
     [[nodiscard]] std::optional<editor::ParagraphStyle> listMarker(const QKeyEvent* event) const;
     // The markers Qt can't draw: the dashes of dashed lists and checkboxes.
     void paintMarkers();
+    // Code on a gray background (QPalette::AlternateBase), drawn, not stored,
+    // as in Markdown viewers: a rounded panel the column's width behind each
+    // run of Monospaced paragraphs, and a small rounded pill behind
+    // monospaced text in other paragraphs (reaching a little past the text,
+    // into kTextBleed at the start of a line).
+    void paintCodeBackgrounds();
+    // The room code needs (not stored: NoteFormat keeps neither): margins on
+    // Monospaced paragraphs, for the panel's padding and its distance from the
+    // text around it, and letter spacing on the characters just before and at
+    // the end of inline code, so its neighbors stay off the pill. Kept up to
+    // date after every change, as part of that change's undo step
+    // (`joinUndo`), or outside the history when a note is loaded. Copies for
+    // other apps leave it out.
+    void syncCodeSpacing(bool joinUndo);
     // The checklist item whose checkbox is at `position` (viewport
     // coordinates), if any.
     [[nodiscard]] QTextBlock checkboxAt(QPointF position) const;
@@ -216,7 +234,8 @@ private:
     void scheduleTextDecorations();
 
     void updateViewportMargins();
-    void applyBottomPadding();
+    // The root frame's margins: kTextBleed at the sides, the bottom padding.
+    void applyFramePadding();
 
     editor::ImageObject* m_imageObject;
     QAction* m_pasteAsPlainText;

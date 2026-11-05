@@ -34,6 +34,7 @@ const ThemeColors kLight{
     .accent = QColor(0xF3, 0xBE, 0x33),
     .accentText = QColor(0x1D, 0x1D, 0x1F),
     .link = QColor(0x9A, 0x6F, 0x0E),
+    .codeBackground = QColor(0xEB, 0xEB, 0xE9),
     .scrollHandle = QColor(0xC4, 0xC4, 0xC2),
     .scrollHandleHover = QColor(0xA4, 0xA4, 0xA2),
     .scrollTrack = QColor(0xE4, 0xE4, 0xE2),
@@ -50,6 +51,7 @@ const ThemeColors kDark{
     .accent = QColor(0xF3, 0xBE, 0x33),
     .accentText = QColor(0x1C, 0x1C, 0x1E),
     .link = QColor(0xF5, 0xC0, 0x4A),
+    .codeBackground = QColor(0x33, 0x33, 0x36),
     .scrollHandle = QColor(0x55, 0x55, 0x5A),
     .scrollHandleHover = QColor(0x78, 0x78, 0x7E),
     .scrollTrack = QColor(0x36, 0x36, 0x3A),
@@ -204,7 +206,8 @@ QPalette ThemeManager::palette(Theme theme)
     palette.setColor(QPalette::Window, c.window);
     palette.setColor(QPalette::WindowText, c.text);
     palette.setColor(QPalette::Base, c.base);
-    palette.setColor(QPalette::AlternateBase, c.window);
+    // The note editor draws code on it (NoteTextEdit).
+    palette.setColor(QPalette::AlternateBase, c.codeBackground);
     palette.setColor(QPalette::Text, c.text);
     palette.setColor(QPalette::PlaceholderText, c.mutedText);
     palette.setColor(QPalette::Button, c.base);

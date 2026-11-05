@@ -212,9 +212,15 @@ void tst_EditorView::scrollBarAtPaneEdge()
     const int barRight = bar->mapTo(m_view.get(), QPoint(bar->width(), 0)).x();
     QCOMPARE(m_view->width() - barRight, 3);
 
+    // Where the text starts and ends, apart from Qt's document margin: the
+    // editor keeps room for code backgrounds inside (NoteTextEdit::kTextBleed).
     const QWidget* viewport = edit->viewport();
-    const int textLeft = viewport->mapTo(m_view.get(), QPoint(0, 0)).x();
-    const int textRight = viewport->mapTo(m_view.get(), QPoint(viewport->width(), 0)).x();
+    const qreal margin = edit->document()->documentMargin();
+    const QTextFrameFormat frame = edit->document()->rootFrame()->frameFormat();
+    const int textLeft =
+        viewport->mapTo(m_view.get(), QPoint(0, 0)).x() + qRound(frame.leftMargin() - margin);
+    const int textRight = viewport->mapTo(m_view.get(), QPoint(viewport->width(), 0)).x() -
+                          qRound(frame.rightMargin() - margin);
     QCOMPARE(textLeft, 24);            // from the pane's left edge
     QCOMPARE(barLeft - textRight, 24); // the same between the text and the scroll bar
 

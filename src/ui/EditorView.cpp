@@ -54,13 +54,15 @@ EditorView::EditorView(QWidget* parent)
     // same between the text and the scroll bar on the right, and below the last
     // line. The text edit reaches almost to the pane's edge, so its scroll bar
     // sits there. The labels get the same right inset, to stay centered over
-    // the text.
+    // the text. The text edit itself starts kTextBleed earlier and keeps that
+    // much inside, as room for code backgrounds.
     m_textEdit->setTextPadding(kSideMargin, kSideMargin);
     m_header->setContentsMargins(0, 0, m_textEdit->rightInset(), 0);
     m_placeholder->setContentsMargins(0, 0, m_textEdit->rightInset(), 0);
 
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(kSideMargin, kHeaderTopMargin, kScrollBarGap, 0);
+    layout->setContentsMargins(kSideMargin - NoteTextEdit::kTextBleed, kHeaderTopMargin,
+                               kScrollBarGap, 0);
     layout->setSpacing(kHeaderTopMargin);
     layout->addWidget(m_header);
     layout->addWidget(m_pages, 1);
