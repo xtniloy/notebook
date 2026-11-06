@@ -149,6 +149,7 @@ The window draws its own frame (rounded corners, soft shadow) with no system tit
 - Images inline (drag & drop or paste), file attachments as cards
 - Paste keeps headings, lists, bold, italic and links from web pages and Markdown, and nothing else (no fonts, colors or remote images); Edit › Paste as Plain Text (`Ctrl+Shift+V`) and Paste as Markdown (`Ctrl+Alt+V`)
 - Links: a web or e-mail address becomes a link when followed by a space, Enter or Tab (`Ctrl+Z` undoes it); `Ctrl+Click` opens it; only `http`, `https` and `mailto` links are ever opened
+- Undo and redo (`Ctrl+Z`, `Ctrl+Shift+Z`): one step per action, back to exactly the document before it; each note has its own history, which starts empty whenever the note opens
 - Code on a light gray background, as in Markdown viewers: a rounded pill with room around it behind inline monospaced text, one rounded panel with inner padding behind each Monospaced block (drawn from the theme; the spacing isn't stored)
 - Collapsible headings (click arrow to fold a section)
 - Links to other notes (`>>` typing to search a note title)

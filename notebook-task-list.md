@@ -672,8 +672,8 @@ _Notes:_ a checklist is a list with our `kChecklistProperty` (stored as list sty
 
 ### 3.10 Undo/redo `S`
 
-- [ ] Verify `Ctrl+Z` / `Ctrl+Shift+Z` for every editor operation above
-- [ ] Undo history is per note and cleared when switching notes (avoids undoing into another note)
+- [x] Verify `Ctrl+Z` / `Ctrl+Shift+Z` for every editor operation above *(`tests/ui/tst_undoredo.cpp`: 20 operations (typing, Enter, deleting, paragraph styles, code blocks and Enter in them, inline formats and inline code, lists and indenting, checklists and checking, images, every kind of paste); one `Ctrl+Z` gives back the exact stored document, `Ctrl+Shift+Z` the one after. Typed links and list markers take two steps on purpose, formatting first (task 3.5, 3.9). The code look's spacing and the link look are part of the step that caused them, or not undo steps at all)*
+- [x] Undo history is per note and cleared when switching notes (avoids undoing into another note) *(`NoteTextEdit::setNoteBody()` clears it whenever a note opens; nothing to change)*
 
 **Tests**
 - `TC-EDT-032` (UI) Data-driven: for each operation (style, list, checklist, image insert, paste) → undo restores the exact previous document.

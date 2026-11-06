@@ -32,3 +32,5 @@ notes_add_test(NAME tst_paste SOURCES tst_paste.cpp LABELS ui LIBS notesapp_ui Q
 notes_add_test(NAME tst_linkediting SOURCES tst_linkediting.cpp LABELS ui LIBS notesapp_ui)
 # Code drawn on a gray background in the editor (follow-up to task 3.4).
 notes_add_test(NAME tst_codelook SOURCES tst_codelook.cpp LABELS ui LIBS notesapp_ui)
+# Undo and redo for every editor operation, per note (task 3.10).
+notes_add_test(NAME tst_undoredo SOURCES tst_undoredo.cpp LABELS ui LIBS notesapp_ui)
