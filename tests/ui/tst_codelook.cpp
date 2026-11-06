@@ -15,6 +15,7 @@
 #include <QTextFrame>
 #include <QTextLayout>
 
+#include <cmath>
 #include <memory>
 
 using notes::editor::ParagraphStyle;
@@ -68,6 +69,7 @@ private slots:
     void spaceAroundTheBlockOnly();
     void spacingIsNotStored();
     void spacingFollowsStyleChangesAndUndo();
+    void pillsOnNextLinesStayApart();
 
 private:
     [[nodiscard]] QTextBlock block(int index) const;
@@ -138,7 +140,19 @@ void tst_CodeLook::inlineCodeHasAPill()
     const QTextLine line = block(0).layout()->lineAt(0);
     const qreal makeLeft = textLeft(0) + line.cursorToX(4);
     QCOMPARE(pixelAt(0, makeLeft - 1.5), codeBackground());
+    QCOMPARE(pixelAt(0, makeLeft - 3), codeBackground());   // room inside it
+    QCOMPARE(pixelAt(0, makeLeft - 6.5), noteBackground()); // and clear of "Run "
     QCOMPARE(pixelAt(0, textLeft(0) - 1.5), noteBackground());
+    // Room above and below the text too: the pill reaches past the line.
+    const QRectF bounds = m_edit->document()->documentLayout()->blockBoundingRect(block(0));
+    const QImage image = m_edit->viewport()->grab().toImage();
+    const qreal ratio = image.devicePixelRatio();
+    // The pixel rows just above and just below the line.
+    const int x = qRound((makeLeft + 1) * ratio);
+    const qreal lineTop = (bounds.top() + line.y()) * ratio;
+    const qreal lineBottom = lineTop + (line.height() * ratio);
+    QCOMPARE(image.pixelColor(x, static_cast<int>(std::ceil(lineTop)) - 1), codeBackground());
+    QCOMPARE(image.pixelColor(x, static_cast<int>(std::floor(lineBottom))), codeBackground());
     // Room after it: its last letter takes more space than the others (all
     // the same width in a monospaced font), so "now" starts clear of the pill.
     const qreal k = line.cursorToX(7) - line.cursorToX(6);
@@ -183,7 +197,9 @@ void tst_CodeLook::spaceAroundTheBlockOnly()
     QCOMPARE(block(3).blockFormat().topMargin(), 0.0);
     QCOMPARE(block(3).blockFormat().bottomMargin(), 0.0);
     QVERIFY(block(4).blockFormat().bottomMargin() > 0); // last line
-    for (const int index : {0, 1, 5}) {
+    QVERIFY(block(0).blockFormat().topMargin() > 0);    // room for the pill
+    QVERIFY(block(0).blockFormat().bottomMargin() > 0);
+    for (const int index : {1, 5}) {
         QCOMPARE(block(index).blockFormat().topMargin(), 0.0);
         QCOMPARE(block(index).blockFormat().bottomMargin(), 0.0);
     }
@@ -219,6 +235,53 @@ void tst_CodeLook::spacingFollowsStyleChangesAndUndo()
     QCOMPARE(notes::editor::StyleManager::styleOf(block(5)), ParagraphStyle::Monospaced);
     QVERIFY(block(5).blockFormat().bottomMargin() > 0);
     QCOMPARE(block(4).blockFormat().bottomMargin(), 0.0);
+}
+
+void tst_CodeLook::pillsOnNextLinesStayApart()
+{
+    // Code at the start of every line: a paragraph wrapped onto three lines,
+    // then a paragraph right below it.
+    QString words;
+    for (int i = 0; i < 40; ++i) {
+        words += QStringLiteral("code ");
+    }
+    const QJsonArray blocks{
+        paragraph({run(QStringLiteral(" ")), run(words, true)}),
+        paragraph({run(QStringLiteral(" ")), run(QStringLiteral("code"), true)}),
+    };
+    m_edit->setNoteBody(
+        QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("blocks"), blocks}})
+                              .toJson(QJsonDocument::Compact)),
+        {});
+    QCoreApplication::processEvents();
+    const int lines = block(0).layout()->lineCount();
+    QVERIFY(lines >= 3);
+
+    // Row by row through all the pills: each line's pill is its own, with
+    // rows of only the note's background between them.
+    const QAbstractTextDocumentLayout* layout = m_edit->document()->documentLayout();
+    const QImage image = m_edit->viewport()->grab().toImage();
+    const qreal ratio = image.devicePixelRatio();
+    const auto rowHasCode = [&](int y) {
+        for (int x = 0; x < image.width(); ++x) {
+            if (image.pixelColor(x, y) == codeBackground()) {
+                return true;
+            }
+        }
+        return false;
+    };
+    const int top = static_cast<int>((layout->blockBoundingRect(block(0)).top() - 4) * ratio);
+    const int bottom = static_cast<int>((layout->blockBoundingRect(block(1)).bottom() + 4) * ratio);
+    int pills = 0;
+    bool inPill = false;
+    for (int y = std::max(top, 0); y < std::min(bottom, image.height()); ++y) {
+        const bool code = rowHasCode(y);
+        if (code && !inPill) {
+            ++pills;
+        }
+        inPill = code;
+    }
+    QCOMPARE(pills, lines + 1);
 }
 
 QTEST_MAIN(tst_CodeLook)

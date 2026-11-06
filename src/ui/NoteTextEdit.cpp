@@ -79,7 +79,8 @@ void clearCodeSpacing(QTextDocument& document)
     for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
         QTextBlockFormat format = block.blockFormat();
         for (const int property : {QTextFormat::BlockTopMargin, QTextFormat::BlockBottomMargin,
-                                   QTextFormat::BlockLeftMargin, QTextFormat::BlockRightMargin}) {
+                                   QTextFormat::BlockLeftMargin, QTextFormat::BlockRightMargin,
+                                   QTextFormat::LineHeight, QTextFormat::LineHeightType}) {
             format.clearProperty(property);
         }
         cursor.setPosition(block.position());
@@ -852,13 +853,18 @@ QFont markerFont(const QTextBlock& block, const QTextDocument& document)
     return block.charFormat().font().resolve(document.defaultFont());
 }
 
-// Code backgrounds. Inline code: the pill reaches kPillPad past the text, and
-// kInlineGap of space before and after the code (letter spacing on the
-// characters next to it, syncCodeSpacing()) keeps its neighbors off it. A
+// Code backgrounds. Inline code: the pill reaches kPillPad past the text at
+// the sides and kPillPadY above and below the line; kInlineGap of space
+// before and after the code (letter spacing on the characters next to it) and
+// kInlineRoomY above and below each of the paragraph's lines (block format,
+// syncCodeSpacing()) keep its neighbors off it, pills on lines next to each
+// other 2 * (kInlineRoomY - kPillPadY) apart. A
 // code block: its text kPanelPadX inside the panel at the sides and
 // kPanelPadY at the top and bottom, the panel kPanelGap from the text around.
 constexpr qreal kPillPad = 4;
-constexpr qreal kInlineGap = 7;
+constexpr qreal kPillPadY = 1;
+constexpr qreal kInlineRoomY = 2;
+constexpr qreal kInlineGap = 8;
 constexpr qreal kPillRadius = 4;
 constexpr qreal kPanelPadX = 12;
 constexpr qreal kPanelPadY = 8;
@@ -933,11 +939,18 @@ qreal gapAt(const QTextBlock& block, int position)
 QTextBlockFormat spacedFormat(const QTextBlock& block)
 {
     QTextBlockFormat format = block.blockFormat();
-    for (const int property : {QTextFormat::BlockTopMargin, QTextFormat::BlockBottomMargin,
-                               QTextFormat::BlockLeftMargin, QTextFormat::BlockRightMargin}) {
+    for (const int property :
+         {QTextFormat::BlockTopMargin, QTextFormat::BlockBottomMargin, QTextFormat::BlockLeftMargin,
+          QTextFormat::BlockRightMargin, QTextFormat::LineHeight, QTextFormat::LineHeightType}) {
         format.clearProperty(property);
     }
     if (!isCodeBlock(block)) {
+        if (!inlineCode(block).isEmpty()) {
+            // Room for the pills above and below the lines.
+            format.setTopMargin(kInlineRoomY);
+            format.setBottomMargin(kInlineRoomY);
+            format.setLineHeight(2 * kInlineRoomY, QTextBlockFormat::LineDistanceHeight);
+        }
         return format;
     }
     // Its text inside the panel, the panel off its neighbors.
@@ -1007,8 +1020,8 @@ QList<QRectF> pillsFor(const QTextBlock& block, const QPointF& origin)
             }
             const qreal left = line.cursorToX(from) - kPillPad;
             const qreal right = line.cursorToX(to) + kPillPad - (to == range.end ? trailing : 0);
-            pills.append(
-                QRectF(origin.x() + left, origin.y() + line.y(), right - left, line.height()));
+            pills.append(QRectF(origin.x() + left, origin.y() + line.y() - kPillPadY, right - left,
+                                line.height() + (2 * kPillPadY)));
         }
     }
     return pills;
