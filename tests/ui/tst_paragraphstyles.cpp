@@ -64,6 +64,8 @@ private slots:
     void aaMenuButtonsSetInlineFormats();
     void undoRestoresStyleInOneStep();
     void monospacedOnWordsMakesInlineCode();
+    void monospacedTurnsOff();
+    void enterInCodeBlockAddsCodeLines();
     void enterAfterHeadingContinuesInBody();
     void enterOnEmptyLineAddsALine();
     void stylesSurviveSaving();
@@ -420,10 +422,74 @@ void tst_ParagraphStyles::monospacedOnWordsMakesInlineCode()
     monospaced();
     QCOMPARE(styleOfParagraph(0), ParagraphStyle::Monospaced);
     QCOMPARE(styleOfParagraph(1), ParagraphStyle::Monospaced);
-    // Words inside a code block: it stays one.
+    // Words inside a code block: Monospaced turns off, for the paragraph.
     select(6, 9);
     monospaced();
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Body);
+}
+
+// Monospaced turns off the way it turned on, one press (and one Ctrl+Z)
+// at a time; after inline code, typing goes on in plain text.
+void tst_ParagraphStyles::monospacedTurnsOff()
+{
+    openWindow();
+    const auto monospaced = [this] {
+        QTest::keyClick(m_edit, Qt::Key_M, Qt::ControlModifier | Qt::ShiftModifier);
+    };
+    const auto monospacedAt = [this](int position) {
+        QTextCursor cursor(m_edit->document());
+        cursor.setPosition(position + 1); // the format of the character before
+        return StyleManager::isMonospaced(cursor.charFormat());
+    };
+    // A code block, and back.
+    moveToParagraph(1);
+    monospaced();
     QCOMPARE(styleOfParagraph(1), ParagraphStyle::Monospaced);
+    monospaced();
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Body);
+    QTest::keyClick(m_edit, Qt::Key_Z, Qt::ControlModifier);
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Monospaced);
+    QTest::keyClick(m_edit, Qt::Key_Z, Qt::ControlModifier);
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Body);
+
+    // "Packing" (from 5) ends in inline code "ing": typing after it is code
+    // until Monospaced is pressed, then plain text, still in the paragraph.
+    QTextCursor cursor(m_edit->document());
+    cursor.setPosition(9);
+    cursor.setPosition(12, QTextCursor::KeepAnchor);
+    m_edit->setTextCursor(cursor);
+    monospaced();
+    cursor.clearSelection();
+    m_edit->setTextCursor(cursor); // at its end
+    QTest::keyClicks(m_edit, QStringLiteral("s"));
+    QVERIFY(monospacedAt(12));
+    monospaced();
+    QTest::keyClicks(m_edit, QStringLiteral(" ok"));
+    QCOMPARE(m_edit->document()->findBlockByNumber(1).text(), QStringLiteral("Packings ok"));
+    QVERIFY(!monospacedAt(13) && !monospacedAt(15));
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Body);
+}
+
+// Enter in a code block adds code lines, empty ones too; typing there is
+// code. (Qt's Enter on an empty code line only reset its format.)
+void tst_ParagraphStyles::enterInCodeBlockAddsCodeLines()
+{
+    openWindow();
+    moveToParagraph(2);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QTest::keyClick(m_edit, Qt::Key_M, Qt::ControlModifier | Qt::ShiftModifier);
+    QCOMPARE(styleOfParagraph(3), ParagraphStyle::Monospaced);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QTest::keyClick(m_edit, Qt::Key_Return);
+    QTest::keyClicks(m_edit, QStringLiteral("make"));
+    QCOMPARE(m_edit->toPlainText(), QStringLiteral("Trip\nPacking\nPassport\n\n\nmake"));
+    for (const int index : {3, 4, 5}) {
+        QCOMPARE(styleOfParagraph(index), ParagraphStyle::Monospaced);
+    }
+    // One Ctrl+Z per Enter.
+    QTest::keyClick(m_edit, Qt::Key_Z, Qt::ControlModifier); // the typing
+    QTest::keyClick(m_edit, Qt::Key_Z, Qt::ControlModifier);
+    QCOMPARE(m_edit->toPlainText(), QStringLiteral("Trip\nPacking\nPassport\n\n"));
 }
 
 // As in macOS Notes: a new paragraph after a heading is Body; inside a

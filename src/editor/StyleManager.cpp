@@ -703,6 +703,12 @@ void StyleManager::toggleInlineMonospace(QTextCursor& cursor)
     cursor.endEditBlock();
 }
 
+QTextCharFormat StyleManager::withoutMonospace(QTextCharFormat format)
+{
+    clearMonospace(format);
+    return format;
+}
+
 bool StyleManager::isMonospaced(const QTextCharFormat& format)
 {
     if (format.fontFixedPitch()) {

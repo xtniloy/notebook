@@ -318,12 +318,37 @@ void NoteTextEdit::setParagraphStyle(editor::ParagraphStyle style)
         return;
     }
     QTextCursor cursor = textCursor();
-    if (style == editor::ParagraphStyle::Monospaced && editor::StyleManager::selectsWords(cursor)) {
-        // A few words selected: inline code, not a code block.
-        editor::StyleManager::toggleInlineMonospace(cursor);
-    } else {
-        editor::StyleManager::apply(cursor, style);
+    using editor::ParagraphStyle;
+    using editor::StyleManager;
+    if (style == ParagraphStyle::Monospaced) {
+        if (StyleManager::selectsWords(cursor)) {
+            // A few words selected: inline code, not a code block.
+            StyleManager::toggleInlineMonospace(cursor);
+            setTextCursor(cursor);
+            return;
+        }
+        if (!cursor.hasSelection() &&
+            StyleManager::styleOf(cursor.block()) != ParagraphStyle::Monospaced &&
+            StyleManager::isMonospaced(currentCharFormat())) {
+            // Just after inline code: what's typed next is plain text.
+            setCurrentCharFormat(StyleManager::withoutMonospace(currentCharFormat()));
+            return;
+        }
+        // Code blocks already: back to Body.
+        bool allCode = true;
+        const QTextBlock last = document()->findBlock(cursor.selectionEnd());
+        for (QTextBlock block = document()->findBlock(cursor.selectionStart()); block.isValid();
+             block = block.next()) {
+            allCode = allCode && StyleManager::styleOf(block) == ParagraphStyle::Monospaced;
+            if (block == last) {
+                break;
+            }
+        }
+        if (allCode) {
+            style = ParagraphStyle::Body;
+        }
     }
+    StyleManager::apply(cursor, style);
     setTextCursor(cursor);
 }
 
@@ -699,7 +724,7 @@ QString NoteTextEdit::linkToOpenAt(QPointF position, Qt::KeyboardModifiers modif
 
 void NoteTextEdit::typeKey(QKeyEvent* event)
 {
-    if (!isReadOnly() && (headingKey(event) || listKey(event))) {
+    if (!isReadOnly() && (headingKey(event) || listKey(event) || codeKey(event))) {
         event->accept();
         ensureCursorVisible();
         return;
@@ -744,6 +769,29 @@ bool NoteTextEdit::headingKey(const QKeyEvent* event)
         // level but not the font, leaving Body that looks like a heading.)
         cursor.insertBlock(cursor.blockFormat(), cursor.charFormat());
     }
+    cursor.endEditBlock();
+    setTextCursor(cursor);
+    return true;
+}
+
+bool NoteTextEdit::codeKey(const QKeyEvent* event)
+{
+    const bool enter = event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter;
+    QTextCursor cursor = textCursor();
+    if (!enter || (event->modifiers() & ~Qt::KeypadModifier) != Qt::NoModifier ||
+        cursor.currentList() != nullptr ||
+        editor::StyleManager::styleOf(cursor.block()) != editor::ParagraphStyle::Monospaced) {
+        return false;
+    }
+    cursor.beginEditBlock();
+    cursor.removeSelectedText();
+    // Code's own format for the new line; syncCodeSpacing() moves the
+    // panel's spacing.
+    QTextCharFormat code = cursor.charFormat();
+    if (!editor::StyleManager::isMonospaced(code)) {
+        code = cursor.block().charFormat();
+    }
+    cursor.insertBlock(cursor.blockFormat(), code);
     cursor.endEditBlock();
     setTextCursor(cursor);
     return true;

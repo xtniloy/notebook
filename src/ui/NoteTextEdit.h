@@ -95,9 +95,10 @@ public:
     // The style of the paragraph at the cursor (the first one selected).
     [[nodiscard]] editor::ParagraphStyle paragraphStyle() const;
     // Gives the selected paragraphs `style` (StyleManager::apply()): one undo
-    // step. Monospaced for a few words of one paragraph makes them inline code
-    // instead, or plain again (StyleManager::toggleInlineMonospace()). Does
-    // nothing while read-only.
+    // step. Monospaced turns on and off: a few words of one paragraph become
+    // inline code or plain again (StyleManager::toggleInlineMonospace());
+    // after inline code, with nothing selected, typing goes on in plain text;
+    // code blocks become Body again. Does nothing while read-only.
     void setParagraphStyle(editor::ParagraphStyle style);
 
     // Whether the selected text all has `style`, or with nothing selected,
@@ -181,6 +182,10 @@ private:
     // Enter in a heading: at its end a Body paragraph follows, as in macOS
     // Notes; elsewhere it splits into two headings. True if handled.
     bool headingKey(const QKeyEvent* event);
+    // Enter in a code block: the next line is code too, empty lines
+    // included. (Qt's own Enter on an empty line resets its format instead,
+    // as the panel's spacing isn't the default.) True if handled.
+    bool codeKey(const QKeyEvent* event);
     // A key as the editor handles it without links.
     void typeKey(QKeyEvent* event);
     // An address typed before the cursor, made a link once the key that

@@ -147,6 +147,9 @@ public:
     // Makes the selected text monospaced, or plain again when all of it
     // already is, as one undo step.
     static void toggleInlineMonospace(QTextCursor& cursor);
+    // `format` without monospace: what typing after inline code goes on in
+    // once Monospaced is turned off there.
+    [[nodiscard]] static QTextCharFormat withoutMonospace(QTextCharFormat format);
 };
 
 } // namespace notes::editor
