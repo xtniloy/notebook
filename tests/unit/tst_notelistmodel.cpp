@@ -67,6 +67,7 @@ private slots:
     void daysRemaining();
     void sortByTitle();
     void staleResultsAreDropped();
+    void noSecondLoadDuringReset();
 
 private:
     Note addNote(qint64 folderId, const QString& text);
@@ -380,6 +381,22 @@ void tst_NoteListModel::staleResultsAreDropped()
     model.setFolder(m_work);
     settle(model);
     QCOMPARE(rows(model), (QStringList{QStringLiteral("[Today]"), QStringLiteral("Work note")}));
+}
+
+// While a folder's list resets, its first page is on the way already: a view
+// asking for more then (QAbstractItemModelTester does) must not load it again,
+// nor get rows inserted inside the reset when the result is ready at once.
+void tst_NoteListModel::noSecondLoadDuringReset()
+{
+    addNote(m_work, QStringLiteral("A"));
+    NoteListModel model(*m_notes, m_clock);
+    bool couldFetch = true;
+    connect(&model, &QAbstractItemModel::modelReset, this,
+            [&] { couldFetch = model.canFetchMore({}); });
+    model.setFolder(m_work);
+    QVERIFY(!couldFetch);
+    settle(model);
+    QCOMPARE(rows(model), (QStringList{QStringLiteral("[Today]"), QStringLiteral("A")}));
 }
 
 QTEST_MAIN(tst_NoteListModel)

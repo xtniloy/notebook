@@ -91,7 +91,11 @@ void NoteListModel::setFolder(qint64 folderId, NoteSort sort)
     m_rows.clear();
     m_offset = 0;
     m_exhausted = false;
-    m_loading = false;
+    // Loading already: the page is fetched right after the reset. A view (or
+    // QAbstractItemModelTester) calling fetchMore() while the reset ends would
+    // otherwise load it twice, and a result that is ready at once would
+    // insert rows inside the reset.
+    m_loading = true;
     endResetModel();
     fetchPage();
 }
