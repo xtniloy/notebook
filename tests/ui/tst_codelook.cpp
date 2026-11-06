@@ -15,8 +15,9 @@
 #include <QTextFrame>
 #include <QTextLayout>
 
-#include <cmath>
+#include <algorithm>
 #include <memory>
+#include <utility>
 
 using notes::editor::ParagraphStyle;
 using notes::ui::NoteTextEdit;
@@ -69,7 +70,7 @@ private slots:
     void spaceAroundTheBlockOnly();
     void spacingIsNotStored();
     void spacingFollowsStyleChangesAndUndo();
-    void pillsOnNextLinesStayApart();
+    void rightToLeftCodeHasAPill();
 
 private:
     [[nodiscard]] QTextBlock block(int index) const;
@@ -143,16 +144,6 @@ void tst_CodeLook::inlineCodeHasAPill()
     QCOMPARE(pixelAt(0, makeLeft - 3), codeBackground());   // room inside it
     QCOMPARE(pixelAt(0, makeLeft - 6.5), noteBackground()); // and clear of "Run "
     QCOMPARE(pixelAt(0, textLeft(0) - 1.5), noteBackground());
-    // Room above and below the text too: the pill reaches past the line.
-    const QRectF bounds = m_edit->document()->documentLayout()->blockBoundingRect(block(0));
-    const QImage image = m_edit->viewport()->grab().toImage();
-    const qreal ratio = image.devicePixelRatio();
-    // The pixel rows just above and just below the line.
-    const int x = qRound((makeLeft + 1) * ratio);
-    const qreal lineTop = (bounds.top() + line.y()) * ratio;
-    const qreal lineBottom = lineTop + (line.height() * ratio);
-    QCOMPARE(image.pixelColor(x, static_cast<int>(std::ceil(lineTop)) - 1), codeBackground());
-    QCOMPARE(image.pixelColor(x, static_cast<int>(std::floor(lineBottom))), codeBackground());
     // Room after it: its last letter takes more space than the others (all
     // the same width in a monospaced font), so "now" starts clear of the pill.
     const qreal k = line.cursorToX(7) - line.cursorToX(6);
@@ -197,9 +188,7 @@ void tst_CodeLook::spaceAroundTheBlockOnly()
     QCOMPARE(block(3).blockFormat().topMargin(), 0.0);
     QCOMPARE(block(3).blockFormat().bottomMargin(), 0.0);
     QVERIFY(block(4).blockFormat().bottomMargin() > 0); // last line
-    QVERIFY(block(0).blockFormat().topMargin() > 0);    // room for the pill
-    QVERIFY(block(0).blockFormat().bottomMargin() > 0);
-    for (const int index : {1, 5}) {
+    for (const int index : {0, 1, 5}) {                 // 0 has inline code: none above or below it
         QCOMPARE(block(index).blockFormat().topMargin(), 0.0);
         QCOMPARE(block(index).blockFormat().bottomMargin(), 0.0);
     }
@@ -237,51 +226,42 @@ void tst_CodeLook::spacingFollowsStyleChangesAndUndo()
     QCOMPARE(block(4).blockFormat().bottomMargin(), 0.0);
 }
 
-void tst_CodeLook::pillsOnNextLinesStayApart()
+void tst_CodeLook::rightToLeftCodeHasAPill()
 {
-    // Code at the start of every line: a paragraph wrapped onto three lines,
-    // then a paragraph right below it.
-    QString words;
-    for (int i = 0; i < 40; ++i) {
-        words += QStringLiteral("code ");
-    }
+    // Arabic and Hebrew inline code: on screen its end is at its left.
+    const QString arabic = QStringLiteral("مرحبا");
+    const QString hebrew = QStringLiteral("שלום");
     const QJsonArray blocks{
-        paragraph({run(QStringLiteral(" ")), run(words, true)}),
-        paragraph({run(QStringLiteral(" ")), run(QStringLiteral("code"), true)}),
+        paragraph({run(QStringLiteral("Say ")), run(arabic, true), run(QStringLiteral(" and ")),
+                   run(hebrew, true), run(QStringLiteral(" now"))}),
     };
     m_edit->setNoteBody(
         QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("blocks"), blocks}})
                               .toJson(QJsonDocument::Compact)),
         {});
     QCoreApplication::processEvents();
-    const int lines = block(0).layout()->lineCount();
-    QVERIFY(lines >= 3);
 
-    // Row by row through all the pills: each line's pill is its own, with
-    // rows of only the note's background between them.
-    const QAbstractTextDocumentLayout* layout = m_edit->document()->documentLayout();
-    const QImage image = m_edit->viewport()->grab().toImage();
-    const qreal ratio = image.devicePixelRatio();
-    const auto rowHasCode = [&](int y) {
-        for (int x = 0; x < image.width(); ++x) {
-            if (image.pixelColor(x, y) == codeBackground()) {
-                return true;
-            }
+    const QTextLine line = block(0).layout()->lineAt(0);
+    const int arabicStart = 4;
+    const int hebrewStart = arabicStart + static_cast<int>(arabic.size()) + 5;
+    for (const auto& [start, length] : {std::pair{arabicStart, static_cast<int>(arabic.size())},
+                                        std::pair{hebrewStart, static_cast<int>(hebrew.size())}}) {
+        // No gap inside the word: its letters stay together.
+        QTextCursor cursor(m_edit->document());
+        cursor.setPosition(start + length); // after its last letter
+        QVERIFY(!cursor.charFormat().hasProperty(QTextFormat::FontLetterSpacing));
+        // The pill is there: in its reach just past the code's left and right
+        // edges on screen.
+        qreal left = line.cursorToX(start);
+        qreal right = left;
+        for (int position = start + 1; position <= start + length; ++position) {
+            left = std::min(left, line.cursorToX(position));
+            right = std::max(right, line.cursorToX(position));
         }
-        return false;
-    };
-    const int top = static_cast<int>((layout->blockBoundingRect(block(0)).top() - 4) * ratio);
-    const int bottom = static_cast<int>((layout->blockBoundingRect(block(1)).bottom() + 4) * ratio);
-    int pills = 0;
-    bool inPill = false;
-    for (int y = std::max(top, 0); y < std::min(bottom, image.height()); ++y) {
-        const bool code = rowHasCode(y);
-        if (code && !inPill) {
-            ++pills;
-        }
-        inPill = code;
+        QVERIFY(right - left > 10);
+        QCOMPARE(pixelAt(0, textLeft(0) + left - 1.5), codeBackground());
+        QCOMPARE(pixelAt(0, textLeft(0) + right + 1.5), codeBackground());
     }
-    QCOMPARE(pills, lines + 1);
 }
 
 QTEST_MAIN(tst_CodeLook)

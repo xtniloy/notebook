@@ -95,7 +95,9 @@ public:
     // The style of the paragraph at the cursor (the first one selected).
     [[nodiscard]] editor::ParagraphStyle paragraphStyle() const;
     // Gives the selected paragraphs `style` (StyleManager::apply()): one undo
-    // step. Does nothing while read-only.
+    // step. Monospaced for a few words of one paragraph makes them inline code
+    // instead, or plain again (StyleManager::toggleInlineMonospace()). Does
+    // nothing while read-only.
     void setParagraphStyle(editor::ParagraphStyle style);
 
     // Whether the selected text all has `style`, or with nothing selected,

@@ -63,6 +63,7 @@ private slots:
     void aaMenuLooksLikeMacNotes();
     void aaMenuButtonsSetInlineFormats();
     void undoRestoresStyleInOneStep();
+    void monospacedOnWordsMakesInlineCode();
     void enterAfterHeadingContinuesInBody();
     void enterOnEmptyLineAddsALine();
     void stylesSurviveSaving();
@@ -369,6 +370,60 @@ void tst_ParagraphStyles::undoRestoresStyleInOneStep()
     QTest::keyClick(m_edit, Qt::Key_Z, Qt::ControlModifier);
     QCOMPARE(styleOfParagraph(1), ParagraphStyle::Body);
     QCOMPARE(m_edit->toPlainText(), QStringLiteral("Trip\nPacking\nPassport"));
+}
+
+// Monospaced for a few selected words makes them inline code, not the
+// paragraph a code block; whole paragraphs still become code blocks.
+void tst_ParagraphStyles::monospacedOnWordsMakesInlineCode()
+{
+    openWindow();
+    const auto select = [this](int from, int to) {
+        QTextCursor cursor(m_edit->document());
+        cursor.setPosition(from);
+        cursor.setPosition(to, QTextCursor::KeepAnchor);
+        m_edit->setTextCursor(cursor);
+    };
+    const auto monospacedAt = [this](int position) {
+        QTextCursor cursor(m_edit->document());
+        cursor.setPosition(position + 1); // the format of the character before
+        return StyleManager::isMonospaced(cursor.charFormat());
+    };
+    const auto monospaced = [this] {
+        QTest::keyClick(m_edit, Qt::Key_M, Qt::ControlModifier | Qt::ShiftModifier);
+    };
+    // "ack" of "Packing" (paragraph 1, from 5).
+    select(6, 9);
+    monospaced();
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Body);
+    QVERIFY(!monospacedAt(5));
+    QVERIFY(monospacedAt(6) && monospacedAt(8));
+    QVERIFY(!monospacedAt(9));
+    QVERIFY(m_edit->noteBody().contains(QStringLiteral("\"mono\":true")));
+    QCOMPARE(m_edit->toPlainText(), QStringLiteral("Trip\nPacking\nPassport"));
+
+    // Again: plain text again; and one Ctrl+Z undoes each.
+    monospaced();
+    QVERIFY(!monospacedAt(6) && !monospacedAt(8));
+    QTest::keyClick(m_edit, Qt::Key_Z, Qt::ControlModifier);
+    QVERIFY(monospacedAt(6) && monospacedAt(8));
+    QTest::keyClick(m_edit, Qt::Key_Z, Qt::ControlModifier);
+    QVERIFY(!monospacedAt(6));
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Body);
+
+    // The whole paragraph selected: a code block.
+    select(5, 12);
+    monospaced();
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Monospaced);
+    // Across paragraphs, even partly: code blocks too.
+    QTest::keyClick(m_edit, Qt::Key_B, Qt::ControlModifier | Qt::ShiftModifier);
+    select(2, 8);
+    monospaced();
+    QCOMPARE(styleOfParagraph(0), ParagraphStyle::Monospaced);
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Monospaced);
+    // Words inside a code block: it stays one.
+    select(6, 9);
+    monospaced();
+    QCOMPARE(styleOfParagraph(1), ParagraphStyle::Monospaced);
 }
 
 // As in macOS Notes: a new paragraph after a heading is Body; inside a

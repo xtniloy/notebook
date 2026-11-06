@@ -645,6 +645,64 @@ void StyleManager::setInline(QTextCursor& cursor, InlineStyle style, bool on)
     cursor.endEditBlock();
 }
 
+bool StyleManager::selectsWords(const QTextCursor& cursor)
+{
+    const QTextDocument* document = cursor.document();
+    if (document == nullptr || !cursor.hasSelection()) {
+        return false;
+    }
+    const QTextBlock block = document->findBlock(cursor.selectionStart());
+    const int textEnd = block.position() + block.length() - 1;
+    if (cursor.selectionEnd() > textEnd || styleOf(block) == ParagraphStyle::Monospaced) {
+        return false; // more than one paragraph, or code already
+    }
+    return cursor.selectionStart() > block.position() || cursor.selectionEnd() < textEnd;
+}
+
+void StyleManager::toggleInlineMonospace(QTextCursor& cursor)
+{
+    const QTextDocument* document = cursor.document();
+    if (document == nullptr || !cursor.hasSelection()) {
+        return;
+    }
+    const int start = cursor.selectionStart();
+    const int end = cursor.selectionEnd();
+    struct Run
+    {
+        int start = 0;
+        int end = 0;
+        QTextCharFormat format;
+    };
+    QList<Run> runs; // the selected part of each fragment, collected first
+    bool allMonospaced = true;
+    for (QTextBlock block = document->findBlock(start); block.isValid() && block.position() < end;
+         block = block.next()) {
+        for (QTextBlock::iterator it = block.begin(); !it.atEnd(); ++it) {
+            const QTextFragment fragment = it.fragment();
+            const int from = std::max(start, fragment.position());
+            const int to = std::min(end, fragment.position() + fragment.length());
+            if (from >= to || fragment.charFormat().isImageFormat()) {
+                continue;
+            }
+            runs.append({.start = from, .end = to, .format = fragment.charFormat()});
+            allMonospaced = allMonospaced && isMonospaced(fragment.charFormat());
+        }
+    }
+    cursor.beginEditBlock();
+    for (Run& run : runs) {
+        clearMonospace(run.format);
+        if (!allMonospaced) {
+            run.format.setFontFixedPitch(true);
+            run.format.setFontFamilies(QStringList{QString(kMonospaceFamily)});
+        }
+        QTextCursor part(cursor.document());
+        part.setPosition(run.start);
+        part.setPosition(run.end, QTextCursor::KeepAnchor);
+        part.setCharFormat(run.format);
+    }
+    cursor.endEditBlock();
+}
+
 bool StyleManager::isMonospaced(const QTextCharFormat& format)
 {
     if (format.fontFixedPitch()) {

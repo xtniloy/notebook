@@ -79,8 +79,7 @@ void clearCodeSpacing(QTextDocument& document)
     for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
         QTextBlockFormat format = block.blockFormat();
         for (const int property : {QTextFormat::BlockTopMargin, QTextFormat::BlockBottomMargin,
-                                   QTextFormat::BlockLeftMargin, QTextFormat::BlockRightMargin,
-                                   QTextFormat::LineHeight, QTextFormat::LineHeightType}) {
+                                   QTextFormat::BlockLeftMargin, QTextFormat::BlockRightMargin}) {
             format.clearProperty(property);
         }
         cursor.setPosition(block.position());
@@ -340,7 +339,12 @@ void NoteTextEdit::setParagraphStyle(editor::ParagraphStyle style)
         return;
     }
     QTextCursor cursor = textCursor();
-    editor::StyleManager::apply(cursor, style);
+    if (style == editor::ParagraphStyle::Monospaced && editor::StyleManager::selectsWords(cursor)) {
+        // A few words selected: inline code, not a code block.
+        editor::StyleManager::toggleInlineMonospace(cursor);
+    } else {
+        editor::StyleManager::apply(cursor, style);
+    }
     setTextCursor(cursor);
 }
 
@@ -853,17 +857,12 @@ QFont markerFont(const QTextBlock& block, const QTextDocument& document)
     return block.charFormat().font().resolve(document.defaultFont());
 }
 
-// Code backgrounds. Inline code: the pill reaches kPillPad past the text at
-// the sides and kPillPadY above and below the line; kInlineGap of space
-// before and after the code (letter spacing on the characters next to it) and
-// kInlineRoomY above and below each of the paragraph's lines (block format,
-// syncCodeSpacing()) keep its neighbors off it, pills on lines next to each
-// other 2 * (kInlineRoomY - kPillPadY) apart. A
-// code block: its text kPanelPadX inside the panel at the sides and
+// Code backgrounds. Inline code: the pill, one line tall, reaches kPillPad
+// past the text at the sides, and kInlineGap of space before and after the
+// code (letter spacing on the characters next to it, syncCodeSpacing()) keeps
+// its neighbors off it. A code block: its text kPanelPadX inside the panel at the sides and
 // kPanelPadY at the top and bottom, the panel kPanelGap from the text around.
 constexpr qreal kPillPad = 4;
-constexpr qreal kPillPadY = 1;
-constexpr qreal kInlineRoomY = 2;
 constexpr qreal kInlineGap = 8;
 constexpr qreal kPillRadius = 4;
 constexpr qreal kPanelPadX = 12;
@@ -939,18 +938,11 @@ qreal gapAt(const QTextBlock& block, int position)
 QTextBlockFormat spacedFormat(const QTextBlock& block)
 {
     QTextBlockFormat format = block.blockFormat();
-    for (const int property :
-         {QTextFormat::BlockTopMargin, QTextFormat::BlockBottomMargin, QTextFormat::BlockLeftMargin,
-          QTextFormat::BlockRightMargin, QTextFormat::LineHeight, QTextFormat::LineHeightType}) {
+    for (const int property : {QTextFormat::BlockTopMargin, QTextFormat::BlockBottomMargin,
+                               QTextFormat::BlockLeftMargin, QTextFormat::BlockRightMargin}) {
         format.clearProperty(property);
     }
     if (!isCodeBlock(block)) {
-        if (!inlineCode(block).isEmpty()) {
-            // Room for the pills above and below the lines.
-            format.setTopMargin(kInlineRoomY);
-            format.setBottomMargin(kInlineRoomY);
-            format.setLineHeight(2 * kInlineRoomY, QTextBlockFormat::LineDistanceHeight);
-        }
         return format;
     }
     // Its text inside the panel, the panel off its neighbors.
@@ -965,17 +957,35 @@ QTextBlockFormat spacedFormat(const QTextBlock& block)
     return format;
 }
 
+// Whether a gap may follow `character`. Not in right-to-left text: Qt puts
+// letter spacing at a letter's right, inside the word there, and a letter
+// that joins its neighbors (Arabic) joins only those with the same format.
+bool takesGap(QChar character)
+{
+    const QChar::Direction direction = character.direction();
+    const QChar::JoiningType joining = character.joiningType();
+    return direction != QChar::DirR && direction != QChar::DirAL &&
+           (joining == QChar::Joining_None || joining == QChar::Joining_Transparent);
+}
+
 // The characters of `block` whose letter spacing isn't what inline code
-// wants (a gap after the character before the code and after its last), with
-// the format each should have.
+// wants (a gap after the character before the code and after its last, in
+// left-to-right text only), with the format each should have.
 QList<std::pair<int, QTextCharFormat>> gapChanges(const QTextBlock& block)
 {
+    const QString text = block.text();
+    const bool leftToRight = block.textDirection() == Qt::LeftToRight;
     QList<int> gaps;
+    const auto gapAfter = [&](int offset) {
+        if (leftToRight && takesGap(text.at(offset))) {
+            gaps.append(block.position() + offset);
+        }
+    };
     for (const CodeRange& range : inlineCode(block)) {
         if (range.start > 0) {
-            gaps.append(block.position() + range.start - 1);
+            gapAfter(range.start - 1);
         }
-        gaps.append(block.position() + range.end - 1);
+        gapAfter(range.end - 1);
     }
     QList<std::pair<int, QTextCharFormat>> changes;
     for (auto it = block.begin(); !it.atEnd(); ++it) {
@@ -1018,10 +1028,20 @@ QList<QRectF> pillsFor(const QTextBlock& block, const QPointF& origin)
             if (from >= to) {
                 continue;
             }
-            const qreal left = line.cursorToX(from) - kPillPad;
-            const qreal right = line.cursorToX(to) + kPillPad - (to == range.end ? trailing : 0);
-            pills.append(QRectF(origin.x() + left, origin.y() + line.y() - kPillPadY, right - left,
-                                line.height() + (2 * kPillPadY)));
+            // Where the code is on screen: its edges, whatever the direction
+            // of its text (right to left: its end is at the left).
+            qreal left = line.cursorToX(from);
+            qreal right = left;
+            for (int position = from + 1; position <= to; ++position) {
+                const qreal x = line.cursorToX(position);
+                left = std::min(left, x);
+                right = std::max(right, x);
+            }
+            if (to == range.end) {
+                right -= trailing; // the gap, at the right of the last letter
+            }
+            pills.append(QRectF(origin.x() + left - kPillPad, origin.y() + line.y(),
+                                right - left + (2 * kPillPad), line.height()));
         }
     }
     return pills;

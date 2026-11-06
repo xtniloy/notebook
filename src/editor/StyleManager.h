@@ -139,6 +139,14 @@ public:
     // Bold skips headings: their bold is the style's (and isn't stored), so
     // the user's bold or not-bold wouldn't survive saving there.
     static void setInline(QTextCursor& cursor, InlineStyle style, bool on);
+
+    // Inline code. Whether Monospaced, chosen for the cursor's selection,
+    // means its words rather than its paragraph: the selection is part of one
+    // paragraph's text, and that paragraph isn't code already.
+    [[nodiscard]] static bool selectsWords(const QTextCursor& cursor);
+    // Makes the selected text monospaced, or plain again when all of it
+    // already is, as one undo step.
+    static void toggleInlineMonospace(QTextCursor& cursor);
 };
 
 } // namespace notes::editor
