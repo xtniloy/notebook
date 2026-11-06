@@ -214,8 +214,8 @@ private:
     void paintCodeBackgrounds();
     // The room code needs (not stored: NoteFormat keeps neither): margins on
     // Monospaced paragraphs, for the panel's padding and its distance from the
-    // text around it, and letter spacing on the characters just before and at
-    // the end of inline code, so its neighbors stay off the pill. Kept up to
+    // text around it, and on paragraphs with inline code more space above and
+    // below each line, for the pills' top and bottom. Kept up to
     // date after every change, as part of that change's undo step
     // (`joinUndo`), or outside the history when a note is loaded. Copies for
     // other apps leave it out.

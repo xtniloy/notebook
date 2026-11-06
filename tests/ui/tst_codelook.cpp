@@ -16,6 +16,7 @@
 #include <QTextLayout>
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <utility>
 
@@ -71,6 +72,7 @@ private slots:
     void spacingIsNotStored();
     void spacingFollowsStyleChangesAndUndo();
     void rightToLeftCodeHasAPill();
+    void pillsOnNextLinesStayApart();
 
 private:
     [[nodiscard]] QTextBlock block(int index) const;
@@ -137,20 +139,35 @@ QColor tst_CodeLook::noteBackground() const
 void tst_CodeLook::inlineCodeHasAPill()
 {
     // "Run make now": just before "make" (in the pill's reach past the
-    // text), and just before "Run" (plain text) at the same distance.
+    // text, its soft edge), and well before it (plain text).
     const QTextLine line = block(0).layout()->lineAt(0);
     const qreal makeLeft = textLeft(0) + line.cursorToX(4);
-    QCOMPARE(pixelAt(0, makeLeft - 1.5), codeBackground());
-    QCOMPARE(pixelAt(0, makeLeft - 3), codeBackground());   // room inside it
-    QCOMPARE(pixelAt(0, makeLeft - 6.5), noteBackground()); // and clear of "Run "
+    QVERIFY(pixelAt(0, makeLeft - 1) != noteBackground());
     QCOMPARE(pixelAt(0, textLeft(0) - 1.5), noteBackground());
-    // Room after it: its last letter takes more space than the others (all
-    // the same width in a monospaced font), so "now" starts clear of the pill.
+    // Room above and below the text: the pill reaches past the line. The
+    // pixel rows just above and just below it.
+    const QRectF bounds = m_edit->document()->documentLayout()->blockBoundingRect(block(0));
+    const QImage image = m_edit->viewport()->grab().toImage();
+    const qreal ratio = image.devicePixelRatio();
+    const int x = qRound((textLeft(0) + line.cursorToX(6)) * ratio); // mid-code
+    const qreal lineTop = (bounds.top() + line.y()) * ratio;
+    const qreal lineBottom = lineTop + (line.height() * ratio);
+    QCOMPARE(image.pixelColor(x, static_cast<int>(std::ceil(lineTop)) - 1), codeBackground());
+    QCOMPARE(image.pixelColor(x, static_cast<int>(std::floor(lineBottom))), codeBackground());
+    // It reaches only a little past the text: above the "n" before, no pill.
+    QCOMPARE(image.pixelColor(qRound((makeLeft - 3.5) * ratio),
+                              static_cast<int>(std::ceil(lineTop)) - 1),
+             noteBackground());
+    // No space added beside it: the letters around it are as wide as ever
+    // (the code's all the same width, a monospaced font), so a selection or
+    // the caret ends where the text does.
     const qreal k = line.cursorToX(7) - line.cursorToX(6);
     const qreal e = line.cursorToX(8) - line.cursorToX(7);
-    QVERIFY2(e - k > 5, qPrintable(QStringLiteral("%1 vs %2").arg(e).arg(k)));
-    // The room isn't stored either.
-    QVERIFY(!m_edit->noteBody().contains(QStringLiteral("pacing")));
+    QVERIFY2(qAbs(e - k) < 0.5, qPrintable(QStringLiteral("%1 vs %2").arg(e).arg(k)));
+    QTextCursor caret(m_edit->document());
+    caret.setPosition(8);
+    m_edit->setTextCursor(caret);
+    QVERIFY(qAbs(m_edit->cursorRect().left() - (textLeft(0) + line.cursorToX(7) + k)) <= 1);
 }
 
 void tst_CodeLook::codeBlockHasOnePanel()
@@ -188,7 +205,9 @@ void tst_CodeLook::spaceAroundTheBlockOnly()
     QCOMPARE(block(3).blockFormat().topMargin(), 0.0);
     QCOMPARE(block(3).blockFormat().bottomMargin(), 0.0);
     QVERIFY(block(4).blockFormat().bottomMargin() > 0); // last line
-    for (const int index : {0, 1, 5}) {                 // 0 has inline code: none above or below it
+    QVERIFY(block(0).blockFormat().topMargin() > 0);    // inline code: room for the pill
+    QVERIFY(block(0).blockFormat().bottomMargin() > 0);
+    for (const int index : {1, 5}) {
         QCOMPARE(block(index).blockFormat().topMargin(), 0.0);
         QCOMPARE(block(index).blockFormat().bottomMargin(), 0.0);
     }
@@ -259,9 +278,57 @@ void tst_CodeLook::rightToLeftCodeHasAPill()
             right = std::max(right, line.cursorToX(position));
         }
         QVERIFY(right - left > 10);
-        QCOMPARE(pixelAt(0, textLeft(0) + left - 1.5), codeBackground());
-        QCOMPARE(pixelAt(0, textLeft(0) + right + 1.5), codeBackground());
+        // Their soft edges (the pill reaches 2px past the text).
+        QVERIFY(pixelAt(0, textLeft(0) + left - 1) != noteBackground());
+        QVERIFY(pixelAt(0, textLeft(0) + right + 1) != noteBackground());
     }
+}
+
+void tst_CodeLook::pillsOnNextLinesStayApart()
+{
+    // Code at the start of every line: a paragraph wrapped onto three lines,
+    // then a paragraph right below it.
+    QString words;
+    for (int i = 0; i < 40; ++i) {
+        words += QStringLiteral("code ");
+    }
+    const QJsonArray blocks{
+        paragraph({run(QStringLiteral(" ")), run(words, true)}),
+        paragraph({run(QStringLiteral(" ")), run(QStringLiteral("code"), true)}),
+    };
+    m_edit->setNoteBody(
+        QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("blocks"), blocks}})
+                              .toJson(QJsonDocument::Compact)),
+        {});
+    QCoreApplication::processEvents();
+    const int lines = block(0).layout()->lineCount();
+    QVERIFY(lines >= 3);
+
+    // Row by row through all the pills: each line's pill is its own, with
+    // rows of only the note's background between them.
+    const QAbstractTextDocumentLayout* layout = m_edit->document()->documentLayout();
+    const QImage image = m_edit->viewport()->grab().toImage();
+    const qreal ratio = image.devicePixelRatio();
+    const auto rowHasCode = [&](int y) {
+        for (int x = 0; x < image.width(); ++x) {
+            if (image.pixelColor(x, y) == codeBackground()) {
+                return true;
+            }
+        }
+        return false;
+    };
+    const int top = static_cast<int>((layout->blockBoundingRect(block(0)).top() - 4) * ratio);
+    const int bottom = static_cast<int>((layout->blockBoundingRect(block(1)).bottom() + 4) * ratio);
+    int pills = 0;
+    bool inPill = false;
+    for (int y = std::max(top, 0); y < std::min(bottom, image.height()); ++y) {
+        const bool code = rowHasCode(y);
+        if (code && !inPill) {
+            ++pills;
+        }
+        inPill = code;
+    }
+    QCOMPARE(pills, lines + 1);
 }
 
 QTEST_MAIN(tst_CodeLook)
