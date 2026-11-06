@@ -53,6 +53,7 @@ private slots:
     void onlyAllowedLinksOpen_data();
     void onlyAllowedLinksOpen();
     void linksAreDrawnAsLinks();
+    void linksFarDownAreDrawnInView();
 
 private:
     // Types `text` into the editor, key by key.
@@ -252,6 +253,34 @@ void tst_LinkEditing::linksAreDrawnAsLinks()
     // Drawn so, not stored: the body has no color or underline.
     QVERIFY(!m_edit->noteBody().contains(QStringLiteral("\"u\"")));
     QVERIFY(!m_edit->noteBody().contains(QStringLiteral("\"fg\"")));
+}
+
+// The link look is drawn for the paragraphs in view (task 3.11: a long note
+// opens without Qt laying all of it out at once): a link far down gets it
+// once scrolled to.
+void tst_LinkEditing::linksFarDownAreDrawnInView()
+{
+    QJsonArray blocks;
+    for (int i = 0; i < 400; ++i) {
+        blocks.append(QJsonObject{
+            {QStringLiteral("runs"),
+             QJsonArray{QJsonObject{{QStringLiteral("text"), QStringLiteral("Line %1").arg(i)}}}}});
+    }
+    const QJsonArray link{
+        QJsonObject{{QStringLiteral("text"), QStringLiteral("there")},
+                    {QStringLiteral("href"), QStringLiteral("https://example.com")}}};
+    blocks.append(QJsonObject{{QStringLiteral("runs"), link}});
+    m_edit->setNoteBody(
+        QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("blocks"), blocks}})
+                              .toJson(QJsonDocument::Compact)),
+        {});
+    QCoreApplication::processEvents();
+    QVERIFY(m_edit->extraSelections().isEmpty()); // far out of view
+
+    m_edit->moveCursor(QTextCursor::End);
+    m_edit->ensureCursorVisible();
+    QTRY_COMPARE(m_edit->extraSelections().size(), 1);
+    QCOMPARE(m_edit->extraSelections().first().cursor.selectedText(), QStringLiteral("there"));
 }
 
 QTEST_MAIN(tst_LinkEditing)

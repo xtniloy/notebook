@@ -683,8 +683,8 @@ _Notes:_ a checklist is a list with our `kChecklistProperty` (stored as list sty
 
 ### 3.11 Editor performance `S`
 
-- [ ] Benchmark typing in a 50,000-word note with images
-- [ ] Profile with `perf` if slow; common fixes: avoid re-deriving title on every keystroke, defer heavy work to autosave
+- [x] Benchmark typing in a 50,000-word note with images *(`tests/bench/bench_editor.cpp`: 50,000 words in 3,240 paragraphs with headings, lists, checklists, inline code, links, code blocks and 20 images, 459 KB stored. Release, headless: opening ~41 ms median (was ~280 ms), a keystroke to the repainted editor 2.5 ms mean, under 7 ms at worst (was 7.2 ms mean, 11.9 ms worst))*
+- [x] Profile with `perf` if slow; common fixes: avoid re-deriving title on every keystroke, defer heavy work to autosave *(`perf` isn't in the dev container; timed each step instead. Opening: loading the note was laid out after every paragraph, then three more times (code spacing, frame padding, a full re-layout), and the link look asked for every link's place, so Qt laid out all of it at once. Now loading is one edit, the re-layout is only for an empty note, and the link and checked-item look covers the paragraphs in view (updated on scrolling and resizing), so Qt lays out a long note in the background after the first screen. Typing: the code spacing went over every paragraph after each key; now only the changed paragraphs and their neighbors. The title is derived on saving, not per key, already)*
 
 **Tests**
 - `TC-PERF-002` (P) Keystroke-to-paint < 16 ms in a 50,000-word note.

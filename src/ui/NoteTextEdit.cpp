@@ -136,6 +136,22 @@ NoteTextEdit::NoteTextEdit(QWidget* parent)
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     connect(document(), &QTextDocument::contentsChanged, this,
             &NoteTextEdit::scheduleTextDecorations);
+    connect(document(), &QTextDocument::contentsChange, this,
+            [this](int position, int removed, int added) {
+                if (m_changedFrom < 0) {
+                    m_changedFrom = position;
+                    m_changedTo = position + added;
+                    return;
+                }
+                if (m_changedTo >= position) {
+                    m_changedTo = std::max(position, m_changedTo - removed) + added;
+                }
+                m_changedFrom = std::min(m_changedFrom, position);
+                m_changedTo = std::max(m_changedTo, position + added);
+            });
+    // The link look and gray checked items are for the paragraphs in view.
+    connect(verticalScrollBar(), &QScrollBar::valueChanged, this,
+            &NoteTextEdit::updateTextDecorations);
     // Images fit the text width (task 3.7).
     m_imageObject->registerOn(*document());
 }
@@ -165,6 +181,11 @@ void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText,
     }
     // No cursors of ours in the document while it's cleared and refilled.
     setExtraSelections({});
+    // One edit, so Qt lays the note out once it's all there (a long one in
+    // the background, the first screen first), not after every paragraph:
+    // a 50,000-word note opened in about 280 ms, now about 40 (task 3.11).
+    QTextCursor batch(document());
+    batch.beginEditBlock();
     editor::NoteFormat::load(body, plainText, *document());
     if (document()->isEmpty()) {
         // A new (empty) note starts with its title, as in macOS Notes (task
@@ -175,13 +196,17 @@ void NoteTextEdit::setNoteBody(const QString& body, const QString& plainText,
         editor::StyleManager::styleHeadings(*document());
     }
     syncCodeSpacing(false);
+    batch.endEditBlock();
     // Loading isn't an edit: start the note with no undo history.
     document()->clearUndoRedoStacks();
     applyFramePadding();
-    // Filled directly rather than through setPlainText(), an empty document's
-    // only line was left without a layout, and Qt draws no caret there: a new
-    // note showed no caret until the first key. Lay it all out again.
-    document()->markContentsDirty(0, document()->characterCount());
+    if (document()->characterCount() <= 1) {
+        // Filled directly rather than through setPlainText(), an empty
+        // document's only line was left without a layout, and Qt draws no
+        // caret there: a new note showed no caret until the first key.
+        document()->markContentsDirty(0, document()->characterCount());
+    }
+    m_changedFrom = -1;      // all synced above
     updateTextDecorations(); // grayed from the start, not a moment later
 }
 
@@ -869,6 +894,12 @@ std::optional<editor::ParagraphStyle> NoteTextEdit::listMarker(const QKeyEvent* 
     return std::nullopt;
 }
 
+void NoteTextEdit::resizeEvent(QResizeEvent* event)
+{
+    QTextEdit::resizeEvent(event);
+    updateTextDecorations(); // other paragraphs may be in view now
+}
+
 void NoteTextEdit::paintEvent(QPaintEvent* event)
 {
     paintCodeBackgrounds(); // behind the text
@@ -1071,6 +1102,29 @@ void NoteTextEdit::paintCodeBackgrounds()
 
 void NoteTextEdit::syncCodeSpacing(bool joinUndo)
 {
+    syncCodeSpacing(joinUndo, document()->begin(), document()->lastBlock());
+}
+
+void NoteTextEdit::syncChangedCodeSpacing()
+{
+    if (m_changedFrom < 0) {
+        return;
+    }
+    const int last = document()->characterCount() - 1;
+    QTextBlock first = document()->findBlock(std::clamp(m_changedFrom, 0, last));
+    QTextBlock end = document()->findBlock(std::clamp(m_changedTo, 0, last));
+    m_changedFrom = -1;
+    if (first.previous().isValid()) {
+        first = first.previous();
+    }
+    if (end.next().isValid()) {
+        end = end.next();
+    }
+    syncCodeSpacing(true, first, end);
+}
+
+void NoteTextEdit::syncCodeSpacing(bool joinUndo, const QTextBlock& first, const QTextBlock& last)
+{
     QTextCursor cursor(document());
     bool editing = false;
     const auto edit = [&] {
@@ -1079,7 +1133,9 @@ void NoteTextEdit::syncCodeSpacing(bool joinUndo)
             editing = true;
         }
     };
-    for (QTextBlock block = document()->begin(); block.isValid(); block = block.next()) {
+    const int end = last.blockNumber();
+    for (QTextBlock block = first; block.isValid() && block.blockNumber() <= end;
+         block = block.next()) {
         if (const QTextBlockFormat format = spacedFormat(block); format != block.blockFormat()) {
             edit();
             cursor.setPosition(block.position());
@@ -1298,7 +1354,7 @@ void NoteTextEdit::scheduleTextDecorations()
         [this] {
             m_decorationsPending = false;
             if (!isReadOnly()) {
-                syncCodeSpacing(true);
+                syncChangedCodeSpacing();
             }
             updateTextDecorations();
         },
@@ -1313,7 +1369,14 @@ void NoteTextEdit::updateTextDecorations()
     link.setForeground(palette().color(QPalette::Link));
     link.setFontUnderline(true);
     QList<ExtraSelection> selections;
-    for (QTextBlock block = document()->begin(); block.isValid(); block = block.next()) {
+    // Only the paragraphs in view (and a screen's worth around): asking Qt
+    // where text far away is would make it lay the whole note out at once.
+    const QAbstractTextDocumentLayout* layout = document()->documentLayout();
+    const int height = viewport()->height();
+    const qreal bottom = verticalScrollBar()->value() + (2.0 * height);
+    QTextBlock block = cursorForPosition(QPoint(0, -height)).block();
+    for (; block.isValid() && layout->blockBoundingRect(block).top() <= bottom;
+         block = block.next()) {
         if (block.length() > 1 && editor::StyleManager::isChecked(block)) {
             QTextCursor text(block);
             text.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);

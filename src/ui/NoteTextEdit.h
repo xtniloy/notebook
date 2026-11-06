@@ -149,6 +149,7 @@ protected:
     void insertFromMimeData(const QMimeData* source) override;
     void keyPressEvent(QKeyEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
@@ -225,12 +226,18 @@ private:
     // (`joinUndo`), or outside the history when a note is loaded. Copies for
     // other apps leave it out.
     void syncCodeSpacing(bool joinUndo);
+    // The same for the paragraphs that changed since the last time (and the
+    // ones next to them, whose spacing depends on them), so a keystroke in a
+    // long note doesn't go over all of it.
+    void syncChangedCodeSpacing();
+    void syncCodeSpacing(bool joinUndo, const QTextBlock& first, const QTextBlock& last);
     // The checklist item whose checkbox is at `position` (viewport
     // coordinates), if any.
     [[nodiscard]] QTextBlock checkboxAt(QPointF position) const;
     void paintCheckbox(QPainter& painter, const QRectF& box, bool checked) const;
     // Checked items' text is grayed and links take the link color, drawn so,
-    // not stored (extra selections).
+    // not stored (extra selections). For the paragraphs in view and around
+    // them; scrolling and resizing update them.
     void updateTextDecorations();
     // Updates them after the current change, from the event loop.
     // Never from inside the document's signals: QTextDocument::clear() emits
@@ -256,6 +263,10 @@ private:
     bool m_moveCheckedToBottom = false;
     bool m_overClickable = false; // the pointer shows a hand there
     bool m_decorationsPending = false;
+    // The part of the document changed since the code spacing was last
+    // synced (document positions); -1: nothing.
+    int m_changedFrom = -1;
+    int m_changedTo = -1;
     // The checkbox a left button press went to: the click is ours from press
     // to release (Qt sees none of it), and toggles if released on it too.
     QTextBlock m_pressedCheckbox;
